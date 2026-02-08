@@ -45,7 +45,7 @@ export const UpcomingRenewals = ({
         <p className="empty-note">No renewals in this window.</p>
       ) : (
         <ul className="renewal-list">
-          {renewals.map((subscription, index) => {
+          {renewals.map((subscription) => {
             const dueInDays = Math.max(0, daysUntil(subscription.nextBillingDate));
             const urgencyClass =
               dueInDays === 0 ? "due-now" : dueInDays <= 3 ? "due-soon" : "due-later";
@@ -54,13 +54,16 @@ export const UpcomingRenewals = ({
               <li
                 key={`${subscription.id}-${subscription.nextBillingDate}`}
                 className={`renewal-item ${urgencyClass}`}
-                style={{ animationDelay: `${60 + index * 45}ms` }}
               >
-                <div>
+                <div className="renewal-main">
                   <h3>{subscription.name}</h3>
-                  <p>{formatRelativeDue(dueInDays)}</p>
+                  <p>{subscription.nextBillingDate}</p>
                 </div>
-                <strong>{formatCurrencyMinor(subscription.amountMinor, currency)}</strong>
+
+                <div className="renewal-side">
+                  <strong>{formatCurrencyMinor(subscription.amountMinor, currency)}</strong>
+                  <span className={`due-pill ${urgencyClass}`}>{formatRelativeDue(dueInDays)}</span>
+                </div>
               </li>
             );
           })}

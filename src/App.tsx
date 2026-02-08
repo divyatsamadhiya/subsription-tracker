@@ -11,7 +11,7 @@ import {
   getUpcomingRenewals,
   nowIsoDate
 } from "./lib/date";
-import { formatRelativeDue } from "./lib/format";
+import { formatCurrencyMinor, formatRelativeDue } from "./lib/format";
 import { downloadTextFile, generateSubscriptionIcs } from "./lib/ics";
 import {
   collectReminderHits,
@@ -238,10 +238,10 @@ const App = () => {
     <main className="app-shell">
       <header className="topbar panel">
         <div className="topbar-copy">
-          <p className="eyebrow">Local-first finance toolkit</p>
-          <h1>Pulseboard Subscription Tracker</h1>
+          <p className="eyebrow">Pulseboard Bento Experience</p>
+          <h1>Subscription intelligence, designed for focus</h1>
           <p className="topbar-subtitle">
-            One clear section at a time: monitor, manage, and backup without clutter.
+            Clear monthly visibility, upcoming-renewal awareness, and quick control over every active service.
           </p>
         </div>
 
@@ -263,17 +263,63 @@ const App = () => {
       {notice ? <p className="banner">{notice}</p> : null}
 
       {activeView === "overview" ? (
-        <div className="overview-stack">
-          <StatCards
-            monthlyTotalMinor={monthlyTotalMinor}
-            yearlyTotalMinor={yearlyTotalMinor}
-            activeCount={activeSubscriptions.length}
-            currency={settings.defaultCurrency}
-          />
+        <div className="overview-grid">
+          <section className="panel highlight-card" aria-labelledby="focus-title">
+            <p className="highlight-label">Current spending pulse</p>
+            <h2 id="focus-title">{formatCurrencyMinor(monthlyTotalMinor, settings.defaultCurrency)}</h2>
+            <p>
+              Monthly baseline with <strong>{activeSubscriptions.length}</strong> active services.
+            </p>
+            <p className="highlight-muted">
+              Yearly projection: {formatCurrencyMinor(yearlyTotalMinor, settings.defaultCurrency)}
+            </p>
 
-          {reminderHits.length > 0 ? (
-            <section className="panel reminder-panel" aria-label="Today reminders">
+            <div className="highlight-actions">
+              <button
+                type="button"
+                className="primary-btn"
+                onClick={() => {
+                  setEditingId(null);
+                  setActiveView("subscriptions");
+                }}
+              >
+                Add subscription
+              </button>
+              <button type="button" className="ghost-btn" onClick={() => setActiveView("settings")}>
+                Open settings
+              </button>
+            </div>
+          </section>
+
+          <section className="panel stats-shell" aria-labelledby="summary-title">
+            <div className="panel-head">
+              <h2 id="summary-title">Spend summary</h2>
+            </div>
+            <StatCards
+              monthlyTotalMinor={monthlyTotalMinor}
+              yearlyTotalMinor={yearlyTotalMinor}
+              activeCount={activeSubscriptions.length}
+              currency={settings.defaultCurrency}
+            />
+          </section>
+
+          <div className="renewals-shell">
+            <UpcomingRenewals
+              renewals={renewals}
+              currency={settings.defaultCurrency}
+              windowDays={upcomingWindow}
+              onWindowChange={setUpcomingWindow}
+            />
+          </div>
+
+          <section className="panel reminder-panel" aria-label="Today reminders">
+            <div className="panel-head">
               <h2>Reminder center</h2>
+            </div>
+
+            {reminderHits.length === 0 ? (
+              <p className="empty-note">No reminder triggers for today.</p>
+            ) : (
               <ul className="reminder-list">
                 {reminderHits.map((hit) => {
                   const normalizedDays = Math.max(
@@ -288,39 +334,7 @@ const App = () => {
                   );
                 })}
               </ul>
-            </section>
-          ) : null}
-
-          <UpcomingRenewals
-            renewals={renewals}
-            currency={settings.defaultCurrency}
-            windowDays={upcomingWindow}
-            onWindowChange={setUpcomingWindow}
-          />
-
-          <section className="panel" aria-labelledby="quick-actions-title">
-            <div className="panel-head">
-              <h2 id="quick-actions-title">Quick actions</h2>
-            </div>
-            <div className="data-actions">
-              <button
-                type="button"
-                className="primary-btn"
-                onClick={() => {
-                  setEditingId(null);
-                  setActiveView("subscriptions");
-                }}
-              >
-                Add subscription
-              </button>
-              <button
-                type="button"
-                className="ghost-btn"
-                onClick={() => setActiveView("settings")}
-              >
-                Open settings
-              </button>
-            </div>
+            )}
           </section>
         </div>
       ) : null}
@@ -350,7 +364,7 @@ const App = () => {
       ) : null}
 
       {activeView === "settings" ? (
-        <div className="settings-stack">
+        <div className="settings-grid">
           <section className="panel" aria-labelledby="app-settings-title">
             <div className="panel-head">
               <h2 id="app-settings-title">App settings</h2>
@@ -393,7 +407,7 @@ const App = () => {
 
           <section className="panel" aria-labelledby="data-controls-title">
             <div className="panel-head">
-              <h2 id="data-controls-title">Data controls</h2>
+              <h2 id="data-controls-title">Backup & restore</h2>
             </div>
 
             <div className="data-actions">

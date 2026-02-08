@@ -15,34 +15,34 @@ export const StatCards = ({
 }: StatCardsProps) => {
   const cards = [
     {
-      label: "Monthly burn",
+      label: "Monthly baseline",
       value: formatCurrencyMinor(monthlyTotalMinor, currency),
+      hint: "Recurring spend each month",
       tone: "teal"
     },
     {
-      label: "Yearly projection",
+      label: "Yearly forecast",
       value: formatCurrencyMinor(yearlyTotalMinor, currency),
+      hint: "Projected 12-month total",
       tone: "blue"
     },
     {
       label: "Active subscriptions",
       value: String(activeCount),
+      hint: "Currently enabled services",
       tone: "amber"
     }
   ] as const;
 
   return (
-    <section className="stats-grid" aria-label="Spending summary">
-      {cards.map((card, index) => (
-        <article
-          key={card.label}
-          className={`stat-card tone-${card.tone}`}
-          style={{ animationDelay: `${80 + index * 70}ms` }}
-        >
-          <p>{card.label}</p>
+    <div className="stats-grid" aria-label="Spending summary">
+      {cards.map((card) => (
+        <article key={card.label} className={`stat-card tone-${card.tone}`}>
+          <p className="stat-kicker">{card.label}</p>
           <strong>{card.value}</strong>
+          <p className="stat-hint">{card.hint}</p>
         </article>
       ))}
-    </section>
+    </div>
   );
 };

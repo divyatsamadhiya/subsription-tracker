@@ -27,11 +27,10 @@ export const SubscriptionGrid = ({
         <p className="empty-note">No subscriptions yet. Add your first one to start tracking.</p>
       ) : (
         <div className="subscription-grid">
-          {subscriptions.map((subscription, index) => (
+          {subscriptions.map((subscription) => (
             <article
               key={subscription.id}
               className={subscription.isActive ? "subscription-card" : "subscription-card is-paused"}
-              style={{ animationDelay: `${80 + index * 40}ms` }}
             >
               <header>
                 <h3>{subscription.name}</h3>
@@ -41,8 +40,11 @@ export const SubscriptionGrid = ({
               </header>
 
               <p className="price">{formatCurrencyMinor(subscription.amountMinor, currency)}</p>
-              <p className="meta">Next: {subscription.nextBillingDate}</p>
-              <p className="meta">Cycle: {subscription.billingCycle.replace("_", " ")}</p>
+
+              <div className="meta-row">
+                <span className="meta-pill">Next {subscription.nextBillingDate}</span>
+                <span className="meta-pill">{subscription.billingCycle.replace("_", " ")}</span>
+              </div>
 
               {subscription.notes ? <p className="notes">{subscription.notes}</p> : null}
 
