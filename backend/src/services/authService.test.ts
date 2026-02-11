@@ -30,9 +30,14 @@ vi.mock("../logger/logger.js", () => ({
   }
 }));
 
+vi.mock("./passwordResetEmailService.js", () => ({
+  sendPasswordResetEmail: vi.fn()
+}));
+
 import { UserModel } from "../models/User.js";
 import { SettingsModel } from "../models/Settings.js";
 import { comparePassword, hashPassword, signUserToken } from "../utils/auth.js";
+import { sendPasswordResetEmail } from "./passwordResetEmailService.js";
 import {
   getCurrentUser,
   loginUser,
@@ -147,6 +152,7 @@ describe("authService", () => {
   it("generates a password reset code for an existing user", async () => {
     const user = makeUser();
     vi.mocked(UserModel.findOne).mockResolvedValue(user as never);
+    vi.mocked(sendPasswordResetEmail).mockResolvedValue(undefined);
 
     const result = await requestPasswordReset({ email: "john@example.com" });
 
@@ -154,6 +160,12 @@ describe("authService", () => {
     expect(user.save).toHaveBeenCalledTimes(1);
     expect(user.passwordResetTokenHash).toHaveLength(64);
     expect(user.passwordResetExpiresAt).toBeInstanceOf(Date);
+    expect(sendPasswordResetEmail).toHaveBeenCalledTimes(1);
+    expect(sendPasswordResetEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toEmail: "john@example.com"
+      })
+    );
   });
 
   it("returns a generic response when reset is requested for unknown email", async () => {
@@ -164,6 +176,22 @@ describe("authService", () => {
     expect(result).toEqual({
       message: "If this email exists, a reset code has been generated."
     });
+    expect(sendPasswordResetEmail).not.toHaveBeenCalled();
+  });
+
+  it("fails reset code request when email delivery fails", async () => {
+    const user = makeUser();
+    vi.mocked(UserModel.findOne).mockResolvedValue(user as never);
+    vi.mocked(sendPasswordResetEmail).mockRejectedValue(new Error("delivery failed"));
+
+    await expect(requestPasswordReset({ email: "john@example.com" })).rejects.toMatchObject({
+      status: 503,
+      message: "Password reset is temporarily unavailable. Please try again later."
+    });
+
+    expect(user.save).toHaveBeenCalledTimes(2);
+    expect(user.passwordResetTokenHash).toBeUndefined();
+    expect(user.passwordResetExpiresAt).toBeUndefined();
   });
 
   it("resets password with a valid reset code", async () => {

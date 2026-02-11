@@ -292,8 +292,10 @@ const App = () => {
     try {
       const response = await forgotPassword(recoveryEmail);
       setRecoveryNotice(response.message);
-    } catch {
-      setRecoveryNotice("Unable to generate reset code.");
+    } catch (requestError) {
+      setRecoveryNotice(
+        requestError instanceof Error ? requestError.message : "Unable to generate reset code."
+      );
     }
   };
 
@@ -342,172 +344,185 @@ const App = () => {
   }
 
   if (!user) {
+    const showRecoveryCard = authMode === "login" && showRecoveryPanel;
+
     return (
       <main className="auth-shell">
-        <section className="panel auth-panel" aria-labelledby="auth-title">
-          <p className="eyebrow">Subscription Tracker</p>
-          <h1 id="auth-title">{authMode === "login" ? "Welcome back" : "Create your account"}</h1>
-          <p className="topbar-subtitle">Sign in to manage billing, reminders, and backups.</p>
+        <div className={showRecoveryCard ? "auth-layout with-recovery" : "auth-layout"}>
+          <section className="panel auth-panel" aria-labelledby="auth-title">
+            <p className="eyebrow">Subscription Tracker</p>
+            <h1 id="auth-title">{authMode === "login" ? "Welcome back" : "Create your account"}</h1>
+            <p className="topbar-subtitle">Sign in to manage billing, reminders, and backups.</p>
 
-          {error ? <p className="banner error">Error: {error}</p> : null}
-          {authNotice ? <p className="banner">{authNotice}</p> : null}
+            {error ? <p className="banner error">Error: {error}</p> : null}
+            {authNotice ? <p className="banner">{authNotice}</p> : null}
 
-          <div className="auth-switch" role="tablist" aria-label="Authentication mode">
-            <button
-              type="button"
-              className={authMode === "login" ? "tab-btn active" : "tab-btn"}
-              role="tab"
-              aria-selected={authMode === "login"}
-              onClick={() => {
-                setAuthMode("login");
-                setAuthNotice("");
-                setRecoveryNotice("");
-              }}
-            >
-              Sign in
-            </button>
-            <button
-              type="button"
-              className={authMode === "register" ? "tab-btn active" : "tab-btn"}
-              role="tab"
-              aria-selected={authMode === "register"}
-              onClick={() => {
-                setAuthMode("register");
-                setShowRecoveryPanel(false);
-                setRecoveryNotice("");
-              }}
-            >
-              Create account
-            </button>
-          </div>
+            <div className="auth-switch" role="tablist" aria-label="Authentication mode">
+              <button
+                type="button"
+                className={authMode === "login" ? "tab-btn active" : "tab-btn"}
+                role="tab"
+                aria-selected={authMode === "login"}
+                onClick={() => {
+                  setAuthMode("login");
+                  setAuthNotice("");
+                  setRecoveryNotice("");
+                }}
+              >
+                Sign in
+              </button>
+              <button
+                type="button"
+                className={authMode === "register" ? "tab-btn active" : "tab-btn"}
+                role="tab"
+                aria-selected={authMode === "register"}
+                onClick={() => {
+                  setAuthMode("register");
+                  setShowRecoveryPanel(false);
+                  setRecoveryNotice("");
+                }}
+              >
+                Create account
+              </button>
+            </div>
 
-          <form className="auth-form" onSubmit={handleAuthSubmit}>
-            <label>
-              Email
-              <input
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                autoComplete="email"
-                required
-              />
-            </label>
-
-            <label>
-              Password
-              <div className="password-row">
+            <form className="auth-form" onSubmit={handleAuthSubmit}>
+              <label>
+                Email
                 <input
-                  type={showAuthPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  autoComplete={authMode === "register" ? "new-password" : "current-password"}
-                  minLength={8}
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  autoComplete="email"
                   required
                 />
-                <button
-                  type="button"
-                  className="password-toggle"
-                  onClick={() => setShowAuthPassword((value) => !value)}
-                  aria-label={showAuthPassword ? "Hide password" : "Show password"}
-                >
-                  {showAuthPassword ? "Hide" : "Show"}
-                </button>
-              </div>
-            </label>
+              </label>
 
-            <button type="submit" className="primary-btn" disabled={loading}>
-              {loading
-                ? "Submitting..."
-                : authMode === "register"
-                  ? "Create account"
-                  : "Sign in"}
-            </button>
-          </form>
+              <label>
+                Password
+                <div className="password-row">
+                  <input
+                    type={showAuthPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    autoComplete={authMode === "register" ? "new-password" : "current-password"}
+                    minLength={8}
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="password-toggle"
+                    onClick={() => setShowAuthPassword((value) => !value)}
+                    aria-label={showAuthPassword ? "Hide password" : "Show password"}
+                  >
+                    {showAuthPassword ? "Hide" : "Show"}
+                  </button>
+                </div>
+              </label>
 
-          {authMode === "login" ? (
-            <section className="forgot-password-panel" aria-labelledby="forgot-password-title">
-              <div className="forgot-password-header">
-                <h2 id="forgot-password-title">Forgot password?</h2>
+              <button type="submit" className="primary-btn" disabled={loading}>
+                {loading
+                  ? "Submitting..."
+                  : authMode === "register"
+                    ? "Create account"
+                    : "Sign in"}
+              </button>
+            </form>
+
+            {authMode === "login" ? (
+              <button
+                type="button"
+                className="ghost-btn auth-secondary"
+                onClick={() => {
+                  setShowRecoveryPanel(true);
+                  setRecoveryNotice("");
+                  setRecoveryEmail((current) => current || email);
+                }}
+              >
+                Forgot password?
+              </button>
+            ) : null}
+          </section>
+
+          {showRecoveryCard ? (
+            <section className="panel auth-panel recovery-panel" aria-labelledby="password-reset-title">
+              <div className="recovery-card-header">
+                <h2 id="password-reset-title">Reset password</h2>
                 <button
                   type="button"
                   className="ghost-btn"
                   onClick={() => {
-                    setShowRecoveryPanel((value) => !value);
+                    setShowRecoveryPanel(false);
                     setRecoveryNotice("");
-                    setRecoveryEmail((current) => current || email);
                   }}
                 >
-                  {showRecoveryPanel ? "Close" : "Reset password"}
+                  Back to sign in
                 </button>
               </div>
 
-              {showRecoveryPanel ? (
-                <div className="forgot-password-body">
-                  <form className="auth-form" onSubmit={handleRequestResetCode}>
-                    <label>
-                      Account email
+              <p className="tiny-note">Request a code, then set a new password for your account.</p>
+
+              <div className="recovery-card-body">
+                <form className="auth-form" onSubmit={handleRequestResetCode}>
+                  <label>
+                    Account email
+                    <input
+                      type="email"
+                      value={recoveryEmail}
+                      onChange={(event) => setRecoveryEmail(event.target.value)}
+                      autoComplete="email"
+                      required
+                    />
+                  </label>
+                  <button type="submit" className="primary-btn" disabled={loading}>
+                    {loading ? "Sending..." : "Send reset code"}
+                  </button>
+                </form>
+
+                <form className="auth-form" onSubmit={handleResetPasswordSubmit}>
+                  <label>
+                    Reset code
+                    <input
+                      type="text"
+                      value={recoveryResetCode}
+                      onChange={(event) => setRecoveryResetCode(event.target.value)}
+                      autoComplete="one-time-code"
+                      required
+                    />
+                  </label>
+
+                  <label>
+                    New password
+                    <div className="password-row">
                       <input
-                        type="email"
-                        value={recoveryEmail}
-                        onChange={(event) => setRecoveryEmail(event.target.value)}
-                        autoComplete="email"
+                        type={showRecoveryPassword ? "text" : "password"}
+                        value={recoveryNewPassword}
+                        onChange={(event) => setRecoveryNewPassword(event.target.value)}
+                        autoComplete="new-password"
+                        minLength={8}
                         required
                       />
-                    </label>
-                    <button type="submit" className="primary-btn" disabled={loading}>
-                      {loading ? "Generating..." : "Generate reset code"}
-                    </button>
-                  </form>
+                      <button
+                        type="button"
+                        className="password-toggle"
+                        onClick={() => setShowRecoveryPassword((value) => !value)}
+                        aria-label={showRecoveryPassword ? "Hide password" : "Show password"}
+                      >
+                        {showRecoveryPassword ? "Hide" : "Show"}
+                      </button>
+                    </div>
+                  </label>
 
-                  <form className="auth-form" onSubmit={handleResetPasswordSubmit}>
-                    <label>
-                      Reset code
-                      <input
-                        type="text"
-                        value={recoveryResetCode}
-                        onChange={(event) => setRecoveryResetCode(event.target.value)}
-                        autoComplete="one-time-code"
-                        required
-                      />
-                    </label>
+                  <button type="submit" className="primary-btn" disabled={loading}>
+                    {loading ? "Updating..." : "Update password"}
+                  </button>
+                </form>
+              </div>
 
-                    <label>
-                      New password
-                      <div className="password-row">
-                        <input
-                          type={showRecoveryPassword ? "text" : "password"}
-                          value={recoveryNewPassword}
-                          onChange={(event) => setRecoveryNewPassword(event.target.value)}
-                          autoComplete="new-password"
-                          minLength={8}
-                          required
-                        />
-                        <button
-                          type="button"
-                          className="password-toggle"
-                          onClick={() => setShowRecoveryPassword((value) => !value)}
-                          aria-label={showRecoveryPassword ? "Hide password" : "Show password"}
-                        >
-                          {showRecoveryPassword ? "Hide" : "Show"}
-                        </button>
-                      </div>
-                    </label>
-
-                    <button type="submit" className="primary-btn" disabled={loading}>
-                      {loading ? "Updating..." : "Update password"}
-                    </button>
-                  </form>
-
-                  {recoveryNotice ? <p className="banner">{recoveryNotice}</p> : null}
-                </div>
-              ) : null}
+              {recoveryNotice ? <p className="banner">{recoveryNotice}</p> : null}
             </section>
           ) : null}
-
-          <p className="auth-footnote">
-            Your data is tied to your account and stored in your backend database.
-          </p>
-        </section>
+        </div>
       </main>
     );
   }

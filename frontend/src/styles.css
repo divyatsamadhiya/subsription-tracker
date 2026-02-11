@@ -65,10 +65,22 @@ select {
   padding: 1rem;
 }
 
+.auth-layout {
+  width: min(920px, 100%);
+  display: grid;
+  gap: 1rem;
+  align-items: start;
+  justify-items: center;
+}
+
 .auth-panel {
-  width: min(420px, 100%);
+  width: min(460px, 100%);
   display: grid;
   gap: 0.85rem;
+}
+
+.recovery-panel {
+  width: min(460px, 100%);
 }
 
 .auth-switch {
@@ -101,25 +113,22 @@ select {
   border-color: #bfd1e6;
 }
 
-.forgot-password-panel {
-  display: grid;
-  gap: 0.7rem;
-  border-top: 1px dashed var(--border);
-  padding-top: 0.7rem;
+.auth-secondary {
+  justify-self: start;
 }
 
-.forgot-password-header {
+.recovery-card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 0.5rem;
 }
 
-.forgot-password-header h2 {
+.recovery-card-header h2 {
   font-size: 0.98rem;
 }
 
-.forgot-password-body {
+.recovery-card-body {
   display: grid;
   gap: 0.75rem;
 }
@@ -133,11 +142,6 @@ select {
   font-size: 0.9rem;
   color: var(--text-muted);
   margin: 0;
-}
-
-.auth-footnote {
-  font-size: 0.82rem;
-  color: var(--text-muted);
 }
 
 .app-shell {
@@ -242,6 +246,18 @@ select {
   background: var(--danger-soft);
   color: #991b1b;
   border-color: #fecaca;
+}
+
+@media (min-width: 860px) {
+  .auth-layout.with-recovery {
+    grid-template-columns: minmax(300px, 1fr) minmax(300px, 1fr);
+    justify-items: stretch;
+  }
+
+  .auth-layout.with-recovery .auth-panel,
+  .auth-layout.with-recovery .recovery-panel {
+    width: 100%;
+  }
 }
 
 .overview-grid {

@@ -78,6 +78,20 @@ describe("enforceTrustedOrigin middleware", () => {
     expect(next).toHaveBeenCalledTimes(1);
   });
 
+  it("allows authenticated request from 127.0.0.1 when localhost is trusted", () => {
+    const req = makeRequest({
+      method: "POST",
+      cookies: { pulseboard_token: "token" },
+      headers: { origin: "http://127.0.0.1:5173" }
+    });
+    const res = makeResponse();
+    const next = vi.fn();
+
+    enforceTrustedOrigin(req, res, next);
+
+    expect(next).toHaveBeenCalledTimes(1);
+  });
+
   it("rejects authenticated request from untrusted origin", () => {
     const req = makeRequest({
       method: "POST",
@@ -94,5 +108,38 @@ describe("enforceTrustedOrigin middleware", () => {
     expect((res.json as unknown as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith({
       error: "Invalid request origin"
     });
+  });
+
+  it("allows authenticated request when origin header is literal null and trusted referer is present", () => {
+    const req = makeRequest({
+      method: "POST",
+      cookies: { pulseboard_token: "token" },
+      headers: {
+        origin: "null",
+        referer: "http://localhost:5173/dashboard"
+      }
+    });
+    const res = makeResponse();
+    const next = vi.fn();
+
+    enforceTrustedOrigin(req, res, next);
+
+    expect(next).toHaveBeenCalledTimes(1);
+  });
+
+  it("allows authenticated request when origin header is literal null and referer is missing", () => {
+    const req = makeRequest({
+      method: "POST",
+      cookies: { pulseboard_token: "token" },
+      headers: {
+        origin: "null"
+      }
+    });
+    const res = makeResponse();
+    const next = vi.fn();
+
+    enforceTrustedOrigin(req, res, next);
+
+    expect(next).toHaveBeenCalledTimes(1);
   });
 });
