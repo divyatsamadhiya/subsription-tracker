@@ -1,32 +1,37 @@
 # MVP Scope
 
-## In Scope (V1)
+## In Scope (Current V1)
 
-1. Add, edit, and delete subscriptions.
-2. Track amount, billing cycle, next billing date, category, and notes.
-3. Dashboard with monthly and yearly spending totals.
-4. Upcoming renewals view (next 7 and 30 days).
-5. Optional local reminders:
-   - In-app due alerts.
-   - Browser notifications when app is active and permission is granted.
-   - `.ics` export for reliable external calendar reminders.
-6. Single app-wide default currency.
-7. Manual JSON export/import backup.
-8. PWA install support and offline-first behavior.
+1. User registration, login, logout, and session bootstrap (`/auth/*`).
+2. Account-scoped subscription CRUD via Express API.
+3. Monthly and yearly spending projections in frontend dashboard.
+4. Upcoming renewals view for 7-day and 30-day windows.
+5. Optional browser reminders while app is active.
+6. `.ics` export per subscription.
+7. Account-scoped settings persistence (`/settings`).
+8. Backend backup export/import (`BackupFileV1`).
+9. Monorepo separation into independent `frontend` and `backend` apps.
 
-## Out of Scope (V1)
+## Out of Scope (Current V1)
 
-1. Login/authentication.
-2. Cloud sync/account sync.
-3. Payment or bank integrations.
-4. Ads, premium tiers, or paid feature gates.
-5. Multi-currency conversion.
+1. OAuth or social login providers.
+2. Password reset/MFA.
+3. Cloud multi-device merge conflict tooling.
+4. Payment or bank integrations.
+5. Premium billing tiers.
+6. Multi-currency conversion.
+
+## Migration Scope Decisions
+
+- Fresh-start cutover from local Dexie to backend storage.
+- No automatic local IndexedDB migration path.
+- Online-first data operations.
 
 ## V1 Feature Checklist
 
-- [ ] Subscription CRUD
-- [ ] Spending totals (monthly/yearly)
-- [ ] Upcoming renewal tracking
-- [ ] Reminder flows (in-app + browser active-state + `.ics`)
-- [ ] Backup import/export (JSON)
-- [ ] PWA install + offline support
+- [x] Auth endpoints and protected session flow
+- [x] Subscription CRUD via backend API
+- [x] Spending totals and renewals tracking
+- [x] Reminder center and `.ics` export
+- [x] Backup import/export via backend
+- [x] Monorepo frontend/backend app split

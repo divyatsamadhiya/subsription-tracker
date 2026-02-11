@@ -3,6 +3,15 @@ import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
+  server: {
+    port: 5173,
+    proxy: {
+      "/api": {
+        target: "http://localhost:4000",
+        changeOrigin: true
+      }
+    }
+  },
   plugins: [
     react(),
     VitePWA({
@@ -11,7 +20,7 @@ export default defineConfig({
       manifest: {
         name: "Pulseboard Subscription Tracker",
         short_name: "Pulseboard",
-        description: "Track recurring subscriptions with local-first privacy.",
+        description: "Track recurring subscriptions with secure account-backed storage.",
         theme_color: "#101830",
         background_color: "#f5f7fb",
         display: "standalone",

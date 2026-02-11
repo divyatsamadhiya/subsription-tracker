@@ -36,6 +36,39 @@ export interface BackupFileV1 {
   subscriptions: Subscription[];
 }
 
+export interface AuthUser {
+  id: string;
+  email: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AuthResponse {
+  user: AuthUser;
+}
+
+export interface RegisterInput {
+  email: string;
+  password: string;
+}
+
+export interface LoginInput {
+  email: string;
+  password: string;
+}
+
+export interface SubscriptionInput {
+  name: string;
+  amountMinor: number;
+  billingCycle: BillingCycle;
+  customIntervalDays?: number;
+  nextBillingDate: string;
+  category: SubscriptionCategory;
+  reminderDaysBefore: number[];
+  isActive: boolean;
+  notes?: string;
+}
+
 export const CATEGORY_OPTIONS = [
   "entertainment",
   "productivity",

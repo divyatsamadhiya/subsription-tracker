@@ -2,32 +2,33 @@
 
 ## Problem Statement
 
-Many people pay for subscriptions they forget to track. Existing apps often require login or paid tiers before users can start. This project solves that by offering a free, instant-start subscription tracker with local-first data storage.
+People lose track of recurring subscriptions and need clearer visibility into spending and renewals. The product now prioritizes secure, account-backed tracking so users can access and manage data consistently through a backend service.
 
 ## Product Principles
 
-- Free forever.
-- No login required.
-- Local-first privacy.
-- Instant start with minimal setup.
+- Fast signup and sign-in.
+- Clear monthly/yearly cost visibility.
+- Reliable renewals awareness.
+- Account-scoped data ownership.
+- Practical backup portability.
 
 ## Audience
 
-- People who want a simple way to track recurring expenses.
-- Users who prefer privacy and do not want to create accounts.
-- Users who need lightweight reminders for renewals and cancellations.
+- Users who want simple recurring expense tracking.
+- Users who want backend-persisted data with account access.
+- Users who need lightweight reminders and export options.
 
 ## Goals
 
-- Let users add and manage subscriptions in under a minute.
-- Show clear monthly and yearly spending visibility.
-- Help users avoid surprise renewals via reminders.
-- Keep all user data on-device with manual backup/import options.
+- Let users register/login and manage subscriptions quickly.
+- Show accurate monthly/yearly totals and upcoming renewals.
+- Provide backup export/import for account data portability.
+- Keep backend APIs predictable and easy to evolve.
 
-## Non-Goals (V1)
+## Non-Goals (Current Scope)
 
-- User accounts or authentication.
-- Cloud sync between devices.
-- Direct bank/payment provider integrations.
-- Premium tiers or paid features.
+- OAuth/social login providers.
+- Password reset and MFA.
+- Bank/payment provider integrations.
 - Multi-currency conversion engine.
+- Team/shared workspace support.

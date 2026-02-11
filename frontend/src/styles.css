@@ -1,0 +1,540 @@
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap");
+
+:root {
+  --bg: #f4f6f8;
+  --surface: #ffffff;
+  --surface-muted: #f8fafc;
+  --text: #1f2937;
+  --text-muted: #6b7280;
+  --primary: #2563eb;
+  --primary-soft: #e6eeff;
+  --danger: #dc2626;
+  --danger-soft: #fee2e2;
+  --success-soft: #e7f7ef;
+  --warning-soft: #fef3c7;
+  --border: #dbe2ea;
+  --radius-lg: 14px;
+  --radius-md: 10px;
+  --shadow: 0 4px 16px rgba(17, 24, 39, 0.05);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: "Manrope", "Segoe UI", sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid rgba(37, 99, 235, 0.35);
+  outline-offset: 2px;
+}
+
+.loading-state,
+.auth-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+}
+
+.auth-shell {
+  padding: 1rem;
+}
+
+.auth-panel {
+  width: min(420px, 100%);
+  display: grid;
+  gap: 0.85rem;
+}
+
+.auth-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.auth-form {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.auth-form label,
+.subscription-form label,
+.subscription-form fieldset,
+.control-grid label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.auth-footnote {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.app-shell {
+  width: min(1080px, 100% - 1.5rem);
+  margin: 1.25rem auto 2rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: 1rem;
+}
+
+.topbar {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.eyebrow {
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.topbar-copy h1 {
+  font-size: clamp(1.35rem, 2.8vw, 1.9rem);
+}
+
+.topbar-subtitle,
+.signed-in,
+.notes,
+.empty-note,
+.tiny-note,
+.stat-hint,
+.renewal-main p {
+  color: var(--text-muted);
+}
+
+.signed-in {
+  font-size: 0.84rem;
+  margin-top: 0.3rem;
+}
+
+.view-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.view-btn,
+.tab-btn,
+.primary-btn,
+.ghost-btn,
+.danger-btn {
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  padding: 0.45rem 0.7rem;
+  cursor: pointer;
+}
+
+.view-btn.active,
+.tab-btn.active,
+.primary-btn {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.primary-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.ghost-btn:hover,
+.view-btn:hover,
+.tab-btn:hover {
+  border-color: #bfd1e6;
+}
+
+.danger-btn {
+  color: var(--danger);
+  background: var(--danger-soft);
+  border-color: #fecaca;
+}
+
+.banner {
+  border-radius: 8px;
+  padding: 0.7rem 0.85rem;
+  background: var(--primary-soft);
+  color: #1e40af;
+  border: 1px solid #bfdbfe;
+}
+
+.banner.error {
+  background: var(--danger-soft);
+  color: #991b1b;
+  border-color: #fecaca;
+}
+
+.overview-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.highlight-card {
+  grid-column: span 5;
+  background: var(--surface-muted);
+}
+
+.highlight-label {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.highlight-card h2 {
+  margin-top: 0.35rem;
+  font-size: 2rem;
+}
+
+.highlight-card p {
+  margin-top: 0.35rem;
+}
+
+.highlight-actions {
+  margin-top: 0.8rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.highlight-muted {
+  color: var(--text-muted);
+}
+
+.stats-shell {
+  grid-column: span 7;
+}
+
+.renewals-shell {
+  grid-column: span 8;
+}
+
+.reminder-panel {
+  grid-column: span 4;
+}
+
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.7rem;
+  margin-bottom: 0.7rem;
+}
+
+.panel-head h2 {
+  font-size: 1rem;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.stat-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  padding: 0.75rem;
+}
+
+.stat-kicker {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  margin-bottom: 0.25rem;
+}
+
+.stat-card strong {
+  font-size: 1.2rem;
+}
+
+.tab-row {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.renewal-list,
+.reminder-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.renewal-item {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  padding: 0.65rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.renewal-main h3 {
+  font-size: 0.96rem;
+}
+
+.renewal-side {
+  text-align: right;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.due-pill {
+  border-radius: 999px;
+  padding: 0.14rem 0.5rem;
+  font-size: 0.72rem;
+  border: 1px solid transparent;
+}
+
+.due-pill.due-now {
+  background: var(--danger-soft);
+  color: #b91c1c;
+}
+
+.due-pill.due-soon {
+  background: var(--warning-soft);
+  color: #92400e;
+}
+
+.due-pill.due-later {
+  background: var(--primary-soft);
+  color: #1e40af;
+}
+
+.reminder-list li {
+  background: var(--success-soft);
+  border: 1px solid #b7e4cb;
+  border-radius: 8px;
+  padding: 0.55rem;
+}
+
+.manage-layout {
+  display: grid;
+  grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
+  gap: 1rem;
+}
+
+.subscription-form {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.subscription-form input,
+.subscription-form textarea,
+.subscription-form select,
+.control-grid select,
+.auth-form input {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text);
+  padding: 0.56rem 0.62rem;
+}
+
+.subscription-form textarea {
+  resize: vertical;
+}
+
+.split,
+.control-grid,
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.checkbox-row {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--text);
+  width: fit-content;
+}
+
+.checkbox-row input {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--primary);
+}
+
+.reminder-group {
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 0.55rem;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.chip-toggle {
+  position: relative;
+}
+
+.chip-toggle input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+}
+
+.chip-toggle span {
+  display: inline-block;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.24rem 0.52rem;
+  background: #fff;
+  font-size: 0.8rem;
+}
+
+.chip-toggle input:checked + span {
+  background: var(--primary-soft);
+  border-color: #bfdbfe;
+  color: #1e40af;
+}
+
+.form-error {
+  color: #b91c1c;
+  font-size: 0.82rem;
+}
+
+.subscription-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 0.65rem;
+}
+
+.subscription-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: #fff;
+  padding: 0.7rem;
+  display: grid;
+  gap: 0.42rem;
+}
+
+.subscription-card.is-paused {
+  background: #fffdf5;
+}
+
+.subscription-card header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.subscription-card h3 {
+  font-size: 0.95rem;
+}
+
+.status {
+  border-radius: 999px;
+  padding: 0.2rem 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.status.active {
+  background: var(--success-soft);
+  color: #166534;
+}
+
+.status.paused {
+  background: var(--warning-soft);
+  color: #92400e;
+}
+
+.price {
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.meta-row,
+.actions,
+.data-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.meta-pill,
+.badge {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.14rem 0.45rem;
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  background: #fff;
+}
+
+@media (max-width: 980px) {
+  .overview-grid {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+  }
+
+  .highlight-card,
+  .stats-shell,
+  .renewals-shell,
+  .reminder-panel {
+    grid-column: span 8;
+  }
+}
+
+@media (max-width: 860px) {
+  .manage-layout,
+  .settings-grid,
+  .split,
+  .control-grid,
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .app-shell {
+    width: min(1080px, 100% - 1rem);
+    margin-top: 0.8rem;
+  }
+}

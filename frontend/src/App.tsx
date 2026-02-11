@@ -3,7 +3,7 @@ import { SubscriptionForm } from "./components/SubscriptionForm";
 import { StatCards } from "./components/StatCards";
 import { SubscriptionGrid } from "./components/SubscriptionGrid";
 import { UpcomingRenewals } from "./components/UpcomingRenewals";
-import { createBackup, backupFilename, parseBackupJson, serializeBackup } from "./lib/backup";
+import { backupFilename, parseBackupJson, serializeBackup } from "./lib/backup";
 import {
   calculateMonthlyTotalMinor,
   calculateYearlyTotalMinor,
@@ -31,6 +31,7 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 type AppView = "overview" | "subscriptions" | "settings";
+type AuthMode = "login" | "register";
 
 const viewTabs: Array<{ id: AppView; label: string }> = [
   { id: "overview", label: "Overview" },
@@ -43,15 +44,20 @@ const App = () => {
     hydrated,
     loading,
     error,
+    user,
     subscriptions,
     settings,
     upcomingWindow,
     setUpcomingWindow,
     hydrate,
+    register,
+    login,
+    logout,
     addSubscription,
     updateSubscription,
     deleteSubscription,
     updateSettings,
+    exportBackup,
     importBackup
   } = useAppStore();
 
@@ -60,6 +66,10 @@ const App = () => {
   const [notice, setNotice] = useState<string>("");
   const [todayIsoDate, setTodayIsoDate] = useState(nowIsoDate());
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [authMode, setAuthMode] = useState<AuthMode>("login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [authNotice, setAuthNotice] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -93,6 +103,7 @@ const App = () => {
     if (!editingId) {
       return undefined;
     }
+
     return subscriptions.find((subscription) => subscription.id === editingId);
   }, [editingId, subscriptions]);
 
@@ -131,15 +142,19 @@ const App = () => {
   const handleFormSubmit = async (
     draft: Parameters<typeof addSubscription>[0]
   ): Promise<void> => {
-    if (editingSubscription) {
-      await updateSubscription(editingSubscription.id, draft);
-      setEditingId(null);
-      setNotice("Subscription updated.");
-      return;
-    }
+    try {
+      if (editingSubscription) {
+        await updateSubscription(editingSubscription.id, draft);
+        setEditingId(null);
+        setNotice("Subscription updated.");
+        return;
+      }
 
-    await addSubscription(draft);
-    setNotice("Subscription added.");
+      await addSubscription(draft);
+      setNotice("Subscription added.");
+    } catch {
+      // Error banner is managed by store state.
+    }
   };
 
   const handleDelete = async (id: string): Promise<void> => {
@@ -153,33 +168,45 @@ const App = () => {
       return;
     }
 
-    await deleteSubscription(id);
-    if (editingId === id) {
-      setEditingId(null);
-    }
+    try {
+      await deleteSubscription(id);
+      if (editingId === id) {
+        setEditingId(null);
+      }
 
-    setNotice("Subscription deleted.");
+      setNotice("Subscription deleted.");
+    } catch {
+      // Error banner is managed by store state.
+    }
   };
 
   const handleEnableNotifications = async (enabled: boolean): Promise<void> => {
-    if (enabled) {
-      const permission = await requestNotificationPermission();
-      if (permission !== "granted") {
-        setNotice("Browser notification permission was not granted.");
-        await updateSettings({ notificationsEnabled: false });
-        return;
+    try {
+      if (enabled) {
+        const permission = await requestNotificationPermission();
+        if (permission !== "granted") {
+          setNotice("Browser notification permission was not granted.");
+          await updateSettings({ notificationsEnabled: false });
+          return;
+        }
       }
-    }
 
-    await updateSettings({ notificationsEnabled: enabled });
-    setNotice(enabled ? "Browser notifications enabled." : "Browser notifications disabled.");
+      await updateSettings({ notificationsEnabled: enabled });
+      setNotice(enabled ? "Browser notifications enabled." : "Browser notifications disabled.");
+    } catch {
+      // Error banner is managed by store state.
+    }
   };
 
-  const handleExportBackup = () => {
-    const backup = createBackup(settings, subscriptions);
-    const text = serializeBackup(backup);
-    downloadTextFile(backupFilename(), text, "application/json;charset=utf-8");
-    setNotice("Backup exported.");
+  const handleExportBackup = async () => {
+    try {
+      const backup = await exportBackup();
+      const text = serializeBackup(backup);
+      downloadTextFile(backupFilename(), text, "application/json;charset=utf-8");
+      setNotice("Backup exported.");
+    } catch {
+      // Error banner is managed by store state.
+    }
   };
 
   const handleImportClick = () => {
@@ -208,7 +235,10 @@ const App = () => {
 
   const handleExportIcs = (subscription: Subscription) => {
     const ics = generateSubscriptionIcs(subscription);
-    const safeName = subscription.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    const safeName = subscription.name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "");
     downloadTextFile(`${safeName || "subscription"}.ics`, ics, "text/calendar;charset=utf-8");
     setNotice(`Exported ${subscription.name} reminder.`);
   };
@@ -226,10 +256,122 @@ const App = () => {
     }
   };
 
+  const handleAuthSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setAuthNotice("");
+
+    try {
+      if (authMode === "register") {
+        await register(email, password);
+        setAuthNotice("Account created.");
+      } else {
+        await login(email, password);
+        setAuthNotice("Signed in.");
+      }
+
+      setEmail("");
+      setPassword("");
+    } catch {
+      setAuthNotice(authMode === "register" ? "Registration failed." : "Sign-in failed.");
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      setEditingId(null);
+      setActiveView("overview");
+      setNotice("Signed out.");
+    } catch {
+      // Error banner is managed by store state.
+    }
+  };
+
+  const handleCurrencyChange = async (value: string) => {
+    try {
+      await updateSettings({ defaultCurrency: value.toUpperCase() });
+      setNotice("Default currency updated.");
+    } catch {
+      // Error banner is managed by store state.
+    }
+  };
+
   if (loading && !hydrated) {
     return (
       <main className="loading-state">
-        <p>Preparing your local workspace...</p>
+        <p>Preparing your account workspace...</p>
+      </main>
+    );
+  }
+
+  if (!user) {
+    return (
+      <main className="auth-shell">
+        <section className="panel auth-panel" aria-labelledby="auth-title">
+          <p className="eyebrow">Subscription Tracker</p>
+          <h1 id="auth-title">{authMode === "login" ? "Welcome back" : "Create your account"}</h1>
+          <p className="topbar-subtitle">Sign in to manage billing, reminders, and backups.</p>
+
+          {error ? <p className="banner error">Error: {error}</p> : null}
+          {authNotice ? <p className="banner">{authNotice}</p> : null}
+
+          <div className="auth-switch" role="tablist" aria-label="Authentication mode">
+            <button
+              type="button"
+              className={authMode === "login" ? "tab-btn active" : "tab-btn"}
+              role="tab"
+              aria-selected={authMode === "login"}
+              onClick={() => setAuthMode("login")}
+            >
+              Sign in
+            </button>
+            <button
+              type="button"
+              className={authMode === "register" ? "tab-btn active" : "tab-btn"}
+              role="tab"
+              aria-selected={authMode === "register"}
+              onClick={() => setAuthMode("register")}
+            >
+              Create account
+            </button>
+          </div>
+
+          <form className="auth-form" onSubmit={handleAuthSubmit}>
+            <label>
+              Email
+              <input
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                autoComplete="email"
+                required
+              />
+            </label>
+
+            <label>
+              Password
+              <input
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                autoComplete={authMode === "register" ? "new-password" : "current-password"}
+                minLength={8}
+                required
+              />
+            </label>
+
+            <button type="submit" className="primary-btn" disabled={loading}>
+              {loading
+                ? "Submitting..."
+                : authMode === "register"
+                  ? "Create account"
+                  : "Sign in"}
+            </button>
+          </form>
+          <p className="auth-footnote">
+            Your data is tied to your account and stored in your backend database.
+          </p>
+        </section>
       </main>
     );
   }
@@ -238,11 +380,10 @@ const App = () => {
     <main className="app-shell">
       <header className="topbar panel">
         <div className="topbar-copy">
-          <p className="eyebrow">Pulseboard Bento Experience</p>
-          <h1>Subscription intelligence, designed for focus</h1>
-          <p className="topbar-subtitle">
-            Clear monthly visibility, upcoming-renewal awareness, and quick control over every active service.
-          </p>
+          <p className="eyebrow">Subscription Tracker</p>
+          <h1>Track recurring costs in one place</h1>
+          <p className="topbar-subtitle">Manage subscriptions, settings, reminders, and backups.</p>
+          <p className="signed-in">Signed in as {user.email}</p>
         </div>
 
         <nav className="view-nav" aria-label="Primary sections">
@@ -256,6 +397,9 @@ const App = () => {
               {tab.label}
             </button>
           ))}
+          <button type="button" className="ghost-btn" onClick={() => void handleLogout()}>
+            Sign out
+          </button>
         </nav>
       </header>
 
@@ -375,9 +519,7 @@ const App = () => {
                 Currency
                 <select
                   value={settings.defaultCurrency}
-                  onChange={(event) =>
-                    void updateSettings({ defaultCurrency: event.target.value.toUpperCase() })
-                  }
+                  onChange={(event) => void handleCurrencyChange(event.target.value)}
                 >
                   <option value="USD">USD</option>
                   <option value="EUR">EUR</option>
@@ -411,7 +553,7 @@ const App = () => {
             </div>
 
             <div className="data-actions">
-              <button type="button" className="ghost-btn" onClick={handleExportBackup}>
+              <button type="button" className="ghost-btn" onClick={() => void handleExportBackup()}>
                 Export backup (JSON)
               </button>
               <button type="button" className="ghost-btn" onClick={handleImportClick}>
@@ -427,7 +569,7 @@ const App = () => {
             </div>
 
             <p className="tiny-note">
-              Import replaces local data with the selected backup file. Keep periodic exports.
+              Import replaces your account data with the selected backup file. Keep periodic exports.
             </p>
           </section>
         </div>

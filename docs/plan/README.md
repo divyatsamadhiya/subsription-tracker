@@ -1,6 +1,6 @@
 # Project Planning Docs
 
-This directory stores all planning discussions and decisions for the Subscription Tracker project.
+This directory stores planning discussions and architectural decisions for Pulseboard.
 
 ## Index
 
@@ -10,10 +10,11 @@ This directory stores all planning discussions and decisions for the Subscriptio
 - [Decision Log](./decision-log.md)
 - [Roadmap](./roadmap.md)
 - [Session Notes - 2026-02-08](./sessions/2026-02-08.md)
+- [Session Notes - 2026-02-11](./sessions/2026-02-11.md)
 
 ## Planning Rules
 
-- Update topic docs (`product-brief.md`, `mvp-scope.md`, `architecture.md`, `roadmap.md`) when the latest agreed plan changes.
-- Append every meaningful decision to `decision-log.md` using the standard date/decision/rationale/impact format.
-- Add a dated file under `sessions/` for each planning conversation to preserve historical context.
-- Keep topic docs as the latest source of truth and use session notes as historical snapshots.
+- Update topic docs (`product-brief.md`, `mvp-scope.md`, `architecture.md`, `roadmap.md`) when the active plan changes.
+- Append each meaningful architecture/product decision to `decision-log.md`.
+- Add dated `sessions/` notes to preserve decision history.
+- Keep topic docs as current source of truth; use session notes as context snapshots.

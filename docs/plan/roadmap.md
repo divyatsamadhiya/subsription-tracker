@@ -1,93 +1,80 @@
 # Roadmap
 
-## Phase 1: Project Setup and Foundations
+## Phase 1: Monorepo Restructure
 
 ### Deliverables
 
-- Initialize React + Vite + TypeScript project.
-- Configure linting, formatting, and test tools.
-- Set up base PWA configuration and app shell.
-- Define initial folder/module structure.
+- Split repository into `frontend` and `backend` workspaces.
+- Update root scripts for single-command dev/build/test orchestration.
+- Move existing Vite app into `frontend` package.
 
 ### Exit Criteria
 
-- Project boots locally.
-- CI-ready commands exist for lint/test/build.
-- PWA baseline is functional.
+- New folder structure is in place.
+- Root scripts run workspace commands successfully.
 
-## Phase 2: Domain and Storage Layer
+## Phase 2: Independent Contracts
 
 ### Deliverables
 
-- Implement domain types and date/cycle utilities.
-- Set up Dexie schema and IndexedDB adapters.
-- Implement settings storage and seed defaults.
+- Keep frontend and backend contracts fully independent.
+- Add backend request/response schema validation.
+- Add frontend request parsing and validation for API responses.
 
 ### Exit Criteria
 
-- Subscriptions and settings can be stored/retrieved locally.
-- Core calculations (next due, cycle handling) pass unit tests.
+- Frontend and backend compile independently.
+- API contracts remain stable and documented.
 
-## Phase 3: Subscription CRUD
+## Phase 3: Backend Foundation
 
 ### Deliverables
 
-- Build create/edit/delete flows with form validation.
-- Add list/detail views with category and status indicators.
-- Handle error and empty states.
+- Implement Express app bootstrap and middleware stack.
+- Configure MongoDB connection and data models.
+- Add auth utilities (bcrypt + JWT cookie handling).
 
 ### Exit Criteria
 
-- Full CRUD works with persistence across refresh.
-- Validation prevents invalid records.
+- Backend starts with valid env vars.
+- Health and auth endpoints respond as expected.
 
-## Phase 4: Dashboard and Renewals
+## Phase 4: Protected Domain APIs
 
 ### Deliverables
 
-- Monthly and yearly total cards.
-- Upcoming renewals for 7/30 day windows.
-- Active subscription count and basic filters/sorting.
+- Implement protected subscriptions/settings/backup routes.
+- Enforce per-user data scoping across queries/mutations.
+- Add request validation and centralized error handling.
 
 ### Exit Criteria
 
-- Totals match stored data.
-- Renewals list is accurate and chronologically ordered.
+- Unauthorized access returns 401.
+- CRUD/settings/backup routes function for authenticated users.
 
-## Phase 5: Reminders
+## Phase 5: Frontend Data Layer Migration
 
 ### Deliverables
 
-- In-app due and due-soon alerts.
-- Browser notification permission and dispatch (active app context).
-- `.ics` export for external calendar reminders.
+- Replace Dexie store persistence with API client calls.
+- Add login/register UI gate before dashboard views.
+- Keep existing dashboard, reminders, and export UX flows.
 
 ### Exit Criteria
 
-- Reminder preferences are applied per subscription.
-- Notification behavior is documented with known web constraints.
+- Authenticated users can complete all core flows.
+- App behavior remains stable with backend data source.
 
-## Phase 6: Backup and Restore
+## Phase 6: Documentation and Validation
 
 ### Deliverables
 
-- JSON export with versioned schema (`BackupFileV1`).
-- JSON import with Zod validation and safe replace flow.
+- Rewrite architecture and scope docs for backend model.
+- Add decision log entries for architecture pivot.
+- Validate workspace tests/build commands.
 
 ### Exit Criteria
 
-- Export/import round-trip restores full app state.
-- Invalid backup files fail with clear user errors.
-
-## Phase 7: Polish and Release
-
-### Deliverables
-
-- Accessibility and responsive UI pass.
-- Offline behavior validation after first load.
-- Deployment docs and production build verification.
-
-### Exit Criteria
-
-- Core acceptance scenarios pass (unit + e2e).
-- App is deployable on static hosting with HTTPS.
+- Documentation reflects current implementation.
+- Test command is green.
+- Build command is green once backend dependencies are installed.
