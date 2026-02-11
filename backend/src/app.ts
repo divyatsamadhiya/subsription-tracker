@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import helmet from "helmet";
 import { config } from "./config.js";
 import { authRouter } from "./routes/auth.js";
 import { subscriptionsRouter } from "./routes/subscriptions.js";
@@ -13,6 +14,11 @@ import { logger } from "./logger/logger.js";
 export const createApp = () => {
   const app = express();
 
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: { policy: "cross-origin" }
+    })
+  );
   app.use(
     cors({
       origin: config.frontendOrigin,

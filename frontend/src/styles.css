@@ -82,6 +82,48 @@ select {
   gap: 0.75rem;
 }
 
+.password-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem;
+}
+
+.password-toggle {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text);
+  padding: 0.5rem 0.7rem;
+  cursor: pointer;
+}
+
+.password-toggle:hover {
+  border-color: #bfd1e6;
+}
+
+.forgot-password-panel {
+  display: grid;
+  gap: 0.7rem;
+  border-top: 1px dashed var(--border);
+  padding-top: 0.7rem;
+}
+
+.forgot-password-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.forgot-password-header h2 {
+  font-size: 0.98rem;
+}
+
+.forgot-password-body {
+  display: grid;
+  gap: 0.75rem;
+}
+
 .auth-form label,
 .subscription-form label,
 .subscription-form fieldset,

@@ -39,7 +39,7 @@ export const errorHandler = (
       message: error.message,
       stack: error.stack
     });
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: "Internal server error" });
     return;
   }
 

@@ -52,6 +52,8 @@ const App = () => {
     hydrate,
     register,
     login,
+    forgotPassword,
+    resetPassword,
     logout,
     addSubscription,
     updateSubscription,
@@ -69,6 +71,14 @@ const App = () => {
   const [authMode, setAuthMode] = useState<AuthMode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showAuthPassword, setShowAuthPassword] = useState(false);
+  const [showRecoveryPanel, setShowRecoveryPanel] = useState(false);
+  const [recoveryEmail, setRecoveryEmail] = useState("");
+  const [recoveryResetCode, setRecoveryResetCode] = useState("");
+  const [recoveryNewPassword, setRecoveryNewPassword] = useState("");
+  const [showRecoveryPassword, setShowRecoveryPassword] = useState(false);
+  const [recoveryNotice, setRecoveryNotice] = useState("");
+  const [recoveryExpiresAt, setRecoveryExpiresAt] = useState<string | null>(null);
   const [authNotice, setAuthNotice] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -276,6 +286,38 @@ const App = () => {
     }
   };
 
+  const handleRequestResetCode = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setRecoveryNotice("");
+    setRecoveryExpiresAt(null);
+
+    try {
+      const response = await forgotPassword(recoveryEmail);
+      setRecoveryNotice(response.message);
+      setRecoveryResetCode(response.resetToken ?? "");
+      setRecoveryExpiresAt(response.expiresAt ?? null);
+    } catch {
+      setRecoveryNotice("Unable to generate reset code.");
+    }
+  };
+
+  const handleResetPasswordSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setRecoveryNotice("");
+
+    try {
+      await resetPassword(recoveryEmail, recoveryResetCode, recoveryNewPassword);
+      setRecoveryNotice("Password updated. Sign in with your new password.");
+      setPassword("");
+      setRecoveryResetCode("");
+      setRecoveryNewPassword("");
+      setRecoveryExpiresAt(null);
+      setShowRecoveryPanel(false);
+    } catch {
+      setRecoveryNotice("Reset failed. Check the code and try again.");
+    }
+  };
+
   const handleLogout = async () => {
     try {
       await logout();
@@ -321,7 +363,11 @@ const App = () => {
               className={authMode === "login" ? "tab-btn active" : "tab-btn"}
               role="tab"
               aria-selected={authMode === "login"}
-              onClick={() => setAuthMode("login")}
+              onClick={() => {
+                setAuthMode("login");
+                setAuthNotice("");
+                setRecoveryNotice("");
+              }}
             >
               Sign in
             </button>
@@ -330,7 +376,11 @@ const App = () => {
               className={authMode === "register" ? "tab-btn active" : "tab-btn"}
               role="tab"
               aria-selected={authMode === "register"}
-              onClick={() => setAuthMode("register")}
+              onClick={() => {
+                setAuthMode("register");
+                setShowRecoveryPanel(false);
+                setRecoveryNotice("");
+              }}
             >
               Create account
             </button>
@@ -350,14 +400,24 @@ const App = () => {
 
             <label>
               Password
-              <input
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                autoComplete={authMode === "register" ? "new-password" : "current-password"}
-                minLength={8}
-                required
-              />
+              <div className="password-row">
+                <input
+                  type={showAuthPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  autoComplete={authMode === "register" ? "new-password" : "current-password"}
+                  minLength={8}
+                  required
+                />
+                <button
+                  type="button"
+                  className="password-toggle"
+                  onClick={() => setShowAuthPassword((value) => !value)}
+                  aria-label={showAuthPassword ? "Hide password" : "Show password"}
+                >
+                  {showAuthPassword ? "Hide" : "Show"}
+                </button>
+              </div>
             </label>
 
             <button type="submit" className="primary-btn" disabled={loading}>
@@ -368,6 +428,92 @@ const App = () => {
                   : "Sign in"}
             </button>
           </form>
+
+          {authMode === "login" ? (
+            <section className="forgot-password-panel" aria-labelledby="forgot-password-title">
+              <div className="forgot-password-header">
+                <h2 id="forgot-password-title">Forgot password?</h2>
+                <button
+                  type="button"
+                  className="ghost-btn"
+                  onClick={() => {
+                    setShowRecoveryPanel((value) => !value);
+                    setRecoveryNotice("");
+                    setRecoveryEmail((current) => current || email);
+                  }}
+                >
+                  {showRecoveryPanel ? "Close" : "Reset password"}
+                </button>
+              </div>
+
+              {showRecoveryPanel ? (
+                <div className="forgot-password-body">
+                  <form className="auth-form" onSubmit={handleRequestResetCode}>
+                    <label>
+                      Account email
+                      <input
+                        type="email"
+                        value={recoveryEmail}
+                        onChange={(event) => setRecoveryEmail(event.target.value)}
+                        autoComplete="email"
+                        required
+                      />
+                    </label>
+                    <button type="submit" className="primary-btn" disabled={loading}>
+                      {loading ? "Generating..." : "Generate reset code"}
+                    </button>
+                  </form>
+
+                  <form className="auth-form" onSubmit={handleResetPasswordSubmit}>
+                    <label>
+                      Reset code
+                      <input
+                        type="text"
+                        value={recoveryResetCode}
+                        onChange={(event) => setRecoveryResetCode(event.target.value)}
+                        autoComplete="one-time-code"
+                        required
+                      />
+                    </label>
+
+                    <label>
+                      New password
+                      <div className="password-row">
+                        <input
+                          type={showRecoveryPassword ? "text" : "password"}
+                          value={recoveryNewPassword}
+                          onChange={(event) => setRecoveryNewPassword(event.target.value)}
+                          autoComplete="new-password"
+                          minLength={8}
+                          required
+                        />
+                        <button
+                          type="button"
+                          className="password-toggle"
+                          onClick={() => setShowRecoveryPassword((value) => !value)}
+                          aria-label={showRecoveryPassword ? "Hide password" : "Show password"}
+                        >
+                          {showRecoveryPassword ? "Hide" : "Show"}
+                        </button>
+                      </div>
+                    </label>
+
+                    <button type="submit" className="primary-btn" disabled={loading}>
+                      {loading ? "Updating..." : "Update password"}
+                    </button>
+                  </form>
+
+                  {recoveryNotice ? <p className="banner">{recoveryNotice}</p> : null}
+                  {recoveryExpiresAt ? (
+                    <p className="auth-footnote">
+                      Reset code expires at {new Date(recoveryExpiresAt).toLocaleString()}.
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+            </section>
+          ) : null}
+
           <p className="auth-footnote">
             Your data is tied to your account and stored in your backend database.
           </p>

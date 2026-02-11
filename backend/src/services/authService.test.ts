@@ -32,9 +32,22 @@ vi.mock("../logger/logger.js", () => ({
 import { UserModel } from "../models/User.js";
 import { SettingsModel } from "../models/Settings.js";
 import { comparePassword, hashPassword, signUserToken } from "../utils/auth.js";
-import { getCurrentUser, loginUser, registerUser } from "./authService.js";
+import {
+  getCurrentUser,
+  loginUser,
+  registerUser,
+  requestPasswordReset,
+  resetPassword
+} from "./authService.js";
 
-const makeUser = (overrides?: Partial<Record<string, unknown>>) => {
+const makeUser = (
+  overrides?: Partial<
+    Record<
+      "_id" | "email" | "passwordHash" | "createdAt" | "updatedAt" | "passwordResetTokenHash" | "passwordResetExpiresAt",
+      unknown
+    >
+  >
+) => {
   const now = new Date("2026-01-01T00:00:00.000Z");
 
   return {
@@ -43,6 +56,9 @@ const makeUser = (overrides?: Partial<Record<string, unknown>>) => {
     passwordHash: "hashed",
     createdAt: now,
     updatedAt: now,
+    passwordResetTokenHash: undefined,
+    passwordResetExpiresAt: undefined,
+    save: vi.fn().mockResolvedValue(undefined),
     ...overrides
   };
 };
@@ -77,7 +93,7 @@ describe("authService", () => {
 
     await expect(
       registerUser({ email: "john@example.com", password: "Password123" })
-    ).rejects.toMatchObject({ status: 409, message: "Email is already registered" });
+    ).rejects.toMatchObject({ status: 400, message: "Registration failed" });
   });
 
   it("logs user in successfully", async () => {
@@ -125,5 +141,86 @@ describe("authService", () => {
       status: 401,
       message: "User account no longer exists"
     });
+  });
+
+  it("generates a password reset code for an existing user", async () => {
+    const user = makeUser();
+    vi.mocked(UserModel.findOne).mockResolvedValue(user as never);
+
+    const result = await requestPasswordReset({ email: "john@example.com" });
+
+    expect(result.message).toBe("If this email exists, a reset code has been generated.");
+    expect(user.save).toHaveBeenCalledTimes(1);
+    expect(user.passwordResetTokenHash).toHaveLength(64);
+    expect(typeof user.passwordResetExpiresAt?.toISOString()).toBe("string");
+  });
+
+  it("returns a generic response when reset is requested for unknown email", async () => {
+    vi.mocked(UserModel.findOne).mockResolvedValue(null as never);
+
+    const result = await requestPasswordReset({ email: "missing@example.com" });
+
+    expect(result).toEqual({
+      message: "If this email exists, a reset code has been generated."
+    });
+  });
+
+  it("resets password with a valid reset code", async () => {
+    const resetToken = "reset-code";
+    const user = makeUser({
+      passwordResetTokenHash: createHash("sha256").update(resetToken).digest("hex"),
+      passwordResetExpiresAt: new Date(Date.now() + 60_000)
+    });
+
+    vi.mocked(UserModel.findOne).mockResolvedValue(user as never);
+    vi.mocked(hashPassword).mockResolvedValue("new_hash_123");
+
+    await expect(
+      resetPassword({
+        email: "john@example.com",
+        resetToken,
+        newPassword: "NewPassword123"
+      })
+    ).resolves.toBeUndefined();
+
+    expect(hashPassword).toHaveBeenCalledWith("NewPassword123");
+    expect(user.passwordHash).toBe("new_hash_123");
+    expect(user.passwordResetTokenHash).toBeUndefined();
+    expect(user.passwordResetExpiresAt).toBeUndefined();
+    expect(user.save).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails password reset with an invalid reset code", async () => {
+    const user = makeUser({
+      passwordResetTokenHash: createHash("sha256").update("valid-code").digest("hex"),
+      passwordResetExpiresAt: new Date(Date.now() + 60_000)
+    });
+
+    vi.mocked(UserModel.findOne).mockResolvedValue(user as never);
+
+    await expect(
+      resetPassword({
+        email: "john@example.com",
+        resetToken: "wrong-code",
+        newPassword: "NewPassword123"
+      })
+    ).rejects.toMatchObject({ status: 400, message: "Invalid or expired reset code" });
+  });
+
+  it("fails password reset when reset code is expired", async () => {
+    const user = makeUser({
+      passwordResetTokenHash: createHash("sha256").update("expired-code").digest("hex"),
+      passwordResetExpiresAt: new Date(Date.now() - 60_000)
+    });
+
+    vi.mocked(UserModel.findOne).mockResolvedValue(user as never);
+
+    await expect(
+      resetPassword({
+        email: "john@example.com",
+        resetToken: "expired-code",
+        newPassword: "NewPassword123"
+      })
+    ).rejects.toMatchObject({ status: 400, message: "Invalid or expired reset code" });
   });
 });

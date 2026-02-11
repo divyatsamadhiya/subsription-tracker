@@ -1,6 +1,15 @@
 import { create } from "zustand";
 import { ApiError, api } from "../lib/api";
-import { DEFAULT_SETTINGS, type AppSettings, type AuthUser, type BackupFileV1, type BillingCycle, type Subscription, type SubscriptionCategory } from "../types";
+import {
+  DEFAULT_SETTINGS,
+  type AppSettings,
+  type AuthUser,
+  type BackupFileV1,
+  type BillingCycle,
+  type ForgotPasswordResponse,
+  type Subscription,
+  type SubscriptionCategory
+} from "../types";
 
 const sortSubscriptions = (subscriptions: Subscription[]): Subscription[] => {
   return [...subscriptions].sort((first, second) => {
@@ -36,6 +45,8 @@ interface AppState {
   hydrate: () => Promise<void>;
   register: (email: string, password: string) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
+  forgotPassword: (email: string) => Promise<ForgotPasswordResponse>;
+  resetPassword: (email: string, resetToken: string, newPassword: string) => Promise<void>;
   logout: () => Promise<void>;
   addSubscription: (draft: SubscriptionDraft) => Promise<void>;
   updateSubscription: (id: string, draft: SubscriptionDraft) => Promise<void>;
@@ -165,6 +176,37 @@ export const useAppStore = create<AppState>((set) => ({
       set({
         loading: false,
         error: userMessage(error, "Login failed.")
+      });
+      throw error;
+    }
+  },
+
+  forgotPassword: async (email) => {
+    set({ loading: true, error: null });
+
+    try {
+      const response = await api.forgotPassword(email);
+      set({ loading: false, error: null });
+      return response;
+    } catch (error) {
+      set({
+        loading: false,
+        error: userMessage(error, "Failed to generate reset code.")
+      });
+      throw error;
+    }
+  },
+
+  resetPassword: async (email, resetToken, newPassword) => {
+    set({ loading: true, error: null });
+
+    try {
+      await api.resetPassword(email, resetToken, newPassword);
+      set({ loading: false, error: null });
+    } catch (error) {
+      set({
+        loading: false,
+        error: userMessage(error, "Failed to reset password.")
       });
       throw error;
     }

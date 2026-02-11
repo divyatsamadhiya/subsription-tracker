@@ -3,6 +3,8 @@ import { Schema, model } from "mongoose";
 export interface UserDocument {
   email: string;
   passwordHash: string;
+  passwordResetTokenHash?: string;
+  passwordResetExpiresAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -19,6 +21,14 @@ const userSchema = new Schema<UserDocument>(
     passwordHash: {
       type: String,
       required: true
+    },
+    passwordResetTokenHash: {
+      type: String,
+      required: false
+    },
+    passwordResetExpiresAt: {
+      type: Date,
+      required: false
     }
   },
   {

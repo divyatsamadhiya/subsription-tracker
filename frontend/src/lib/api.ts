@@ -2,10 +2,18 @@ import {
   appSettingsSchema,
   authResponseSchema,
   backupFileSchema,
+  forgotPasswordResponseSchema,
   subscriptionInputSchema,
   subscriptionSchema
 } from "./schemas";
-import type { AppSettings, AuthUser, BackupFileV1, Subscription, SubscriptionInput } from "../types";
+import type {
+  AppSettings,
+  AuthUser,
+  BackupFileV1,
+  ForgotPasswordResponse,
+  Subscription,
+  SubscriptionInput
+} from "../types";
 
 class ApiError extends Error {
   status: number;
@@ -80,6 +88,25 @@ export const api = {
     );
 
     return parsed.user;
+  },
+
+  async forgotPassword(email: string): Promise<ForgotPasswordResponse> {
+    return requestJson(
+      "/api/v1/auth/forgot-password",
+      {
+        method: "POST",
+        body: JSON.stringify({ email })
+      },
+      (payload) => forgotPasswordResponseSchema.parse(payload)
+    );
+  },
+
+  async resetPassword(email: string, resetToken: string, newPassword: string): Promise<void> {
+    await requestNoContent("/api/v1/auth/reset-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, resetToken, newPassword })
+    });
   },
 
   async logout(): Promise<void> {

@@ -5,6 +5,7 @@ import {
   type AppSettings,
   type AuthUser,
   type BackupFileV1,
+  type ForgotPasswordResponse,
   type Subscription,
   type SubscriptionInput
 } from "../types";
@@ -20,6 +21,12 @@ export const authUserSchema: z.ZodType<AuthUser> = z.object({
 
 export const authResponseSchema = z.object({
   user: authUserSchema
+});
+
+export const forgotPasswordResponseSchema: z.ZodType<ForgotPasswordResponse> = z.object({
+  message: z.string().min(1),
+  resetToken: z.string().min(1).optional(),
+  expiresAt: z.string().datetime().optional()
 });
 
 export const subscriptionInputSchema = z

@@ -57,6 +57,20 @@ export interface LoginInput {
   password: string;
 }
 
+export interface ForgotPasswordInput {
+  email: string;
+}
+
+export interface ForgotPasswordResponse {
+  message: string;
+}
+
+export interface ResetPasswordInput {
+  email: string;
+  resetToken: string;
+  newPassword: string;
+}
+
 export interface SubscriptionInput {
   name: string;
   amountMinor: number;

@@ -57,5 +57,8 @@ describe("error middleware", () => {
     errorHandler(new Error("Boom"), req, res, vi.fn());
 
     expect((res.status as unknown as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith(500);
+    expect((res.json as unknown as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith({
+      error: "Internal server error"
+    });
   });
 });

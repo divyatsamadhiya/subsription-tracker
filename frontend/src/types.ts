@@ -43,6 +43,12 @@ export interface AuthUser {
   updatedAt: string;
 }
 
+export interface ForgotPasswordResponse {
+  message: string;
+  resetToken?: string;
+  expiresAt?: string;
+}
+
 export interface SubscriptionInput {
   name: string;
   amountMinor: number;

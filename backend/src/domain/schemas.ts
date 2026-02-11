@@ -6,8 +6,11 @@ import {
   type AuthResponse,
   type AuthUser,
   type BackupFileV1,
+  type ForgotPasswordInput,
+  type ForgotPasswordResponse,
   type LoginInput,
   type RegisterInput,
+  type ResetPasswordInput,
   type Subscription,
   type SubscriptionInput
 } from "./types.js";
@@ -34,6 +37,20 @@ export const loginInputSchema = z.object({
   email: z.string().email().transform((value) => value.trim().toLowerCase()),
   password: z.string().min(8).max(128)
 }) satisfies z.ZodType<LoginInput>;
+
+export const forgotPasswordInputSchema = z.object({
+  email: z.string().email().transform((value) => value.trim().toLowerCase())
+}) satisfies z.ZodType<ForgotPasswordInput>;
+
+export const forgotPasswordResponseSchema = z.object({
+  message: z.string().min(1)
+}) satisfies z.ZodType<ForgotPasswordResponse>;
+
+export const resetPasswordInputSchema = z.object({
+  email: z.string().email().transform((value) => value.trim().toLowerCase()),
+  resetToken: z.string().min(1),
+  newPassword: z.string().min(8).max(128)
+}) satisfies z.ZodType<ResetPasswordInput>;
 
 export const subscriptionInputSchema = z
   .object({
