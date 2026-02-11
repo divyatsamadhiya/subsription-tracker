@@ -7,12 +7,6 @@ Pulseboard is now a full-stack monorepo with a separated React frontend and Expr
 - `frontend`: React + Vite + TypeScript app
 - `backend`: Express.js + MongoDB + JWT cookie auth
 
-## Repository Layout
-
-- `/Users/divyatsamadhiya/Developer/repos/subsription-tracker/frontend`
-- `/Users/divyatsamadhiya/Developer/repos/subsription-tracker/backend`
-- `/Users/divyatsamadhiya/Developer/repos/subsription-tracker/docs/plan`
-
 ## Prerequisites
 
 - Node.js 20+
@@ -21,7 +15,7 @@ Pulseboard is now a full-stack monorepo with a separated React frontend and Expr
 
 ## Environment
 
-Create `/Users/divyatsamadhiya/Developer/repos/subsription-tracker/backend/.env` based on `/Users/divyatsamadhiya/Developer/repos/subsription-tracker/backend/.env.example`.
+Create `.env`
 
 Required values:
 
