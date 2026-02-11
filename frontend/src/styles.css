@@ -135,11 +135,6 @@ select {
   margin: 0;
 }
 
-.auth-footnote {
-  font-size: 0.82rem;
-  color: var(--text-muted);
-}
-
 .app-shell {
   width: min(1080px, 100% - 1.5rem);
   margin: 1.25rem auto 2rem;

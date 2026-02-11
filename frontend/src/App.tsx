@@ -504,9 +504,6 @@ const App = () => {
             </section>
           ) : null}
 
-          <p className="auth-footnote">
-            Your data is tied to your account and stored in your backend database.
-          </p>
         </section>
       </main>
     );
