@@ -15,7 +15,7 @@ vi.mock("../logger/logger.js", () => ({
 }));
 
 import type { Request, Response } from "express";
-import { requireAuth } from "./auth.js";
+import { getAuthUserId, optionalAuth, requireAuth } from "./auth.js";
 import { verifyUserToken } from "../utils/auth.js";
 
 const makeResponse = () => {
@@ -75,5 +75,49 @@ describe("requireAuth middleware", () => {
 
     expect(next).toHaveBeenCalledTimes(1);
     expect((req as Request & { userId?: string }).userId).toBe("user_1");
+  });
+});
+
+describe("optionalAuth middleware", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("continues without userId when token is missing", () => {
+    const req = { cookies: {} } as unknown as Request;
+    const res = makeResponse();
+    const next = vi.fn();
+
+    optionalAuth(req, res, next);
+
+    expect(next).toHaveBeenCalledTimes(1);
+    expect((req as Request & { userId?: string }).userId).toBeUndefined();
+  });
+
+  it("continues without userId when token is invalid", () => {
+    vi.mocked(verifyUserToken).mockImplementation(() => {
+      throw new Error("invalid");
+    });
+
+    const req = { cookies: { pulseboard_token: "bad_token" } } as unknown as Request;
+    const res = makeResponse();
+    const next = vi.fn();
+
+    optionalAuth(req, res, next);
+
+    expect(next).toHaveBeenCalledTimes(1);
+    expect((req as Request & { userId?: string }).userId).toBeUndefined();
+  });
+});
+
+describe("getAuthUserId", () => {
+  it("returns userId when present", () => {
+    const req = { userId: "user_1" } as unknown as Request;
+    expect(getAuthUserId(req)).toBe("user_1");
+  });
+
+  it("throws HttpError 401 when userId is missing", () => {
+    const req = {} as Request;
+    expect(() => getAuthUserId(req)).toThrowError(/Authentication required/);
   });
 });

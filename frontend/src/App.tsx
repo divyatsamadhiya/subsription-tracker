@@ -78,7 +78,6 @@ const App = () => {
   const [recoveryNewPassword, setRecoveryNewPassword] = useState("");
   const [showRecoveryPassword, setShowRecoveryPassword] = useState(false);
   const [recoveryNotice, setRecoveryNotice] = useState("");
-  const [recoveryExpiresAt, setRecoveryExpiresAt] = useState<string | null>(null);
   const [authNotice, setAuthNotice] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -289,13 +288,10 @@ const App = () => {
   const handleRequestResetCode = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setRecoveryNotice("");
-    setRecoveryExpiresAt(null);
 
     try {
       const response = await forgotPassword(recoveryEmail);
       setRecoveryNotice(response.message);
-      setRecoveryResetCode(response.resetToken ?? "");
-      setRecoveryExpiresAt(response.expiresAt ?? null);
     } catch {
       setRecoveryNotice("Unable to generate reset code.");
     }
@@ -311,7 +307,6 @@ const App = () => {
       setPassword("");
       setRecoveryResetCode("");
       setRecoveryNewPassword("");
-      setRecoveryExpiresAt(null);
       setShowRecoveryPanel(false);
     } catch {
       setRecoveryNotice("Reset failed. Check the code and try again.");
@@ -504,11 +499,6 @@ const App = () => {
                   </form>
 
                   {recoveryNotice ? <p className="banner">{recoveryNotice}</p> : null}
-                  {recoveryExpiresAt ? (
-                    <p className="auth-footnote">
-                      Reset code expires at {new Date(recoveryExpiresAt).toLocaleString()}.
-                    </p>
-                  ) : null}
                 </div>
               ) : null}
             </section>

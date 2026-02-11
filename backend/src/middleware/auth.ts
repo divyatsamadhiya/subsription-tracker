@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import { authCookieName, verifyUserToken } from "../utils/auth.js";
 import { logger } from "../logger/logger.js";
+import { HttpError } from "../utils/http.js";
 
 export const requireAuth = (req: Request, res: Response, next: NextFunction): void => {
   const token = req.cookies[authCookieName] as string | undefined;
@@ -39,5 +40,9 @@ export const optionalAuth = (req: Request, _res: Response, next: NextFunction): 
 };
 
 export const getAuthUserId = (req: Request): string => {
-  return (req as Request & { userId?: string }).userId ?? "";
+  const userId = (req as Request & { userId?: string }).userId;
+  if (!userId) {
+    throw new HttpError(401, "Authentication required");
+  }
+  return userId;
 };

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../models/User.js", () => ({
@@ -152,7 +153,7 @@ describe("authService", () => {
     expect(result.message).toBe("If this email exists, a reset code has been generated.");
     expect(user.save).toHaveBeenCalledTimes(1);
     expect(user.passwordResetTokenHash).toHaveLength(64);
-    expect(typeof user.passwordResetExpiresAt?.toISOString()).toBe("string");
+    expect(user.passwordResetExpiresAt).toBeInstanceOf(Date);
   });
 
   it("returns a generic response when reset is requested for unknown email", async () => {

@@ -22,35 +22,35 @@ export const authUserSchema = z.object({
   email: z.string().email(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime()
-}) satisfies z.ZodType<AuthUser>;
+}).strict() satisfies z.ZodType<AuthUser>;
 
 export const authResponseSchema = z.object({
   user: authUserSchema
-}) satisfies z.ZodType<AuthResponse>;
+}).strict() satisfies z.ZodType<AuthResponse>;
 
 export const registerInputSchema = z.object({
   email: z.string().email().transform((value) => value.trim().toLowerCase()),
   password: z.string().min(8).max(128)
-}) satisfies z.ZodType<RegisterInput>;
+}).strict() satisfies z.ZodType<RegisterInput>;
 
 export const loginInputSchema = z.object({
   email: z.string().email().transform((value) => value.trim().toLowerCase()),
   password: z.string().min(8).max(128)
-}) satisfies z.ZodType<LoginInput>;
+}).strict() satisfies z.ZodType<LoginInput>;
 
 export const forgotPasswordInputSchema = z.object({
   email: z.string().email().transform((value) => value.trim().toLowerCase())
-}) satisfies z.ZodType<ForgotPasswordInput>;
+}).strict() satisfies z.ZodType<ForgotPasswordInput>;
 
 export const forgotPasswordResponseSchema = z.object({
   message: z.string().min(1)
-}) satisfies z.ZodType<ForgotPasswordResponse>;
+}).strict() satisfies z.ZodType<ForgotPasswordResponse>;
 
 export const resetPasswordInputSchema = z.object({
   email: z.string().email().transform((value) => value.trim().toLowerCase()),
   resetToken: z.string().min(1),
   newPassword: z.string().min(8).max(128)
-}) satisfies z.ZodType<ResetPasswordInput>;
+}).strict() satisfies z.ZodType<ResetPasswordInput>;
 
 export const subscriptionInputSchema = z
   .object({
@@ -64,6 +64,7 @@ export const subscriptionInputSchema = z
     isActive: z.boolean(),
     notes: z.string().max(2000).optional()
   })
+  .strict()
   .superRefine((value, context) => {
     if (value.billingCycle === "custom_days" && !value.customIntervalDays) {
       context.addIssue({
@@ -88,13 +89,13 @@ export const subscriptionSchema = z.object({
   notes: z.string().max(2000).optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime()
-}) satisfies z.ZodType<Subscription>;
+}).strict() satisfies z.ZodType<Subscription>;
 
 export const appSettingsSchema = z.object({
   defaultCurrency: z.string().length(3),
   weekStartsOn: z.union([z.literal(0), z.literal(1)]),
   notificationsEnabled: z.boolean()
-}) satisfies z.ZodType<AppSettings>;
+}).strict() satisfies z.ZodType<AppSettings>;
 
 export const updateSettingsSchema = appSettingsSchema.partial().refine(
   (value) => Object.keys(value).length > 0,
@@ -106,4 +107,4 @@ export const backupFileSchema = z.object({
   exportedAt: z.string().datetime(),
   settings: appSettingsSchema,
   subscriptions: z.array(subscriptionSchema)
-}) satisfies z.ZodType<BackupFileV1>;
+}).strict() satisfies z.ZodType<BackupFileV1>;

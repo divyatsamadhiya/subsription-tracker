@@ -22,7 +22,7 @@ Required values:
 - `MONGODB_URI`
 - `JWT_SECRET`
 - `PORT` (default `4000`)
-- `FRONTEND_ORIGIN` (default `http://localhost:5173`)
+- `FRONTEND_ORIGIN` (default `http://localhost:5173`, comma-separated list supported, `*` is not allowed)
 
 ## Install
 
@@ -68,6 +68,7 @@ Base URL: `http://localhost:4000/api/v1`
 ## Notes
 
 - Auth uses HTTP-only JWT cookies (`pulseboard_token`) with a 7-day expiry.
+- Authenticated write requests are origin-checked against `FRONTEND_ORIGIN`.
 - All subscription/settings/backup data is user-scoped on the backend.
 - The app is online-first now. PWA shell remains installable, but data operations require backend access.
 - This migration is a fresh-start cutover: no automatic browser Dexie migration path is included.

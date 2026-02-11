@@ -17,17 +17,15 @@ export const authUserSchema: z.ZodType<AuthUser> = z.object({
   email: z.string().email(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime()
-});
+}).strict();
 
 export const authResponseSchema = z.object({
   user: authUserSchema
-});
+}).strict();
 
 export const forgotPasswordResponseSchema: z.ZodType<ForgotPasswordResponse> = z.object({
-  message: z.string().min(1),
-  resetToken: z.string().min(1).optional(),
-  expiresAt: z.string().datetime().optional()
-});
+  message: z.string().min(1)
+}).strict();
 
 export const subscriptionInputSchema = z
   .object({
@@ -41,6 +39,7 @@ export const subscriptionInputSchema = z
     isActive: z.boolean(),
     notes: z.string().max(2000).optional()
   })
+  .strict()
   .superRefine((value, context) => {
     if (value.billingCycle === "custom_days" && !value.customIntervalDays) {
       context.addIssue({
@@ -65,13 +64,13 @@ export const subscriptionSchema: z.ZodType<Subscription> = z.object({
   notes: z.string().max(2000).optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime()
-});
+}).strict();
 
 export const appSettingsSchema = z.object({
   defaultCurrency: z.string().length(3),
   weekStartsOn: z.union([z.literal(0), z.literal(1)]),
   notificationsEnabled: z.boolean()
-}) satisfies z.ZodType<AppSettings>;
+}).strict() satisfies z.ZodType<AppSettings>;
 
 export const updateSettingsSchema = appSettingsSchema.partial().refine(
   (value) => Object.keys(value).length > 0,
@@ -83,7 +82,7 @@ export const backupFileSchema: z.ZodType<BackupFileV1> = z.object({
   exportedAt: z.string().datetime(),
   settings: appSettingsSchema,
   subscriptions: z.array(subscriptionSchema)
-});
+}).strict();
 
 const formBaseSchema = z.object({
   name: z.string().trim().min(1, "Name is required"),

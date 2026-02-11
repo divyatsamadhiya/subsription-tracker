@@ -35,7 +35,7 @@ export const authController = {
   },
 
   logout: async (req: Request, res: Response): Promise<void> => {
-    const userId = getAuthUserId(req);
+    const userId = (req as Request & { userId?: string }).userId;
     if (userId) {
       logger.info("Logout requested", { userId });
     }

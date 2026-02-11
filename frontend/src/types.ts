@@ -45,8 +45,6 @@ export interface AuthUser {
 
 export interface ForgotPasswordResponse {
   message: string;
-  resetToken?: string;
-  expiresAt?: string;
 }
 
 export interface SubscriptionInput {

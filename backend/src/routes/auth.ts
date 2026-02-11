@@ -1,6 +1,6 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
-import { requireAuth } from "../middleware/auth.js";
+import { optionalAuth, requireAuth } from "../middleware/auth.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { authController } from "../controllers/authController.js";
 
@@ -21,5 +21,5 @@ authRouter.post("/register", authWriteLimiter, asyncHandler(authController.regis
 authRouter.post("/login", authWriteLimiter, asyncHandler(authController.login));
 authRouter.post("/forgot-password", authWriteLimiter, asyncHandler(authController.forgotPassword));
 authRouter.post("/reset-password", authWriteLimiter, asyncHandler(authController.resetPassword));
-authRouter.post("/logout", asyncHandler(authController.logout));
+authRouter.post("/logout", optionalAuth, asyncHandler(authController.logout));
 authRouter.get("/me", requireAuth, asyncHandler(authController.me));

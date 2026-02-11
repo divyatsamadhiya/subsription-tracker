@@ -1,9 +1,13 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Request, Response } from "express";
 import { requestLogger } from "./requestLogger.js";
 import { logger } from "../logger/logger.js";
 
 describe("requestLogger middleware", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("logs successful responses", () => {
     const infoSpy = vi.spyOn(logger, "info").mockImplementation(() => logger);
     const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => logger);

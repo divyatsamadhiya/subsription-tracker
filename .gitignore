@@ -8,5 +8,11 @@ coverage
 **/coverage
 *.tsbuildinfo
 .env
+.env.*
 backend/.env
+backend/.env.*
+frontend/.env
+frontend/.env.*
+.npmrc
+*.log
 .DS_Store

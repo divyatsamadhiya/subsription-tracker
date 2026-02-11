@@ -43,6 +43,4 @@ const settingsSchema = new Schema<SettingsDocument>(
   }
 );
 
-settingsSchema.index({ userId: 1 }, { unique: true });
-
 export const SettingsModel = model<SettingsDocument>("Settings", settingsSchema);
