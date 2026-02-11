@@ -16,3 +16,4 @@ frontend/.env.*
 .npmrc
 *.log
 .DS_Store
+docs/
