@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomInt } from "node:crypto";
 import {
   authResponseSchema,
   authUserSchema,
@@ -24,6 +24,7 @@ import {
 import { HttpError } from "../utils/http.js";
 import { toAuthUser } from "../utils/serializers.js";
 import { logger } from "../logger/logger.js";
+import { sendPasswordResetEmail } from "./passwordResetEmailService.js";
 
 export interface AuthWithToken {
   token: string;
@@ -116,19 +117,36 @@ export const requestPasswordReset = async (input: unknown): Promise<ForgotPasswo
     return forgotPasswordResponseSchema.parse({ message });
   }
 
-  const resetToken = randomBytes(32).toString("hex");
+  const resetCode = String(randomInt(100_000, 1_000_000));
   const expiresAt = new Date(Date.now() + resetTokenTtlMs);
 
-  user.passwordResetTokenHash = hashResetToken(resetToken);
+  user.passwordResetTokenHash = hashResetToken(resetCode);
   user.passwordResetExpiresAt = expiresAt;
   await user.save();
 
-  logger.info("Password reset code generated", {
+  try {
+    await sendPasswordResetEmail({
+      toEmail: user.email,
+      resetCode,
+      expiresAt
+    });
+  } catch (error) {
+    user.passwordResetTokenHash = undefined;
+    user.passwordResetExpiresAt = undefined;
+    await user.save();
+
+    logger.error("Password reset email delivery failed", {
+      userId: user._id.toString(),
+      message: error instanceof Error ? error.message : "Unknown email delivery error"
+    });
+    throw new HttpError(503, "Password reset is temporarily unavailable. Please try again later.");
+  }
+
+  logger.info("Password reset code generated and delivered", {
     userId: user._id.toString(),
     expiresAt: expiresAt.toISOString()
   });
 
-  // In production this token should be delivered out-of-band (email/SMS), never returned by API.
   return forgotPasswordResponseSchema.parse({ message });
 };
 

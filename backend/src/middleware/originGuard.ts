@@ -17,6 +17,19 @@ const getRefererOrigin = (referer: string | undefined): string | null => {
   }
 };
 
+const normalizeOrigin = (originHeader: string | undefined): string | null => {
+  if (!originHeader) {
+    return null;
+  }
+
+  const normalized = originHeader.trim().toLowerCase();
+  if (normalized === "null") {
+    return null;
+  }
+
+  return originHeader;
+};
+
 export const enforceTrustedOrigin = (req: Request, res: Response, next: NextFunction): void => {
   if (!unsafeMethods.has(req.method.toUpperCase())) {
     next();
@@ -29,7 +42,7 @@ export const enforceTrustedOrigin = (req: Request, res: Response, next: NextFunc
     return;
   }
 
-  const origin = req.get("origin") ?? getRefererOrigin(req.get("referer"));
+  const origin = normalizeOrigin(req.get("origin")) ?? getRefererOrigin(req.get("referer"));
 
   // Allow non-browser clients that do not send Origin/Referer.
   if (!origin) {

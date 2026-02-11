@@ -24,6 +24,14 @@ Required values:
 - `PORT` (default `4000`)
 - `FRONTEND_ORIGIN` (default `http://localhost:5173`, comma-separated list supported, `*` is not allowed)
 
+Optional for password reset email delivery:
+
+- `RESEND_API_KEY` (recommended; reset emails are sent with Resend API)
+- `RESET_EMAIL_FROM` (default `onboarding@resend.dev`)
+- `RESET_EMAIL_FROM_NAME` (default `Pulseboard`)
+- `ALLOW_SENDMAIL_FALLBACK` (default `false`; set `true` only if your host MTA is configured)
+- `SENDMAIL_PATH` (default `/usr/sbin/sendmail`; used only when `ALLOW_SENDMAIL_FALLBACK=true`)
+
 ## Install
 
 ```bash
@@ -54,6 +62,8 @@ Base URL: `http://localhost:4000/api/v1`
 
 - `POST /auth/register`
 - `POST /auth/login`
+- `POST /auth/forgot-password`
+- `POST /auth/reset-password`
 - `POST /auth/logout`
 - `GET /auth/me`
 - `GET /subscriptions`
