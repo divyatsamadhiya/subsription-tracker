@@ -24,7 +24,10 @@ export const SubscriptionGrid = ({
   return (
     <section className="panel" aria-labelledby="subscriptions-title">
       <div className="panel-head">
-        <h2 id="subscriptions-title">Subscriptions by category</h2>
+        <div>
+          <h2 id="subscriptions-title">Subscriptions by category</h2>
+          <p className="panel-subtitle">Edit, export reminders, or remove services</p>
+        </div>
         <span className="badge">
           {subscriptions.length} items · {grouped.length} categories
         </span>
@@ -58,7 +61,9 @@ export const SubscriptionGrid = ({
 
                     <div className="meta-row">
                       <span className="meta-pill">Next {subscription.nextBillingDate}</span>
-                      <span className="meta-pill">{subscription.billingCycle.replace("_", " ")}</span>
+                      <span className="meta-pill pill-cycle">
+                        {subscription.billingCycle.replace("_", " ")}
+                      </span>
                     </div>
 
                     {subscription.notes ? <p className="notes">{subscription.notes}</p> : null}
