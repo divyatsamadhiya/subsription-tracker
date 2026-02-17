@@ -443,6 +443,18 @@ const App = () => {
   const shouldShowProfilePrompt =
     user !== null && !user.profileComplete && showProfileCompletionPrompt;
 
+  const todayLabel = useMemo(() => {
+    return new Date(todayIsoDate).toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric"
+    });
+  }, [todayIsoDate]);
+
+  const activeViewLabel = useMemo(() => {
+    return viewTabs.find((tab) => tab.id === activeView)?.label ?? "Overview";
+  }, [activeView]);
+
   if (loading && !hydrated) {
     return (
       <main className="loading-state">
@@ -453,14 +465,59 @@ const App = () => {
 
   if (!user) {
     const showRecoveryCard = authMode === "login" && showRecoveryPanel;
+    const authLayoutClass = showRecoveryCard
+      ? "auth-layout with-recovery"
+      : authMode === "register"
+        ? "auth-layout register-layout"
+        : "auth-layout";
 
     return (
       <main className="auth-shell">
-        <div className={showRecoveryCard ? "auth-layout with-recovery" : "auth-layout"}>
+        <div className={authLayoutClass}>
+          {authMode === "login" ? (
+            <aside className="panel auth-showcase" aria-hidden="true">
+              <p className="eyebrow">Finance command center</p>
+              <h2>Everything recurring, visualized in one clean workspace.</h2>
+              <p>
+                Stay ahead of renewals, forecast yearly spending, and keep your account history safe
+                with backup and restore controls.
+              </p>
+              <ul className="showcase-list">
+                <li>Live monthly and annual spend metrics</li>
+                <li>Upcoming renewal timeline with due-state badges</li>
+                <li>Secure profile, settings, and backup management</li>
+              </ul>
+            </aside>
+          ) : (
+            <aside className="panel auth-showcase register-showcase" aria-hidden="true">
+              <p className="eyebrow">Account setup flow</p>
+              <h2>Create your workspace and start tracking within a minute.</h2>
+              <p>Set your identity once, then manage subscriptions from a clean dashboard.</p>
+              <ol className="showcase-steps">
+                <li>
+                  <strong>Step 1</strong>
+                  <span>Add your basic account details.</span>
+                </li>
+                <li>
+                  <strong>Step 2</strong>
+                  <span>Create your first subscription entry.</span>
+                </li>
+                <li>
+                  <strong>Step 3</strong>
+                  <span>Enable reminders and backup data.</span>
+                </li>
+              </ol>
+            </aside>
+          )}
+
           <section className="panel auth-panel" aria-labelledby="auth-title">
             <p className="eyebrow">Subscription Tracker</p>
             <h1 id="auth-title">{authMode === "login" ? "Welcome back" : "Create your account"}</h1>
-            <p className="topbar-subtitle">Sign in to manage billing, reminders, and backups.</p>
+            <p className="topbar-subtitle">
+              {authMode === "login"
+                ? "Sign in to manage billing, reminders, and backups."
+                : "Create an account to start tracking subscriptions with reminders and backups."}
+            </p>
 
             {error ? <p className="banner error">Error: {error}</p> : null}
             {authNotice ? <p className="banner">{authNotice}</p> : null}
@@ -668,66 +725,60 @@ const App = () => {
 
   return (
     <main className="app-shell">
-      <header className="topbar panel">
-        <div className="topbar-copy">
-          <p className="eyebrow">Subscription Tracker</p>
-          <h1>Track recurring costs in one place</h1>
-          <p className="topbar-subtitle">Manage subscriptions, settings, reminders, and backups.</p>
-          <p className="signed-in">Signed in as {user.profile.fullName ?? user.email}</p>
-        </div>
+      <div className="workspace-layout">
+        <aside className="workspace-sidebar panel">
+          <div className="sidebar-brand">
+            <p className="eyebrow">Subscription Tracker</p>
+            <h1>Billing Workspace</h1>
+            <p className="tiny-note">Signed in as {user.profile.fullName ?? user.email}</p>
+          </div>
 
-        <nav className="view-nav" aria-label="Primary sections">
-          {viewTabs.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              className={activeView === tab.id ? "view-btn active" : "view-btn"}
-              onClick={() => setActiveView(tab.id)}
-            >
-              {tab.label}
-            </button>
-          ))}
-          <button type="button" className="ghost-btn" onClick={() => void handleLogout()}>
+          <nav className="sidebar-nav" aria-label="Primary sections">
+            {viewTabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                className={activeView === tab.id ? "sidebar-btn active" : "sidebar-btn"}
+                onClick={() => setActiveView(tab.id)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </nav>
+
+          <div className="sidebar-metrics" aria-label="Workspace highlights">
+            <article className="topbar-metric">
+              <span>Monthly spend</span>
+              <strong>{formatCurrencyMinor(monthlyTotalMinor, settings.defaultCurrency)}</strong>
+            </article>
+            <article className="topbar-metric">
+              <span>Active services</span>
+              <strong>{activeSubscriptions.length}</strong>
+            </article>
+            <article className="topbar-metric">
+              <span>Next renewal</span>
+              <strong>{renewals[0]?.nextBillingDate ?? "No upcoming dates"}</strong>
+            </article>
+          </div>
+
+          <button
+            type="button"
+            className="ghost-btn signout-btn signout-btn-sidebar"
+            onClick={() => void handleLogout()}
+          >
             Sign out
           </button>
-        </nav>
-      </header>
+        </aside>
 
-      {error ? <p className="banner error">Error: {error}</p> : null}
-      {notice ? <p className="banner">{notice}</p> : null}
-      {shouldShowProfilePrompt ? (
-        <div className="banner profile-banner" role="status">
-          <p>
-            Complete your profile details (full name and country) to finish account setup.
-          </p>
-          <div className="profile-banner-actions">
-            <button type="button" className="ghost-btn" onClick={() => setActiveView("profile")}>
-              Complete now
-            </button>
-            <button
-              type="button"
-              className="ghost-btn"
-              onClick={() => setShowProfileCompletionPrompt(false)}
-            >
-              Dismiss
-            </button>
-          </div>
-        </div>
-      ) : null}
+        <section className="workspace-main">
+          <header className="workspace-header panel">
+            <div className="workspace-copy">
+              <p className="eyebrow">Workspace overview</p>
+              <h2>{activeViewLabel}</h2>
+              <p className="topbar-subtitle">Date: {todayLabel}</p>
+            </div>
 
-      {activeView === "overview" ? (
-        <div className="overview-grid">
-          <section className="panel highlight-card" aria-labelledby="focus-title">
-            <p className="highlight-label">Current spending pulse</p>
-            <h2 id="focus-title">{formatCurrencyMinor(monthlyTotalMinor, settings.defaultCurrency)}</h2>
-            <p>
-              Monthly baseline with <strong>{activeSubscriptions.length}</strong> active services.
-            </p>
-            <p className="highlight-muted">
-              Yearly projection: {formatCurrencyMinor(yearlyTotalMinor, settings.defaultCurrency)}
-            </p>
-
-            <div className="highlight-actions">
+            <div className="workspace-actions">
               <button
                 type="button"
                 className="primary-btn"
@@ -742,239 +793,305 @@ const App = () => {
                 Open settings
               </button>
             </div>
-          </section>
+          </header>
 
-          <section className="panel stats-shell" aria-labelledby="summary-title">
-            <div className="panel-head">
-              <h2 id="summary-title">Spend summary</h2>
+          {error ? <p className="banner error">Error: {error}</p> : null}
+          {notice ? <p className="banner">{notice}</p> : null}
+          {shouldShowProfilePrompt ? (
+            <div className="banner profile-banner" role="status">
+              <p>
+                Complete your profile details (full name and country) to finish account setup.
+              </p>
+              <div className="profile-banner-actions">
+                <button type="button" className="ghost-btn" onClick={() => setActiveView("profile")}>
+                  Complete now
+                </button>
+                <button
+                  type="button"
+                  className="ghost-btn"
+                  onClick={() => setShowProfileCompletionPrompt(false)}
+                >
+                  Dismiss
+                </button>
+              </div>
             </div>
-            <StatCards
-              monthlyTotalMinor={monthlyTotalMinor}
-              yearlyTotalMinor={yearlyTotalMinor}
-              activeCount={activeSubscriptions.length}
-              currency={settings.defaultCurrency}
-            />
-          </section>
+          ) : null}
 
-          <div className="renewals-shell">
-            <UpcomingRenewals
-              renewals={renewals}
-              currency={settings.defaultCurrency}
-              windowDays={upcomingWindow}
-              onWindowChange={setUpcomingWindow}
-            />
-          </div>
+          {activeView === "overview" ? (
+            <div className="overview-grid">
+              <section className="panel highlight-card" aria-labelledby="focus-title">
+                <p className="highlight-label">Current spending pulse</p>
+                <h2 id="focus-title">{formatCurrencyMinor(monthlyTotalMinor, settings.defaultCurrency)}</h2>
+                <p>
+                  Monthly baseline with <strong>{activeSubscriptions.length}</strong> active services.
+                </p>
+                <p className="highlight-muted">
+                  Yearly projection: {formatCurrencyMinor(yearlyTotalMinor, settings.defaultCurrency)}
+                </p>
 
-          <section className="panel reminder-panel" aria-label="Today reminders">
-            <div className="panel-head">
-              <h2>Reminder center</h2>
-            </div>
+                <div className="highlight-kpis">
+                  <span>
+                    <strong>{subscriptions.length}</strong> total subscriptions
+                  </span>
+                  <span>
+                    <strong>{renewals.length}</strong> renewals in selected window
+                  </span>
+                </div>
 
-            {reminderHits.length === 0 ? (
-              <p className="empty-note">No reminder triggers for today.</p>
-            ) : (
-              <ul className="reminder-list">
-                {reminderHits.map((hit) => {
-                  const normalizedDays = Math.max(
-                    0,
-                    daysUntil(hit.subscription.nextBillingDate, todayIsoDate)
-                  );
+                <div className="highlight-actions">
+                  <button
+                    type="button"
+                    className="primary-btn"
+                    onClick={() => {
+                      setEditingId(null);
+                      setActiveView("subscriptions");
+                    }}
+                  >
+                    Add subscription
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost-btn"
+                    onClick={() => setActiveView("settings")}
+                  >
+                    Open settings
+                  </button>
+                </div>
+              </section>
 
-                  return (
-                    <li key={`${hit.subscription.id}-${hit.subscription.nextBillingDate}-${hit.daysBefore}`}>
-                      <strong>{hit.subscription.name}</strong> {formatRelativeDue(normalizedDays)}
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </section>
-        </div>
-      ) : null}
-
-      {activeView === "subscriptions" ? (
-        <div className="manage-layout">
-          <div className="manage-left">
-            <SubscriptionForm
-              mode={editingSubscription ? "edit" : "create"}
-              currency={settings.defaultCurrency}
-              initialValue={editingSubscription}
-              onSubmit={handleFormSubmit}
-              onCancelEdit={() => setEditingId(null)}
-            />
-          </div>
-
-          <div className="manage-right">
-            <SubscriptionGrid
-              subscriptions={subscriptions}
-              currency={settings.defaultCurrency}
-              onEdit={(id) => setEditingId(id)}
-              onDelete={handleDelete}
-              onExportIcs={handleExportIcs}
-            />
-          </div>
-        </div>
-      ) : null}
-
-      {activeView === "profile" ? (
-        <div className="profile-grid">
-          <section className="panel" aria-labelledby="profile-title">
-            <div className="panel-head">
-              <h2 id="profile-title">Profile details</h2>
-            </div>
-
-            <form className="auth-form profile-form" onSubmit={handleProfileSave}>
-              <label>
-                Full name
-                <input
-                  type="text"
-                  value={profileFullName}
-                  onChange={(event) => setProfileFullName(event.target.value)}
-                  autoComplete="name"
-                  minLength={2}
-                  maxLength={80}
-                  required
+              <section className="panel stats-shell" aria-labelledby="summary-title">
+                <div className="panel-head">
+                  <h2 id="summary-title">Spend summary</h2>
+                </div>
+                <StatCards
+                  monthlyTotalMinor={monthlyTotalMinor}
+                  yearlyTotalMinor={yearlyTotalMinor}
+                  activeCount={activeSubscriptions.length}
+                  currency={settings.defaultCurrency}
                 />
-              </label>
+              </section>
 
-              <div className="split">
-                <label>
-                  Country
-                  <input
-                    type="text"
-                    value={profileCountry}
-                    onChange={(event) => setProfileCountry(event.target.value)}
-                    placeholder="India"
-                    autoComplete="country-name"
-                    minLength={2}
-                    maxLength={80}
-                    required
-                  />
-                </label>
-
-                <label>
-                  Timezone (optional)
-                  <input
-                    type="text"
-                    value={profileTimeZone}
-                    onChange={(event) => setProfileTimeZone(event.target.value)}
-                    placeholder="America/New_York"
-                    autoComplete="off"
-                  />
-                </label>
+              <div className="renewals-shell">
+                <UpcomingRenewals
+                  renewals={renewals}
+                  currency={settings.defaultCurrency}
+                  windowDays={upcomingWindow}
+                  onWindowChange={setUpcomingWindow}
+                />
               </div>
 
-              <label>
-                Phone (optional)
-                <input
-                  type="tel"
-                  value={profilePhone}
-                  onChange={(event) => setProfilePhone(event.target.value)}
-                  placeholder="+14155552671"
-                  autoComplete="tel"
+              <section className="panel reminder-panel" aria-label="Today reminders">
+                <div className="panel-head">
+                  <h2>Reminder center</h2>
+                </div>
+
+                {reminderHits.length === 0 ? (
+                  <p className="empty-note">No reminder triggers for today.</p>
+                ) : (
+                  <ul className="reminder-list">
+                    {reminderHits.map((hit) => {
+                      const normalizedDays = Math.max(
+                        0,
+                        daysUntil(hit.subscription.nextBillingDate, todayIsoDate)
+                      );
+
+                      return (
+                        <li key={`${hit.subscription.id}-${hit.subscription.nextBillingDate}-${hit.daysBefore}`}>
+                          <strong>{hit.subscription.name}</strong> {formatRelativeDue(normalizedDays)}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </section>
+            </div>
+          ) : null}
+
+          {activeView === "subscriptions" ? (
+            <div className="manage-layout">
+              <div className="manage-left">
+                <SubscriptionForm
+                  mode={editingSubscription ? "edit" : "create"}
+                  currency={settings.defaultCurrency}
+                  initialValue={editingSubscription}
+                  onSubmit={handleFormSubmit}
+                  onCancelEdit={() => setEditingId(null)}
                 />
-              </label>
+              </div>
 
-              <label>
-                Bio (optional)
-                <textarea
-                  value={profileBio}
-                  onChange={(event) => setProfileBio(event.target.value)}
-                  rows={4}
-                  maxLength={280}
-                  placeholder="Tell us a bit about your billing setup."
+              <div className="manage-right">
+                <SubscriptionGrid
+                  subscriptions={subscriptions}
+                  currency={settings.defaultCurrency}
+                  onEdit={(id) => setEditingId(id)}
+                  onDelete={handleDelete}
+                  onExportIcs={handleExportIcs}
                 />
-              </label>
-
-              <button type="submit" className="primary-btn">
-                Save profile
-              </button>
-            </form>
-          </section>
-        </div>
-      ) : null}
-
-      {activeView === "settings" ? (
-        <div className="settings-grid">
-          <section className="panel" aria-labelledby="app-settings-title">
-            <div className="panel-head">
-              <h2 id="app-settings-title">App settings</h2>
+              </div>
             </div>
+          ) : null}
 
-            <div className="control-grid">
-              <label>
-                Currency
-                <select
-                  value={settings.defaultCurrency}
-                  onChange={(event) => void handleCurrencyChange(event.target.value)}
-                >
-                  <option value="USD">USD</option>
-                  <option value="EUR">EUR</option>
-                  <option value="GBP">GBP</option>
-                  <option value="INR">INR</option>
-                  <option value="CAD">CAD</option>
-                </select>
-              </label>
+          {activeView === "profile" ? (
+            <div className="profile-grid">
+              <section className="panel" aria-labelledby="profile-title">
+                <div className="panel-head">
+                  <h2 id="profile-title">Profile details</h2>
+                </div>
 
-              <label>
-                Theme
-                <select
-                  value={settings.themePreference}
-                  onChange={(event) =>
-                    void handleThemePreferenceChange(event.target.value as ThemePreference)
-                  }
-                >
-                  <option value="system">System</option>
-                  <option value="light">Light</option>
-                  <option value="dark">Dark</option>
-                </select>
-              </label>
+                <form className="auth-form profile-form" onSubmit={handleProfileSave}>
+                  <label>
+                    Full name
+                    <input
+                      type="text"
+                      value={profileFullName}
+                      onChange={(event) => setProfileFullName(event.target.value)}
+                      autoComplete="name"
+                      minLength={2}
+                      maxLength={80}
+                      required
+                    />
+                  </label>
 
-              <label className="checkbox-row">
-                <input
-                  type="checkbox"
-                  checked={settings.notificationsEnabled}
-                  disabled={!supportsNotifications()}
-                  onChange={(event) => void handleEnableNotifications(event.target.checked)}
-                />
-                Browser reminders
-              </label>
+                  <div className="split">
+                    <label>
+                      Country
+                      <input
+                        type="text"
+                        value={profileCountry}
+                        onChange={(event) => setProfileCountry(event.target.value)}
+                        placeholder="India"
+                        autoComplete="country-name"
+                        minLength={2}
+                        maxLength={80}
+                        required
+                      />
+                    </label>
+
+                    <label>
+                      Timezone (optional)
+                      <input
+                        type="text"
+                        value={profileTimeZone}
+                        onChange={(event) => setProfileTimeZone(event.target.value)}
+                        placeholder="America/New_York"
+                        autoComplete="off"
+                      />
+                    </label>
+                  </div>
+
+                  <label>
+                    Phone (optional)
+                    <input
+                      type="tel"
+                      value={profilePhone}
+                      onChange={(event) => setProfilePhone(event.target.value)}
+                      placeholder="+14155552671"
+                      autoComplete="tel"
+                    />
+                  </label>
+
+                  <label>
+                    Bio (optional)
+                    <textarea
+                      value={profileBio}
+                      onChange={(event) => setProfileBio(event.target.value)}
+                      rows={4}
+                      maxLength={280}
+                      placeholder="Tell us a bit about your billing setup."
+                    />
+                  </label>
+
+                  <button type="submit" className="primary-btn">
+                    Save profile
+                  </button>
+                </form>
+              </section>
             </div>
+          ) : null}
 
-            {installPrompt ? (
-              <button type="button" className="ghost-btn" onClick={() => void handleInstallApp()}>
-                Install app
-              </button>
-            ) : null}
-          </section>
+          {activeView === "settings" ? (
+            <div className="settings-grid">
+              <section className="panel" aria-labelledby="app-settings-title">
+                <div className="panel-head">
+                  <h2 id="app-settings-title">App settings</h2>
+                </div>
 
-          <section className="panel" aria-labelledby="data-controls-title">
-            <div className="panel-head">
-              <h2 id="data-controls-title">Backup & restore</h2>
+                <div className="control-grid">
+                  <label>
+                    Currency
+                    <select
+                      value={settings.defaultCurrency}
+                      onChange={(event) => void handleCurrencyChange(event.target.value)}
+                    >
+                      <option value="USD">USD</option>
+                      <option value="EUR">EUR</option>
+                      <option value="GBP">GBP</option>
+                      <option value="INR">INR</option>
+                      <option value="CAD">CAD</option>
+                    </select>
+                  </label>
+
+                  <label>
+                    Theme
+                    <select
+                      value={settings.themePreference}
+                      onChange={(event) =>
+                        void handleThemePreferenceChange(event.target.value as ThemePreference)
+                      }
+                    >
+                      <option value="system">System</option>
+                      <option value="light">Light</option>
+                      <option value="dark">Dark</option>
+                    </select>
+                  </label>
+
+                  <label className="checkbox-row">
+                    <input
+                      type="checkbox"
+                      checked={settings.notificationsEnabled}
+                      disabled={!supportsNotifications()}
+                      onChange={(event) => void handleEnableNotifications(event.target.checked)}
+                    />
+                    Browser reminders
+                  </label>
+                </div>
+
+                {installPrompt ? (
+                  <button type="button" className="ghost-btn" onClick={() => void handleInstallApp()}>
+                    Install app
+                  </button>
+                ) : null}
+              </section>
+
+              <section className="panel" aria-labelledby="data-controls-title">
+                <div className="panel-head">
+                  <h2 id="data-controls-title">Backup & restore</h2>
+                </div>
+
+                <div className="data-actions">
+                  <button type="button" className="ghost-btn" onClick={() => void handleExportBackup()}>
+                    Export backup (JSON)
+                  </button>
+                  <button type="button" className="ghost-btn" onClick={handleImportClick}>
+                    Import backup (JSON)
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="application/json"
+                    onChange={(event) => void handleImportFile(event)}
+                    hidden
+                  />
+                </div>
+
+                <p className="tiny-note">
+                  Import replaces your account data with the selected backup file. Keep periodic exports.
+                </p>
+              </section>
             </div>
-
-            <div className="data-actions">
-              <button type="button" className="ghost-btn" onClick={() => void handleExportBackup()}>
-                Export backup (JSON)
-              </button>
-              <button type="button" className="ghost-btn" onClick={handleImportClick}>
-                Import backup (JSON)
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="application/json"
-                onChange={(event) => void handleImportFile(event)}
-                hidden
-              />
-            </div>
-
-            <p className="tiny-note">
-              Import replaces your account data with the selected backup file. Keep periodic exports.
-            </p>
-          </section>
-        </div>
-      ) : null}
+          ) : null}
+        </section>
+      </div>
     </main>
   );
 };

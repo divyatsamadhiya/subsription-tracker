@@ -18,7 +18,10 @@ export const UpcomingRenewals = ({
   return (
     <section className="panel" aria-labelledby="upcoming-renewals-title">
       <div className="panel-head">
-        <h2 id="upcoming-renewals-title">Upcoming renewals</h2>
+        <div>
+          <h2 id="upcoming-renewals-title">Upcoming renewals</h2>
+          <p className="panel-subtitle">Prioritized by next billing date</p>
+        </div>
         <div className="tab-row" role="tablist" aria-label="Renewal time window">
           <button
             type="button"
@@ -57,7 +60,7 @@ export const UpcomingRenewals = ({
               >
                 <div className="renewal-main">
                   <h3>{subscription.name}</h3>
-                  <p>{subscription.nextBillingDate}</p>
+                  <p>Next charge: {subscription.nextBillingDate}</p>
                 </div>
 
                 <div className="renewal-side">
