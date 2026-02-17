@@ -66,6 +66,8 @@ Base URL: `http://localhost:4000/api/v1`
 - `POST /auth/reset-password`
 - `POST /auth/logout`
 - `GET /auth/me`
+- `GET /profile`
+- `PATCH /profile`
 - `GET /subscriptions`
 - `POST /subscriptions`
 - `PUT /subscriptions/:id`
@@ -77,8 +79,10 @@ Base URL: `http://localhost:4000/api/v1`
 
 ## Notes
 
+- `POST /auth/register` requires `email`, `password`, `fullName`, and `country`.
 - Auth uses HTTP-only JWT cookies (`pulseboard_token`) with a 7-day expiry.
 - Authenticated write requests are origin-checked against `FRONTEND_ORIGIN`.
 - All subscription/settings/backup data is user-scoped on the backend.
+- Auth responses include profile data plus `profileComplete` for onboarding prompts.
 - The app is online-first now. PWA shell remains installable, but data operations require backend access.
 - This migration is a fresh-start cutover: no automatic browser Dexie migration path is included.

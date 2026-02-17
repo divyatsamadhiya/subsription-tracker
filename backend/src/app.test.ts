@@ -27,4 +27,15 @@ describe("app security configuration", () => {
   it("rejects wildcard frontend origins with cookie auth", () => {
     expect(config.frontendOrigins).not.toContain("*");
   });
+
+  it("registers profile routes in middleware stack", () => {
+    const app = createApp();
+    const stack = (app as { _router?: { stack?: Array<{ regexp?: { toString(): string } }> } })._router
+      ?.stack ?? [];
+    const hasProfileRoute = stack.some((layer) =>
+      layer.regexp?.toString().includes("\\/api\\/v1\\/profile")
+    );
+
+    expect(hasProfileRoute).toBe(true);
+  });
 });

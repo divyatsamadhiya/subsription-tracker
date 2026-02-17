@@ -3,8 +3,11 @@ import {
   authResponseSchema,
   backupFileSchema,
   forgotPasswordResponseSchema,
+  profileResponseSchema,
+  registerPayloadSchema,
   subscriptionInputSchema,
-  subscriptionSchema
+  subscriptionSchema,
+  userProfilePatchSchema
 } from "./schemas";
 import type {
   AppSettings,
@@ -12,7 +15,9 @@ import type {
   BackupFileV1,
   ForgotPasswordResponse,
   Subscription,
-  SubscriptionInput
+  SubscriptionInput,
+  UserProfile,
+  UserProfilePatch
 } from "../types";
 
 class ApiError extends Error {
@@ -64,12 +69,19 @@ const requestNoContent = async (path: string, options: RequestInit): Promise<voi
 };
 
 export const api = {
-  async register(email: string, password: string): Promise<AuthUser> {
+  async register(input: {
+    email: string;
+    password: string;
+    fullName: string;
+    country: string;
+    timeZone?: string;
+  }): Promise<AuthUser> {
+    const body = registerPayloadSchema.parse(input);
     const parsed = await requestJson(
       "/api/v1/auth/register",
       {
         method: "POST",
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify(body)
       },
       (payload) => authResponseSchema.parse(payload)
     );
@@ -121,6 +133,26 @@ export const api = {
     );
 
     return parsed.user;
+  },
+
+  async getProfile(): Promise<{ profile: UserProfile; profileComplete: boolean }> {
+    return requestJson(
+      "/api/v1/profile",
+      { method: "GET" },
+      (payload) => profileResponseSchema.parse(payload)
+    );
+  },
+
+  async updateProfile(input: UserProfilePatch): Promise<{ profile: UserProfile; profileComplete: boolean }> {
+    const body = userProfilePatchSchema.parse(input);
+    return requestJson(
+      "/api/v1/profile",
+      {
+        method: "PATCH",
+        body: JSON.stringify(body)
+      },
+      (payload) => profileResponseSchema.parse(payload)
+    );
   },
 
   async listSubscriptions(): Promise<Subscription[]> {

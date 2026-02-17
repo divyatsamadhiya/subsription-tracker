@@ -8,7 +8,9 @@ import {
   type BillingCycle,
   type ForgotPasswordResponse,
   type Subscription,
-  type SubscriptionCategory
+  type SubscriptionCategory,
+  type UserProfile,
+  type UserProfilePatch
 } from "../types";
 
 const sortSubscriptions = (subscriptions: Subscription[]): Subscription[] => {
@@ -38,16 +40,23 @@ interface AppState {
   loading: boolean;
   error: string | null;
   user: AuthUser | null;
+  profile: UserProfile;
   subscriptions: Subscription[];
   settings: AppSettings;
   upcomingWindow: 7 | 30;
   setUpcomingWindow: (window: 7 | 30) => void;
   hydrate: () => Promise<void>;
-  register: (email: string, password: string) => Promise<void>;
+  register: (input: {
+    email: string;
+    password: string;
+    fullName: string;
+    country: string;
+  }) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   forgotPassword: (email: string) => Promise<ForgotPasswordResponse>;
   resetPassword: (email: string, resetToken: string, newPassword: string) => Promise<void>;
   logout: () => Promise<void>;
+  updateProfile: (profilePatch: UserProfilePatch) => Promise<void>;
   addSubscription: (draft: SubscriptionDraft) => Promise<void>;
   updateSubscription: (id: string, draft: SubscriptionDraft) => Promise<void>;
   deleteSubscription: (id: string) => Promise<void>;
@@ -69,15 +78,20 @@ const userMessage = (error: unknown, fallback: string): string => {
 };
 
 const loadDashboardState = async (): Promise<{
+  profile: UserProfile;
+  profileComplete: boolean;
   settings: AppSettings;
   subscriptions: Subscription[];
 }> => {
-  const [settings, subscriptions] = await Promise.all([
+  const [profileResponse, settings, subscriptions] = await Promise.all([
+    api.getProfile(),
     api.getSettings(),
     api.listSubscriptions()
   ]);
 
   return {
+    profile: profileResponse.profile,
+    profileComplete: profileResponse.profileComplete,
     settings,
     subscriptions: sortSubscriptions(subscriptions)
   };
@@ -88,6 +102,7 @@ export const useAppStore = create<AppState>((set) => ({
   loading: false,
   error: null,
   user: null,
+  profile: {},
   subscriptions: [],
   settings: DEFAULT_SETTINGS,
   upcomingWindow: 7,
@@ -102,7 +117,12 @@ export const useAppStore = create<AppState>((set) => ({
       const dashboard = await loadDashboardState();
 
       set({
-        user,
+        user: {
+          ...user,
+          profile: dashboard.profile,
+          profileComplete: dashboard.profileComplete
+        },
+        profile: dashboard.profile,
         settings: dashboard.settings,
         subscriptions: dashboard.subscriptions,
         hydrated: true,
@@ -113,6 +133,7 @@ export const useAppStore = create<AppState>((set) => ({
       if (error instanceof ApiError && error.status === 401) {
         set({
           user: null,
+          profile: {},
           subscriptions: [],
           settings: DEFAULT_SETTINGS,
           hydrated: true,
@@ -124,6 +145,7 @@ export const useAppStore = create<AppState>((set) => ({
 
       set({
         user: null,
+        profile: {},
         subscriptions: [],
         settings: DEFAULT_SETTINGS,
         hydrated: true,
@@ -133,15 +155,20 @@ export const useAppStore = create<AppState>((set) => ({
     }
   },
 
-  register: async (email, password) => {
+  register: async (input) => {
     set({ loading: true, error: null });
 
     try {
-      const user = await api.register(email, password);
+      const user = await api.register(input);
       const dashboard = await loadDashboardState();
 
       set({
-        user,
+        user: {
+          ...user,
+          profile: dashboard.profile,
+          profileComplete: dashboard.profileComplete
+        },
+        profile: dashboard.profile,
         settings: dashboard.settings,
         subscriptions: dashboard.subscriptions,
         loading: false,
@@ -165,7 +192,12 @@ export const useAppStore = create<AppState>((set) => ({
       const dashboard = await loadDashboardState();
 
       set({
-        user,
+        user: {
+          ...user,
+          profile: dashboard.profile,
+          profileComplete: dashboard.profileComplete
+        },
+        profile: dashboard.profile,
         settings: dashboard.settings,
         subscriptions: dashboard.subscriptions,
         loading: false,
@@ -219,6 +251,7 @@ export const useAppStore = create<AppState>((set) => ({
       await api.logout();
       set({
         user: null,
+        profile: {},
         subscriptions: [],
         settings: DEFAULT_SETTINGS,
         loading: false,
@@ -229,6 +262,27 @@ export const useAppStore = create<AppState>((set) => ({
         loading: false,
         error: userMessage(error, "Logout failed.")
       });
+      throw error;
+    }
+  },
+
+  updateProfile: async (profilePatch) => {
+    try {
+      const profileResponse = await api.updateProfile(profilePatch);
+
+      set((current) => ({
+        profile: profileResponse.profile,
+        user: current.user
+          ? {
+              ...current.user,
+              profile: profileResponse.profile,
+              profileComplete: profileResponse.profileComplete
+            }
+          : null,
+        error: null
+      }));
+    } catch (error) {
+      set({ error: userMessage(error, "Failed to update profile.") });
       throw error;
     }
   },
@@ -309,11 +363,19 @@ export const useAppStore = create<AppState>((set) => ({
       await api.importBackup(backup);
       const dashboard = await loadDashboardState();
 
-      set({
+      set((current) => ({
+        profile: dashboard.profile,
+        user: current.user
+          ? {
+              ...current.user,
+              profile: dashboard.profile,
+              profileComplete: dashboard.profileComplete
+            }
+          : null,
         subscriptions: dashboard.subscriptions,
         settings: dashboard.settings,
         error: null
-      });
+      }));
     } catch (error) {
       set({ error: userMessage(error, "Failed to import backup.") });
       throw error;

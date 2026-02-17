@@ -56,7 +56,8 @@ describe("backupService", () => {
     vi.mocked(SettingsModel.findOne).mockResolvedValue({
       defaultCurrency: "USD",
       weekStartsOn: 0,
-      notificationsEnabled: false
+      notificationsEnabled: false,
+      themePreference: "dark"
     } as never);
     vi.mocked(SubscriptionModel.find).mockReturnValue({ sort } as never);
 
@@ -65,6 +66,7 @@ describe("backupService", () => {
     expect(backup.version).toBe("1.0");
     expect(backup.subscriptions).toHaveLength(1);
     expect(backup.settings.defaultCurrency).toBe("USD");
+    expect(backup.settings.themePreference).toBe("dark");
   });
 
   it("exports backup with default settings when settings are missing", async () => {
@@ -75,6 +77,7 @@ describe("backupService", () => {
     const backup = await exportBackupForUser("user_1");
 
     expect(backup.settings.defaultCurrency).toBe("USD");
+    expect(backup.settings.themePreference).toBe("system");
     expect(backup.subscriptions).toHaveLength(0);
   });
 
@@ -90,7 +93,8 @@ describe("backupService", () => {
       settings: {
         defaultCurrency: "USD",
         weekStartsOn: 0,
-        notificationsEnabled: false
+        notificationsEnabled: false,
+        themePreference: "dark"
       },
       subscriptions: [
         {
@@ -117,7 +121,8 @@ describe("backupService", () => {
       settings: {
         defaultCurrency: "USD",
         weekStartsOn: 0,
-        notificationsEnabled: false
+        notificationsEnabled: false,
+        themePreference: "system"
       },
       subscriptions: []
     });

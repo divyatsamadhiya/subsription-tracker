@@ -3,6 +3,11 @@ import { Schema, model } from "mongoose";
 export interface UserDocument {
   email: string;
   passwordHash: string;
+  fullName?: string;
+  country?: string;
+  timeZone?: string;
+  phone?: string;
+  bio?: string;
   passwordResetTokenHash?: string;
   passwordResetExpiresAt?: Date;
   createdAt: Date;
@@ -21,6 +26,31 @@ const userSchema = new Schema<UserDocument>(
     passwordHash: {
       type: String,
       required: true
+    },
+    fullName: {
+      type: String,
+      required: false,
+      trim: true
+    },
+    country: {
+      type: String,
+      required: false,
+      trim: true
+    },
+    timeZone: {
+      type: String,
+      required: false,
+      trim: true
+    },
+    phone: {
+      type: String,
+      required: false,
+      trim: true
+    },
+    bio: {
+      type: String,
+      required: false,
+      trim: true
     },
     passwordResetTokenHash: {
       type: String,

@@ -7,14 +7,58 @@ import {
   type BackupFileV1,
   type ForgotPasswordResponse,
   type Subscription,
-  type SubscriptionInput
+  type SubscriptionInput,
+  type UserProfile,
+  type UserProfilePatch
 } from "../types";
 
 export const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
+const isValidTimeZone = (value: string): boolean => {
+  try {
+    Intl.DateTimeFormat(undefined, { timeZone: value });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const fullNameSchema = z.string().trim().min(2).max(80);
+const countrySchema = z.string().trim().min(2).max(80);
+const timeZoneSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .refine((value) => isValidTimeZone(value), { message: "Invalid timezone" });
+const phoneSchema = z.string().trim().regex(/^\+[1-9]\d{6,14}$/, "Invalid phone format");
+const bioSchema = z.string().trim().max(280);
+
+export const userProfileSchema: z.ZodType<UserProfile> = z.object({
+  fullName: fullNameSchema.optional(),
+  country: countrySchema.optional(),
+  timeZone: timeZoneSchema.optional(),
+  phone: phoneSchema.optional(),
+  bio: bioSchema.optional()
+}).strict();
+
+export const userProfilePatchSchema: z.ZodType<UserProfilePatch> = z
+  .object({
+    fullName: fullNameSchema.optional(),
+    country: countrySchema.optional(),
+    timeZone: z.union([timeZoneSchema, z.null()]).optional(),
+    phone: z.union([phoneSchema, z.null()]).optional(),
+    bio: z.union([bioSchema, z.null()]).optional()
+  })
+  .strict()
+  .refine((value) => Object.keys(value).length > 0, {
+    message: "At least one profile field is required"
+  });
+
 export const authUserSchema: z.ZodType<AuthUser> = z.object({
   id: z.string().min(1),
   email: z.string().email(),
+  profile: userProfileSchema,
+  profileComplete: z.boolean(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime()
 }).strict();
@@ -69,10 +113,19 @@ export const subscriptionSchema: z.ZodType<Subscription> = z.object({
 export const appSettingsSchema = z.object({
   defaultCurrency: z.string().length(3),
   weekStartsOn: z.union([z.literal(0), z.literal(1)]),
-  notificationsEnabled: z.boolean()
+  notificationsEnabled: z.boolean(),
+  themePreference: z.enum(["system", "light", "dark"])
 }).strict() satisfies z.ZodType<AppSettings>;
 
-export const updateSettingsSchema = appSettingsSchema.partial().refine(
+export const updateSettingsSchema = z
+  .object({
+    defaultCurrency: z.string().length(3).optional(),
+    weekStartsOn: z.union([z.literal(0), z.literal(1)]).optional(),
+    notificationsEnabled: z.boolean().optional(),
+    themePreference: z.enum(["system", "light", "dark"]).optional()
+  })
+  .strict()
+  .refine(
   (value) => Object.keys(value).length > 0,
   { message: "At least one settings field is required" }
 );
@@ -82,6 +135,19 @@ export const backupFileSchema: z.ZodType<BackupFileV1> = z.object({
   exportedAt: z.string().datetime(),
   settings: appSettingsSchema,
   subscriptions: z.array(subscriptionSchema)
+}).strict();
+
+export const profileResponseSchema = z.object({
+  profile: userProfileSchema,
+  profileComplete: z.boolean()
+}).strict();
+
+export const registerPayloadSchema = z.object({
+  email: z.string().email().transform((value) => value.trim().toLowerCase()),
+  password: z.string().min(8).max(128),
+  fullName: fullNameSchema,
+  country: countrySchema,
+  timeZone: timeZoneSchema.optional()
 }).strict();
 
 const formBaseSchema = z.object({

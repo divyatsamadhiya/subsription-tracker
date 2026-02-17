@@ -1,5 +1,5 @@
 import { backupFileSchema } from "./schemas";
-import type { AppSettings, BackupFileV1, Subscription } from "../types";
+import { DEFAULT_SETTINGS, type AppSettings, type BackupFileV1, type Subscription } from "../types";
 
 export const createBackup = (
   settings: AppSettings,
@@ -19,6 +19,20 @@ export const serializeBackup = (backup: BackupFileV1): string => {
 
 export const parseBackupJson = (input: string): BackupFileV1 => {
   const parsedJson: unknown = JSON.parse(input);
+  if (typeof parsedJson === "object" && parsedJson !== null) {
+    const record = parsedJson as Record<string, unknown>;
+    if (typeof record.settings === "object" && record.settings !== null) {
+      const settings = record.settings as Record<string, unknown>;
+      return backupFileSchema.parse({
+        ...record,
+        settings: {
+          ...settings,
+          themePreference: settings.themePreference ?? DEFAULT_SETTINGS.themePreference
+        }
+      });
+    }
+  }
+
   return backupFileSchema.parse(parsedJson);
 };
 

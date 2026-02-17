@@ -7,6 +7,7 @@ import { authRouter } from "./routes/auth.js";
 import { subscriptionsRouter } from "./routes/subscriptions.js";
 import { settingsRouter } from "./routes/settings.js";
 import { backupRouter } from "./routes/backup.js";
+import { profileRouter } from "./routes/profile.js";
 import { errorHandler, notFoundHandler } from "./middleware/error.js";
 import { requestLogger } from "./middleware/requestLogger.js";
 import { enforceTrustedOrigin } from "./middleware/originGuard.js";
@@ -47,6 +48,7 @@ export const createApp = () => {
   app.use("/api/v1/auth", authRouter);
   app.use("/api/v1/subscriptions", subscriptionsRouter);
   app.use("/api/v1/settings", settingsRouter);
+  app.use("/api/v1/profile", profileRouter);
   app.use("/api/v1/backup", backupRouter);
 
   app.use(notFoundHandler);

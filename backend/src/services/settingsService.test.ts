@@ -31,6 +31,7 @@ const makeSettings = (overrides?: Partial<Record<string, unknown>>) => ({
   defaultCurrency: "USD",
   weekStartsOn: 0,
   notificationsEnabled: false,
+  themePreference: "system",
   ...overrides
 });
 
@@ -45,6 +46,7 @@ describe("settingsService", () => {
     const settings = await getSettingsForUser("user_1");
 
     expect(settings.defaultCurrency).toBe("USD");
+    expect(settings.themePreference).toBe("system");
     expect(SettingsModel.create).not.toHaveBeenCalled();
   });
 
@@ -56,6 +58,7 @@ describe("settingsService", () => {
 
     expect(SettingsModel.create).toHaveBeenCalled();
     expect(settings.defaultCurrency).toBe("USD");
+    expect(settings.themePreference).toBe("system");
   });
 
   it("updates settings and propagates currency change", async () => {
@@ -75,12 +78,26 @@ describe("settingsService", () => {
 
   it("updates settings without currency propagation when currency is unchanged", async () => {
     vi.mocked(SettingsModel.findOne).mockResolvedValue(makeSettings({ defaultCurrency: "USD" }) as never);
-    vi.mocked(SettingsModel.findOneAndUpdate).mockResolvedValue(makeSettings({ notificationsEnabled: true }) as never);
+    vi.mocked(SettingsModel.findOneAndUpdate).mockResolvedValue(
+      makeSettings({ notificationsEnabled: true, themePreference: "dark" }) as never
+    );
 
     const settings = await updateSettingsForUser("user_1", { notificationsEnabled: true });
 
     expect(SubscriptionModel.updateMany).not.toHaveBeenCalled();
     expect(settings.notificationsEnabled).toBe(true);
+  });
+
+  it("updates theme preference", async () => {
+    vi.mocked(SettingsModel.findOne).mockResolvedValue(makeSettings() as never);
+    vi.mocked(SettingsModel.findOneAndUpdate).mockResolvedValue(
+      makeSettings({ themePreference: "dark" }) as never
+    );
+
+    const settings = await updateSettingsForUser("user_1", { themePreference: "dark" });
+
+    expect(settings.themePreference).toBe("dark");
+    expect(SubscriptionModel.updateMany).not.toHaveBeenCalled();
   });
 
   it("rejects empty settings patch", async () => {
