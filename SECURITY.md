@@ -8,7 +8,7 @@ The latest code on the `master` branch is supported with security updates.
 
 Please do not report security vulnerabilities through public GitHub issues.
 
-Send a detailed report to: sdivyatuniverse@gmail.com
+Send a detailed report to: `security@pulseboard.dev`
 
 Include:
 - A description of the issue and potential impact
@@ -16,4 +16,11 @@ Include:
 - Affected versions/commits
 - Any suggested mitigation
 
-You will receive an acknowledgment within 72 hours. Valid reports will be handled with priority, and a fix timeline will be shared after triage.
+You can also use GitHub private vulnerability reporting if enabled for this repository.
+
+Response process:
+- Acknowledgment target: within 72 hours
+- Initial triage target: within 7 days
+- Remediation target: based on severity and exploitability
+
+We may request additional details to validate impact. Please avoid testing against systems you do not own or have explicit permission to assess.
