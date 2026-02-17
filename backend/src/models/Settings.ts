@@ -5,6 +5,7 @@ export interface SettingsDocument {
   defaultCurrency: string;
   weekStartsOn: 0 | 1;
   notificationsEnabled: boolean;
+  themePreference: "system" | "light" | "dark";
   createdAt: Date;
   updatedAt: Date;
 }
@@ -35,6 +36,12 @@ const settingsSchema = new Schema<SettingsDocument>(
       type: Boolean,
       required: true,
       default: false
+    },
+    themePreference: {
+      type: String,
+      required: true,
+      enum: ["system", "light", "dark"],
+      default: "system"
     }
   },
   {

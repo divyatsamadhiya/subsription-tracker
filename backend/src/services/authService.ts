@@ -49,7 +49,10 @@ export const registerUser = async (input: unknown): Promise<AuthWithToken> => {
   const passwordHash = await hashPassword(payload.password);
   const user = await UserModel.create({
     email: payload.email,
-    passwordHash
+    passwordHash,
+    fullName: payload.fullName,
+    country: payload.country,
+    timeZone: payload.timeZone
   });
 
   await SettingsModel.create({

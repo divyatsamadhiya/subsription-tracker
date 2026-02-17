@@ -33,7 +33,7 @@ describe("requireAuth middleware", () => {
   });
 
   it("returns 401 when token is missing", () => {
-    const req = { cookies: {}, originalUrl: "/api/v1/test" } as unknown as Request;
+    const req = { cookies: {}, originalUrl: "/api/v1/profile" } as unknown as Request;
     const res = makeResponse();
     const next = vi.fn();
 

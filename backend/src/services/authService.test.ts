@@ -49,7 +49,18 @@ import {
 const makeUser = (
   overrides?: Partial<
     Record<
-      "_id" | "email" | "passwordHash" | "createdAt" | "updatedAt" | "passwordResetTokenHash" | "passwordResetExpiresAt",
+      | "_id"
+      | "email"
+      | "passwordHash"
+      | "fullName"
+      | "country"
+      | "timeZone"
+      | "phone"
+      | "bio"
+      | "createdAt"
+      | "updatedAt"
+      | "passwordResetTokenHash"
+      | "passwordResetExpiresAt",
       unknown
     >
   >
@@ -60,6 +71,11 @@ const makeUser = (
     _id: { toString: () => "user_1" },
     email: "john@example.com",
     passwordHash: "hashed",
+    fullName: "John Doe",
+    country: "United States",
+    timeZone: "America/New_York",
+    phone: undefined,
+    bio: undefined,
     createdAt: now,
     updatedAt: now,
     passwordResetTokenHash: undefined,
@@ -77,13 +93,15 @@ describe("authService", () => {
   it("registers a new user successfully", async () => {
     vi.mocked(UserModel.findOne).mockResolvedValue(null as never);
     vi.mocked(hashPassword).mockResolvedValue("hash_123");
-    vi.mocked(UserModel.create).mockResolvedValue(makeUser() as never);
+    vi.mocked(UserModel.create).mockResolvedValue(makeUser({ country: "India" }) as never);
     vi.mocked(SettingsModel.create).mockResolvedValue({} as never);
     vi.mocked(signUserToken).mockReturnValue("token_abc");
 
     const result = await registerUser({
       email: "John@Example.com",
-      password: "Password123"
+      password: "Password123",
+      fullName: "John Doe",
+      country: "India"
     });
 
     expect(UserModel.findOne).toHaveBeenCalledWith({ email: "john@example.com" });
@@ -92,14 +110,32 @@ describe("authService", () => {
     expect(signUserToken).toHaveBeenCalledWith("user_1");
     expect(result.token).toBe("token_abc");
     expect(result.user.email).toBe("john@example.com");
+    expect(result.user.profile.fullName).toBe("John Doe");
+    expect(result.user.profile.country).toBe("India");
+    expect(result.user.profileComplete).toBe(true);
   });
 
   it("fails registration for duplicate email", async () => {
     vi.mocked(UserModel.findOne).mockResolvedValue(makeUser() as never);
 
     await expect(
-      registerUser({ email: "john@example.com", password: "Password123" })
+      registerUser({
+        email: "john@example.com",
+        password: "Password123",
+        fullName: "John Doe",
+        country: "United States"
+      })
     ).rejects.toMatchObject({ status: 400, message: "Registration failed" });
+  });
+
+  it("fails registration when required profile fields are missing", async () => {
+    await expect(
+      registerUser({
+        email: "john@example.com",
+        password: "Password123",
+        country: "United States"
+      })
+    ).rejects.toBeDefined();
   });
 
   it("logs user in successfully", async () => {
@@ -138,6 +174,17 @@ describe("authService", () => {
 
     expect(UserModel.findById).toHaveBeenCalledWith("user_1");
     expect(user.email).toBe("john@example.com");
+    expect(user.profileComplete).toBe(true);
+  });
+
+  it("marks legacy user profile as incomplete when required fields are missing", async () => {
+    vi.mocked(UserModel.findById).mockResolvedValue(
+      makeUser({ fullName: undefined, country: undefined, timeZone: undefined }) as never
+    );
+
+    const user = await getCurrentUser("user_1");
+
+    expect(user.profileComplete).toBe(false);
   });
 
   it("fails current user lookup when user is missing", async () => {

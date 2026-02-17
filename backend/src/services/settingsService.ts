@@ -11,7 +11,8 @@ const ensureSettings = async (userId: string): Promise<AppSettings> => {
     return appSettingsSchema.parse({
       defaultCurrency: existing.defaultCurrency,
       weekStartsOn: existing.weekStartsOn,
-      notificationsEnabled: existing.notificationsEnabled
+      notificationsEnabled: existing.notificationsEnabled,
+      themePreference: existing.themePreference ?? DEFAULT_SETTINGS.themePreference
     });
   }
 
@@ -25,7 +26,8 @@ const ensureSettings = async (userId: string): Promise<AppSettings> => {
   return appSettingsSchema.parse({
     defaultCurrency: created.defaultCurrency,
     weekStartsOn: created.weekStartsOn,
-    notificationsEnabled: created.notificationsEnabled
+    notificationsEnabled: created.notificationsEnabled,
+    themePreference: created.themePreference
   });
 };
 
@@ -59,7 +61,8 @@ export const updateSettingsForUser = async (
   const settings = appSettingsSchema.parse({
     defaultCurrency: updatedDoc.defaultCurrency,
     weekStartsOn: updatedDoc.weekStartsOn,
-    notificationsEnabled: updatedDoc.notificationsEnabled
+    notificationsEnabled: updatedDoc.notificationsEnabled,
+    themePreference: updatedDoc.themePreference ?? DEFAULT_SETTINGS.themePreference
   });
 
   logger.info("Settings updated", { userId });

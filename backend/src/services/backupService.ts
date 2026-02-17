@@ -21,7 +21,8 @@ export const exportBackupForUser = async (userId: string): Promise<BackupFileV1>
     settings: appSettingsSchema.parse({
       defaultCurrency: settingsDoc?.defaultCurrency ?? DEFAULT_SETTINGS.defaultCurrency,
       weekStartsOn: settingsDoc?.weekStartsOn ?? DEFAULT_SETTINGS.weekStartsOn,
-      notificationsEnabled: settingsDoc?.notificationsEnabled ?? DEFAULT_SETTINGS.notificationsEnabled
+      notificationsEnabled: settingsDoc?.notificationsEnabled ?? DEFAULT_SETTINGS.notificationsEnabled,
+      themePreference: settingsDoc?.themePreference ?? DEFAULT_SETTINGS.themePreference
     }),
     subscriptions: subscriptionsDocs.map((document) => subscriptionSchema.parse(toSubscription(document)))
   };
@@ -32,7 +33,27 @@ export const exportBackupForUser = async (userId: string): Promise<BackupFileV1>
 };
 
 export const importBackupForUser = async (userId: string, input: unknown): Promise<void> => {
-  const backup = backupFileSchema.parse(input);
+  const normalizedInput = (() => {
+    if (typeof input !== "object" || input === null) {
+      return input;
+    }
+
+    const inputRecord = input as Record<string, unknown>;
+    const settingsRaw = inputRecord.settings;
+    if (typeof settingsRaw !== "object" || settingsRaw === null) {
+      return input;
+    }
+
+    const settingsRecord = settingsRaw as Record<string, unknown>;
+    return {
+      ...inputRecord,
+      settings: {
+        ...settingsRecord,
+        themePreference: settingsRecord.themePreference ?? DEFAULT_SETTINGS.themePreference
+      }
+    };
+  })();
+  const backup = backupFileSchema.parse(normalizedInput);
 
   await Promise.all([
     SubscriptionModel.deleteMany({ userId }),

@@ -22,7 +22,7 @@ import {
   supportsNotifications
 } from "./lib/notifications";
 import { useAppStore } from "./store/useAppStore";
-import type { Subscription } from "./types";
+import type { Subscription, ThemePreference } from "./types";
 
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: string[];
@@ -30,12 +30,13 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
 }
 
-type AppView = "overview" | "subscriptions" | "settings";
+type AppView = "overview" | "subscriptions" | "profile" | "settings";
 type AuthMode = "login" | "register";
 
 const viewTabs: Array<{ id: AppView; label: string }> = [
   { id: "overview", label: "Overview" },
   { id: "subscriptions", label: "Subscriptions" },
+  { id: "profile", label: "Profile" },
   { id: "settings", label: "Settings & Backup" }
 ];
 
@@ -45,6 +46,7 @@ const App = () => {
     loading,
     error,
     user,
+    profile,
     subscriptions,
     settings,
     upcomingWindow,
@@ -55,6 +57,7 @@ const App = () => {
     forgotPassword,
     resetPassword,
     logout,
+    updateProfile,
     addSubscription,
     updateSubscription,
     deleteSubscription,
@@ -71,6 +74,8 @@ const App = () => {
   const [authMode, setAuthMode] = useState<AuthMode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [registerFullName, setRegisterFullName] = useState("");
+  const [registerCountry, setRegisterCountry] = useState("");
   const [showAuthPassword, setShowAuthPassword] = useState(false);
   const [showRecoveryPanel, setShowRecoveryPanel] = useState(false);
   const [recoveryEmail, setRecoveryEmail] = useState("");
@@ -79,6 +84,13 @@ const App = () => {
   const [showRecoveryPassword, setShowRecoveryPassword] = useState(false);
   const [recoveryNotice, setRecoveryNotice] = useState("");
   const [authNotice, setAuthNotice] = useState("");
+  const [profileFullName, setProfileFullName] = useState("");
+  const [profileCountry, setProfileCountry] = useState("");
+  const [profileTimeZone, setProfileTimeZone] = useState("");
+  const [profilePhone, setProfilePhone] = useState("");
+  const [profileBio, setProfileBio] = useState("");
+  const [showProfileCompletionPrompt, setShowProfileCompletionPrompt] = useState(true);
+  const [systemTheme, setSystemTheme] = useState<"light" | "dark">("light");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -108,6 +120,41 @@ const App = () => {
     };
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const syncSystemTheme = () => {
+      setSystemTheme(mediaQuery.matches ? "dark" : "light");
+    };
+
+    syncSystemTheme();
+    mediaQuery.addEventListener("change", syncSystemTheme);
+    return () => {
+      mediaQuery.removeEventListener("change", syncSystemTheme);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setProfileFullName("");
+      setProfileCountry("");
+      setProfileTimeZone("");
+      setProfilePhone("");
+      setProfileBio("");
+      return;
+    }
+
+    setProfileFullName(profile.fullName ?? "");
+    setProfileCountry(profile.country ?? "");
+    setProfileTimeZone(profile.timeZone ?? "");
+    setProfilePhone(profile.phone ?? "");
+    setProfileBio(profile.bio ?? "");
+    setShowProfileCompletionPrompt(true);
+  }, [profile, user]);
+
   const editingSubscription = useMemo(() => {
     if (!editingId) {
       return undefined;
@@ -135,6 +182,19 @@ const App = () => {
   const reminderHits = useMemo(() => {
     return collectReminderHits(subscriptions, todayIsoDate);
   }, [subscriptions, todayIsoDate]);
+
+  const resolvedTheme = useMemo(() => {
+    if (settings.themePreference === "system") {
+      return systemTheme;
+    }
+
+    return settings.themePreference;
+  }, [settings.themePreference, systemTheme]);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = resolvedTheme;
+    document.documentElement.style.colorScheme = resolvedTheme;
+  }, [resolvedTheme]);
 
   useEffect(() => {
     if (!settings.notificationsEnabled || notificationPermission() !== "granted") {
@@ -271,7 +331,12 @@ const App = () => {
 
     try {
       if (authMode === "register") {
-        await register(email, password);
+        await register({
+          email,
+          password,
+          fullName: registerFullName,
+          country: registerCountry
+        });
         setAuthNotice("Account created.");
       } else {
         await login(email, password);
@@ -280,6 +345,8 @@ const App = () => {
 
       setEmail("");
       setPassword("");
+      setRegisterFullName("");
+      setRegisterCountry("");
     } catch {
       setAuthNotice(authMode === "register" ? "Registration failed." : "Sign-in failed.");
     }
@@ -335,6 +402,47 @@ const App = () => {
     }
   };
 
+  const handleThemePreferenceChange = async (value: ThemePreference) => {
+    try {
+      await updateSettings({ themePreference: value });
+      setNotice(
+        value === "system"
+          ? "Theme follows your system preference."
+          : `${value[0].toUpperCase()}${value.slice(1)} theme enabled.`
+      );
+    } catch {
+      // Error banner is managed by store state.
+    }
+  };
+
+  const handleProfileSave = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    try {
+      const normalizedFullName = profileFullName.trim();
+      const normalizedCountry = profileCountry.trim();
+      const normalizedTimeZone = profileTimeZone.trim();
+      const normalizedPhone = profilePhone.trim();
+      const normalizedBio = profileBio.trim();
+
+      await updateProfile({
+        fullName: normalizedFullName,
+        country: normalizedCountry,
+        timeZone: normalizedTimeZone.length > 0 ? normalizedTimeZone : null,
+        phone: normalizedPhone.length > 0 ? normalizedPhone : null,
+        bio: normalizedBio.length > 0 ? normalizedBio : null
+      });
+
+      setNotice("Profile updated.");
+      setShowProfileCompletionPrompt(false);
+    } catch {
+      // Error banner is managed by store state.
+    }
+  };
+
+  const shouldShowProfilePrompt =
+    user !== null && !user.profileComplete && showProfileCompletionPrompt;
+
   if (loading && !hydrated) {
     return (
       <main className="loading-state">
@@ -387,6 +495,21 @@ const App = () => {
             </div>
 
             <form className="auth-form" onSubmit={handleAuthSubmit}>
+              {authMode === "register" ? (
+                <label>
+                  Full name
+                  <input
+                    type="text"
+                    value={registerFullName}
+                    onChange={(event) => setRegisterFullName(event.target.value)}
+                    autoComplete="name"
+                    minLength={2}
+                    maxLength={80}
+                    required
+                  />
+                </label>
+              ) : null}
+
               <label>
                 Email
                 <input
@@ -419,6 +542,22 @@ const App = () => {
                   </button>
                 </div>
               </label>
+
+              {authMode === "register" ? (
+                <label>
+                  Country
+                  <input
+                    type="text"
+                    value={registerCountry}
+                    onChange={(event) => setRegisterCountry(event.target.value)}
+                    placeholder="India"
+                    autoComplete="country-name"
+                    minLength={2}
+                    maxLength={80}
+                    required
+                  />
+                </label>
+              ) : null}
 
               <button type="submit" className="primary-btn" disabled={loading}>
                 {loading
@@ -534,7 +673,7 @@ const App = () => {
           <p className="eyebrow">Subscription Tracker</p>
           <h1>Track recurring costs in one place</h1>
           <p className="topbar-subtitle">Manage subscriptions, settings, reminders, and backups.</p>
-          <p className="signed-in">Signed in as {user.email}</p>
+          <p className="signed-in">Signed in as {user.profile.fullName ?? user.email}</p>
         </div>
 
         <nav className="view-nav" aria-label="Primary sections">
@@ -556,6 +695,25 @@ const App = () => {
 
       {error ? <p className="banner error">Error: {error}</p> : null}
       {notice ? <p className="banner">{notice}</p> : null}
+      {shouldShowProfilePrompt ? (
+        <div className="banner profile-banner" role="status">
+          <p>
+            Complete your profile details (full name and country) to finish account setup.
+          </p>
+          <div className="profile-banner-actions">
+            <button type="button" className="ghost-btn" onClick={() => setActiveView("profile")}>
+              Complete now
+            </button>
+            <button
+              type="button"
+              className="ghost-btn"
+              onClick={() => setShowProfileCompletionPrompt(false)}
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {activeView === "overview" ? (
         <div className="overview-grid">
@@ -658,6 +816,84 @@ const App = () => {
         </div>
       ) : null}
 
+      {activeView === "profile" ? (
+        <div className="profile-grid">
+          <section className="panel" aria-labelledby="profile-title">
+            <div className="panel-head">
+              <h2 id="profile-title">Profile details</h2>
+            </div>
+
+            <form className="auth-form profile-form" onSubmit={handleProfileSave}>
+              <label>
+                Full name
+                <input
+                  type="text"
+                  value={profileFullName}
+                  onChange={(event) => setProfileFullName(event.target.value)}
+                  autoComplete="name"
+                  minLength={2}
+                  maxLength={80}
+                  required
+                />
+              </label>
+
+              <div className="split">
+                <label>
+                  Country
+                  <input
+                    type="text"
+                    value={profileCountry}
+                    onChange={(event) => setProfileCountry(event.target.value)}
+                    placeholder="India"
+                    autoComplete="country-name"
+                    minLength={2}
+                    maxLength={80}
+                    required
+                  />
+                </label>
+
+                <label>
+                  Timezone (optional)
+                  <input
+                    type="text"
+                    value={profileTimeZone}
+                    onChange={(event) => setProfileTimeZone(event.target.value)}
+                    placeholder="America/New_York"
+                    autoComplete="off"
+                  />
+                </label>
+              </div>
+
+              <label>
+                Phone (optional)
+                <input
+                  type="tel"
+                  value={profilePhone}
+                  onChange={(event) => setProfilePhone(event.target.value)}
+                  placeholder="+14155552671"
+                  autoComplete="tel"
+                />
+              </label>
+
+              <label>
+                Bio (optional)
+                <textarea
+                  value={profileBio}
+                  onChange={(event) => setProfileBio(event.target.value)}
+                  rows={4}
+                  maxLength={280}
+                  placeholder="Tell us a bit about your billing setup."
+                />
+              </label>
+
+              <button type="submit" className="primary-btn">
+                Save profile
+              </button>
+            </form>
+          </section>
+        </div>
+      ) : null}
+
       {activeView === "settings" ? (
         <div className="settings-grid">
           <section className="panel" aria-labelledby="app-settings-title">
@@ -677,6 +913,20 @@ const App = () => {
                   <option value="GBP">GBP</option>
                   <option value="INR">INR</option>
                   <option value="CAD">CAD</option>
+                </select>
+              </label>
+
+              <label>
+                Theme
+                <select
+                  value={settings.themePreference}
+                  onChange={(event) =>
+                    void handleThemePreferenceChange(event.target.value as ThemePreference)
+                  }
+                >
+                  <option value="system">System</option>
+                  <option value="light">Light</option>
+                  <option value="dark">Dark</option>
                 </select>
               </label>
 

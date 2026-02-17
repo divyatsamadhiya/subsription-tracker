@@ -27,7 +27,10 @@ export interface AppSettings {
   defaultCurrency: string;
   weekStartsOn: 0 | 1;
   notificationsEnabled: boolean;
+  themePreference: ThemePreference;
 }
+
+export type ThemePreference = "system" | "light" | "dark";
 
 export interface BackupFileV1 {
   version: "1.0";
@@ -39,6 +42,8 @@ export interface BackupFileV1 {
 export interface AuthUser {
   id: string;
   email: string;
+  profile: UserProfile;
+  profileComplete: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -50,6 +55,30 @@ export interface AuthResponse {
 export interface RegisterInput {
   email: string;
   password: string;
+  fullName: string;
+  country: string;
+  timeZone?: string;
+}
+
+export interface UserProfile {
+  fullName?: string;
+  country?: string;
+  timeZone?: string;
+  phone?: string;
+  bio?: string;
+}
+
+export interface UserProfilePatch {
+  fullName?: string;
+  country?: string;
+  timeZone?: string | null;
+  phone?: string | null;
+  bio?: string | null;
+}
+
+export interface ProfileResponse {
+  profile: UserProfile;
+  profileComplete: boolean;
 }
 
 export interface LoginInput {
@@ -103,5 +132,6 @@ export const DEFAULT_REMINDER_DAYS = [1, 3, 7];
 export const DEFAULT_SETTINGS: AppSettings = {
   defaultCurrency: "USD",
   weekStartsOn: 0,
-  notificationsEnabled: false
+  notificationsEnabled: false,
+  themePreference: "system"
 };
