@@ -76,7 +76,7 @@ describe("backupService", () => {
 
     const backup = await exportBackupForUser("user_1");
 
-    expect(backup.settings.defaultCurrency).toBe("USD");
+    expect(backup.settings.defaultCurrency).toBe("INR");
     expect(backup.settings.themePreference).toBe("system");
     expect(backup.subscriptions).toHaveLength(0);
   });
