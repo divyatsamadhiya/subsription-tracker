@@ -130,7 +130,7 @@ export const BILLING_CYCLE_OPTIONS = [
 export const DEFAULT_REMINDER_DAYS = [1, 3, 7];
 
 export const DEFAULT_SETTINGS: AppSettings = {
-  defaultCurrency: "USD",
+  defaultCurrency: "INR",
   weekStartsOn: 0,
   notificationsEnabled: false,
   themePreference: "system"
