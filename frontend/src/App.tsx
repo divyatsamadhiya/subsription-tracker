@@ -1,8 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { AnalyticsDashboard } from "./components/AnalyticsDashboard";
 import { SubscriptionForm } from "./components/SubscriptionForm";
 import { StatCards } from "./components/StatCards";
 import { SubscriptionGrid } from "./components/SubscriptionGrid";
 import { UpcomingRenewals } from "./components/UpcomingRenewals";
+import {
+  buildAnalyticsSummary,
+  buildCategorySpend,
+  buildRenewalBuckets,
+  buildSpendTrend
+} from "./lib/analytics";
 import { backupFilename, parseBackupJson, serializeBackup } from "./lib/backup";
 import {
   calculateMonthlyTotalMinor,
@@ -30,11 +37,12 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
 }
 
-type AppView = "overview" | "subscriptions" | "profile" | "settings";
+type AppView = "overview" | "analytics" | "subscriptions" | "profile" | "settings";
 type AuthMode = "login" | "register";
 
 const viewTabs: Array<{ id: AppView; label: string }> = [
   { id: "overview", label: "Overview" },
+  { id: "analytics", label: "Analytics" },
   { id: "subscriptions", label: "Subscriptions" },
   { id: "profile", label: "Profile" },
   { id: "settings", label: "Settings & Backup" }
@@ -181,6 +189,22 @@ const App = () => {
 
   const reminderHits = useMemo(() => {
     return collectReminderHits(subscriptions, todayIsoDate);
+  }, [subscriptions, todayIsoDate]);
+
+  const spendTrend = useMemo(() => {
+    return buildSpendTrend(subscriptions, { fromIsoDate: todayIsoDate, monthsAhead: 6 });
+  }, [subscriptions, todayIsoDate]);
+
+  const categorySpend = useMemo(() => {
+    return buildCategorySpend(subscriptions);
+  }, [subscriptions]);
+
+  const renewalBuckets = useMemo(() => {
+    return buildRenewalBuckets(subscriptions, { fromIsoDate: todayIsoDate, daysAhead: 30 });
+  }, [subscriptions, todayIsoDate]);
+
+  const analyticsSummary = useMemo(() => {
+    return buildAnalyticsSummary(subscriptions, todayIsoDate);
   }, [subscriptions, todayIsoDate]);
 
   const resolvedTheme = useMemo(() => {
@@ -905,6 +929,20 @@ const App = () => {
                 )}
               </section>
             </div>
+          ) : null}
+
+          {activeView === "analytics" ? (
+            <AnalyticsDashboard
+              spendTrend={spendTrend}
+              categorySpend={categorySpend}
+              renewalBuckets={renewalBuckets}
+              summary={analyticsSummary}
+              currency={settings.defaultCurrency}
+              onAddSubscription={() => {
+                setEditingId(null);
+                setActiveView("subscriptions");
+              }}
+            />
           ) : null}
 
           {activeView === "subscriptions" ? (
