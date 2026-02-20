@@ -1,9 +1,53 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Chip,
+  Dialog,
+  DialogContent,
+  Divider,
+  FormControl,
+  FormControlLabel,
+  Grid,
+  IconButton,
+  InputAdornment,
+  InputLabel,
+  List,
+  ListItem,
+  ListItemText,
+  MenuItem,
+  Select,
+  Snackbar,
+  Stack,
+  Switch,
+  Tab,
+  Tabs,
+  TextField,
+  Typography
+} from "@mui/material";
+import AddIcon from "@mui/icons-material/Add";
+import AutoGraphRoundedIcon from "@mui/icons-material/AutoGraphRounded";
+import CloudUploadRoundedIcon from "@mui/icons-material/CloudUploadRounded";
+import DownloadIcon from "@mui/icons-material/Download";
+import EventAvailableRoundedIcon from "@mui/icons-material/EventAvailableRounded";
+import HowToRegRoundedIcon from "@mui/icons-material/HowToRegRounded";
+import UploadIcon from "@mui/icons-material/Upload";
+import InstallDesktopIcon from "@mui/icons-material/InstallDesktop";
+import PlaylistAddCheckRoundedIcon from "@mui/icons-material/PlaylistAddCheckRounded";
+import SettingsIcon from "@mui/icons-material/Settings";
+import ShieldRoundedIcon from "@mui/icons-material/ShieldRounded";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import { AnalyticsDashboard } from "./components/AnalyticsDashboard";
 import { SubscriptionForm } from "./components/SubscriptionForm";
 import { StatCards } from "./components/StatCards";
 import { SubscriptionGrid } from "./components/SubscriptionGrid";
 import { UpcomingRenewals } from "./components/UpcomingRenewals";
+import { AuthLayout } from "./components/layout/AuthLayout";
+import { WorkspaceLayout } from "./components/layout/WorkspaceLayout";
 import {
   buildAnalyticsSummary,
   buildCategorySpend,
@@ -39,6 +83,7 @@ interface BeforeInstallPromptEvent extends Event {
 
 type AppView = "overview" | "analytics" | "subscriptions" | "profile" | "settings";
 type AuthMode = "login" | "register";
+type SnackbarSeverity = "success" | "info" | "warning" | "error";
 
 const viewTabs: Array<{ id: AppView; label: string }> = [
   { id: "overview", label: "Overview" },
@@ -76,7 +121,6 @@ const App = () => {
 
   const [activeView, setActiveView] = useState<AppView>("overview");
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string>("");
   const [todayIsoDate, setTodayIsoDate] = useState(nowIsoDate());
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [authMode, setAuthMode] = useState<AuthMode>("login");
@@ -98,12 +142,28 @@ const App = () => {
   const [profilePhone, setProfilePhone] = useState("");
   const [profileBio, setProfileBio] = useState("");
   const [showProfileCompletionPrompt, setShowProfileCompletionPrompt] = useState(true);
-  const [systemTheme, setSystemTheme] = useState<"light" | "dark">("light");
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [subscriptionDialogOpen, setSubscriptionDialogOpen] = useState(false);
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: SnackbarSeverity;
+  }>({ open: false, message: "", severity: "info" });
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const showFeedback = (message: string, severity: SnackbarSeverity = "success") => {
+    setSnackbar({ open: true, message, severity });
+  };
 
   useEffect(() => {
     void hydrate();
   }, [hydrate]);
+
+  useEffect(() => {
+    if (error) {
+      showFeedback(`Error: ${error}`, "error");
+    }
+  }, [error]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -129,29 +189,15 @@ const App = () => {
   }, []);
 
   useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    const syncSystemTheme = () => {
-      setSystemTheme(mediaQuery.matches ? "dark" : "light");
-    };
-
-    syncSystemTheme();
-    mediaQuery.addEventListener("change", syncSystemTheme);
-    return () => {
-      mediaQuery.removeEventListener("change", syncSystemTheme);
-    };
-  }, []);
-
-  useEffect(() => {
     if (!user) {
       setProfileFullName("");
       setProfileCountry("");
       setProfileTimeZone("");
       setProfilePhone("");
       setProfileBio("");
+      setAuthNotice("");
+      setRecoveryNotice("");
+      setShowRecoveryPanel(false);
       return;
     }
 
@@ -207,19 +253,6 @@ const App = () => {
     return buildAnalyticsSummary(subscriptions, todayIsoDate);
   }, [subscriptions, todayIsoDate]);
 
-  const resolvedTheme = useMemo(() => {
-    if (settings.themePreference === "system") {
-      return systemTheme;
-    }
-
-    return settings.themePreference;
-  }, [settings.themePreference, systemTheme]);
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = resolvedTheme;
-    document.documentElement.style.colorScheme = resolvedTheme;
-  }, [resolvedTheme]);
-
   useEffect(() => {
     if (!settings.notificationsEnabled || notificationPermission() !== "granted") {
       return;
@@ -232,21 +265,39 @@ const App = () => {
     });
   }, [settings.notificationsEnabled, reminderHits, todayIsoDate]);
 
+  const openCreateSubscriptionDialog = () => {
+    setEditingId(null);
+    setActiveView("subscriptions");
+    setSubscriptionDialogOpen(true);
+  };
+
+  const openEditSubscriptionDialog = (id: string) => {
+    setEditingId(id);
+    setActiveView("subscriptions");
+    setSubscriptionDialogOpen(true);
+  };
+
+  const closeSubscriptionDialog = () => {
+    setSubscriptionDialogOpen(false);
+    setEditingId(null);
+  };
+
   const handleFormSubmit = async (
     draft: Parameters<typeof addSubscription>[0]
   ): Promise<void> => {
     try {
       if (editingSubscription) {
         await updateSubscription(editingSubscription.id, draft);
-        setEditingId(null);
-        setNotice("Subscription updated.");
+        closeSubscriptionDialog();
+        showFeedback("Subscription updated.");
         return;
       }
 
       await addSubscription(draft);
-      setNotice("Subscription added.");
+      setSubscriptionDialogOpen(false);
+      showFeedback("Subscription added.");
     } catch {
-      // Error banner is managed by store state.
+      // Error feedback is managed by store state.
     }
   };
 
@@ -256,20 +307,15 @@ const App = () => {
       return;
     }
 
-    const confirmed = window.confirm(`Delete ${target.name}?`);
-    if (!confirmed) {
-      return;
-    }
-
     try {
       await deleteSubscription(id);
       if (editingId === id) {
-        setEditingId(null);
+        closeSubscriptionDialog();
       }
 
-      setNotice("Subscription deleted.");
+      showFeedback("Subscription deleted.");
     } catch {
-      // Error banner is managed by store state.
+      // Error feedback is managed by store state.
     }
   };
 
@@ -278,16 +324,16 @@ const App = () => {
       if (enabled) {
         const permission = await requestNotificationPermission();
         if (permission !== "granted") {
-          setNotice("Browser notification permission was not granted.");
+          showFeedback("Browser notification permission was not granted.", "warning");
           await updateSettings({ notificationsEnabled: false });
           return;
         }
       }
 
       await updateSettings({ notificationsEnabled: enabled });
-      setNotice(enabled ? "Browser notifications enabled." : "Browser notifications disabled.");
+      showFeedback(enabled ? "Browser notifications enabled." : "Browser notifications disabled.");
     } catch {
-      // Error banner is managed by store state.
+      // Error feedback is managed by store state.
     }
   };
 
@@ -296,9 +342,9 @@ const App = () => {
       const backup = await exportBackup();
       const text = serializeBackup(backup);
       downloadTextFile(backupFilename(), text, "application/json;charset=utf-8");
-      setNotice("Backup exported.");
+      showFeedback("Backup exported.");
     } catch {
-      // Error banner is managed by store state.
+      // Error feedback is managed by store state.
     }
   };
 
@@ -319,10 +365,10 @@ const App = () => {
       const backup = parseBackupJson(text);
       await importBackup(backup);
       setEditingId(null);
-      setNotice("Backup imported and applied.");
+      showFeedback("Backup imported and applied.");
     } catch (importError) {
       const message = importError instanceof Error ? importError.message : "Import failed.";
-      setNotice(`Import failed: ${message}`);
+      showFeedback(`Import failed: ${message}`, "error");
     }
   };
 
@@ -333,7 +379,7 @@ const App = () => {
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/(^-|-$)/g, "");
     downloadTextFile(`${safeName || "subscription"}.ics`, ics, "text/calendar;charset=utf-8");
-    setNotice(`Exported ${subscription.name} reminder.`);
+    showFeedback(`Exported ${subscription.name} reminder.`);
   };
 
   const handleInstallApp = async () => {
@@ -344,7 +390,7 @@ const App = () => {
     await installPrompt.prompt();
     const result = await installPrompt.userChoice;
     if (result.outcome === "accepted") {
-      setNotice("App install started.");
+      showFeedback("App install started.", "info");
       setInstallPrompt(null);
     }
   };
@@ -409,33 +455,34 @@ const App = () => {
   const handleLogout = async () => {
     try {
       await logout();
+      setSubscriptionDialogOpen(false);
       setEditingId(null);
       setActiveView("overview");
-      setNotice("Signed out.");
+      showFeedback("Signed out.", "info");
     } catch {
-      // Error banner is managed by store state.
+      // Error feedback is managed by store state.
     }
   };
 
   const handleCurrencyChange = async (value: string) => {
     try {
       await updateSettings({ defaultCurrency: value.toUpperCase() });
-      setNotice("Default currency updated.");
+      showFeedback("Default currency updated.");
     } catch {
-      // Error banner is managed by store state.
+      // Error feedback is managed by store state.
     }
   };
 
   const handleThemePreferenceChange = async (value: ThemePreference) => {
     try {
       await updateSettings({ themePreference: value });
-      setNotice(
+      showFeedback(
         value === "system"
           ? "Theme follows your system preference."
           : `${value[0].toUpperCase()}${value.slice(1)} theme enabled.`
       );
     } catch {
-      // Error banner is managed by store state.
+      // Error feedback is managed by store state.
     }
   };
 
@@ -457,10 +504,10 @@ const App = () => {
         bio: normalizedBio.length > 0 ? normalizedBio : null
       });
 
-      setNotice("Profile updated.");
+      showFeedback("Profile updated.");
       setShowProfileCompletionPrompt(false);
     } catch {
-      // Error banner is managed by store state.
+      // Error feedback is managed by store state.
     }
   };
 
@@ -481,656 +528,809 @@ const App = () => {
 
   if (loading && !hydrated) {
     return (
-      <main className="loading-state">
-        <p>Preparing your account workspace...</p>
-      </main>
+      <Box sx={{ minHeight: "100vh", display: "grid", placeItems: "center" }}>
+        <Typography color="text.secondary">Preparing your account workspace...</Typography>
+      </Box>
     );
   }
 
   if (!user) {
     const showRecoveryCard = authMode === "login" && showRecoveryPanel;
-    const authLayoutClass = showRecoveryCard
-      ? "auth-layout with-recovery"
-      : authMode === "register"
-        ? "auth-layout register-layout"
-        : "auth-layout";
+    const showcaseItems =
+      authMode === "login"
+        ? [
+            {
+              title: "Live spending intelligence",
+              body: "Track monthly and yearly subscription spend in real time.",
+              icon: <AutoGraphRoundedIcon fontSize="small" />
+            },
+            {
+              title: "Renewal awareness",
+              body: "Never miss upcoming charges with priority reminder windows.",
+              icon: <EventAvailableRoundedIcon fontSize="small" />
+            },
+            {
+              title: "Secure account controls",
+              body: "Profile, settings, and backups are always tied to your account.",
+              icon: <ShieldRoundedIcon fontSize="small" />
+            }
+          ]
+        : [
+            {
+              title: "Create your profile",
+              body: "Add core identity details once to initialize your billing workspace.",
+              icon: <HowToRegRoundedIcon fontSize="small" />
+            },
+            {
+              title: "Add first subscription",
+              body: "Track amount, billing cycle, and renewal date in one structured form.",
+              icon: <PlaylistAddCheckRoundedIcon fontSize="small" />
+            },
+            {
+              title: "Enable continuity",
+              body: "Set notifications and keep JSON backups ready for recovery.",
+              icon: <CloudUploadRoundedIcon fontSize="small" />
+            }
+          ];
 
     return (
-      <main className="auth-shell">
-        <div className={authLayoutClass}>
-          {authMode === "login" ? (
-            <aside className="panel auth-showcase" aria-hidden="true">
-              <p className="eyebrow">Finance command center</p>
-              <h2>Everything recurring, visualized in one clean workspace.</h2>
-              <p>
-                Stay ahead of renewals, forecast yearly spending, and keep your account history safe
-                with backup and restore controls.
-              </p>
-              <ul className="showcase-list">
-                <li>Live monthly and annual spend metrics</li>
-                <li>Upcoming renewal timeline with due-state badges</li>
-                <li>Secure profile, settings, and backup management</li>
-              </ul>
-            </aside>
-          ) : (
-            <aside className="panel auth-showcase register-showcase" aria-hidden="true">
-              <p className="eyebrow">Account setup flow</p>
-              <h2>Create your workspace and start tracking within a minute.</h2>
-              <p>Set your identity once, then manage subscriptions from a clean dashboard.</p>
-              <ol className="showcase-steps">
-                <li>
-                  <strong>Step 1</strong>
-                  <span>Add your basic account details.</span>
-                </li>
-                <li>
-                  <strong>Step 2</strong>
-                  <span>Create your first subscription entry.</span>
-                </li>
-                <li>
-                  <strong>Step 3</strong>
-                  <span>Enable reminders and backup data.</span>
-                </li>
-              </ol>
-            </aside>
-          )}
+      <>
+        <AuthLayout
+          primary={
+            <Card
+              variant="outlined"
+              sx={{
+                height: "100%",
+                background:
+                  "linear-gradient(160deg, rgba(120, 94, 197, 0.14) 0%, rgba(46, 34, 72, 0.04) 45%, transparent 80%)"
+              }}
+            >
+              <CardContent>
+                <Stack spacing={1.75}>
+                  <Typography variant="overline" color="text.secondary">
+                    {authMode === "login" ? "Finance command center" : "Account setup flow"}
+                  </Typography>
+                  <Typography variant="h3" sx={{ maxWidth: 620 }}>
+                    {authMode === "login"
+                      ? "Everything recurring, visualized in one clean workspace."
+                      : "Create your workspace and start tracking within a minute."}
+                  </Typography>
+                  <Typography color="text.secondary" sx={{ maxWidth: 620 }}>
+                    {authMode === "login"
+                      ? "Stay ahead of renewals, forecast yearly spending, and keep your account history safe with backup and restore controls."
+                      : "Set your identity once, then manage subscriptions from a clean dashboard."}
+                  </Typography>
 
-          <section className="panel auth-panel" aria-labelledby="auth-title">
-            <p className="eyebrow">Subscription Tracker</p>
-            <h1 id="auth-title">{authMode === "login" ? "Welcome back" : "Create your account"}</h1>
-            <p className="topbar-subtitle">
-              {authMode === "login"
-                ? "Sign in to manage billing, reminders, and backups."
-                : "Create an account to start tracking subscriptions with reminders and backups."}
-            </p>
+                  <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                    {(authMode === "login"
+                      ? ["Spend insights", "Renewal alerts", "Backup safety"]
+                      : ["3-step onboarding", "Guided setup", "Reminder ready"]
+                    ).map((item) => (
+                      <Chip key={item} size="small" label={item} />
+                    ))}
+                  </Stack>
 
-            {error ? <p className="banner error">Error: {error}</p> : null}
-            {authNotice ? <p className="banner">{authNotice}</p> : null}
+                  <Divider flexItem />
 
-            <div className="auth-switch" role="tablist" aria-label="Authentication mode">
-              <button
-                type="button"
-                className={authMode === "login" ? "tab-btn active" : "tab-btn"}
-                role="tab"
-                aria-selected={authMode === "login"}
-                onClick={() => {
-                  setAuthMode("login");
-                  setAuthNotice("");
-                  setRecoveryNotice("");
-                }}
-              >
-                Sign in
-              </button>
-              <button
-                type="button"
-                className={authMode === "register" ? "tab-btn active" : "tab-btn"}
-                role="tab"
-                aria-selected={authMode === "register"}
-                onClick={() => {
-                  setAuthMode("register");
-                  setShowRecoveryPanel(false);
-                  setRecoveryNotice("");
-                }}
-              >
-                Create account
-              </button>
-            </div>
+                  <Stack spacing={1}>
+                    {showcaseItems.map((item) => (
+                      <Box
+                        key={item.title}
+                        sx={{
+                          p: 1.25,
+                          borderRadius: 2,
+                          border: "1px solid",
+                          borderColor: "divider",
+                          backgroundColor: "background.paper",
+                          transition: "all 180ms ease",
+                          "&:hover": {
+                            borderColor: "primary.main",
+                            transform: "translateY(-1px)"
+                          }
+                        }}
+                      >
+                        <Stack direction="row" spacing={1.2} alignItems="flex-start">
+                          <Box
+                            sx={{
+                              mt: 0.15,
+                              width: 28,
+                              height: 28,
+                              borderRadius: 1.5,
+                              display: "grid",
+                              placeItems: "center",
+                              color: "primary.main",
+                              backgroundColor: "action.hover"
+                            }}
+                          >
+                            {item.icon}
+                          </Box>
+                          <Box>
+                            <Typography variant="subtitle2">
+                              {item.title}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              {item.body}
+                            </Typography>
+                          </Box>
+                        </Stack>
+                      </Box>
+                    ))}
+                  </Stack>
+                </Stack>
+              </CardContent>
+            </Card>
+          }
+          panel={
+            <Card
+              variant="outlined"
+              sx={{
+                height: "100%",
+                backgroundColor: "background.paper"
+              }}
+            >
+              <CardContent>
+                <Stack spacing={1.5} sx={{ maxWidth: 760, mx: "auto" }}>
+                  <Stack spacing={0.5}>
+                    <Typography variant="overline" color="text.secondary">
+                      Subscription Tracker
+                    </Typography>
+                    <Typography id="auth-title" variant="h3">
+                      {authMode === "login" ? "Welcome back" : "Create your account"}
+                    </Typography>
+                    <Typography color="text.secondary">
+                      {authMode === "login"
+                        ? "Sign in to manage billing, reminders, and backups."
+                        : "Create an account to start tracking subscriptions with reminders and backups."}
+                    </Typography>
+                  </Stack>
 
-            <form className="auth-form" onSubmit={handleAuthSubmit}>
-              {authMode === "register" ? (
-                <label>
-                  Full name
-                  <input
-                    type="text"
-                    value={registerFullName}
-                    onChange={(event) => setRegisterFullName(event.target.value)}
-                    autoComplete="name"
-                    minLength={2}
-                    maxLength={80}
-                    required
-                  />
-                </label>
-              ) : null}
+                  <Box sx={{ p: 0.5, borderRadius: 2, backgroundColor: "action.hover" }}>
+                    <Tabs
+                      value={authMode}
+                      onChange={(_event, value: AuthMode) => {
+                        setAuthMode(value);
+                        setAuthNotice("");
+                        if (value === "login") {
+                          setRecoveryNotice("");
+                        }
+                        if (value === "register") {
+                          setShowRecoveryPanel(false);
+                          setRecoveryNotice("");
+                        }
+                      }}
+                      variant="fullWidth"
+                      aria-label="Authentication mode"
+                      sx={{
+                        minHeight: 38,
+                        "& .MuiTabs-indicator": {
+                          display: "none"
+                        },
+                        "& .MuiTab-root": {
+                          minHeight: 38,
+                          borderRadius: 1.5,
+                          fontWeight: 700
+                        },
+                        "& .Mui-selected": {
+                          backgroundColor: "background.paper",
+                          boxShadow: "0 1px 2px rgba(0,0,0,0.08)"
+                        }
+                      }}
+                    >
+                      <Tab value="login" label="Sign in" />
+                      <Tab value="register" label="Create account" />
+                    </Tabs>
+                  </Box>
 
-              <label>
-                Email
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  autoComplete="email"
-                  required
-                />
-              </label>
+                  {authNotice ? <Alert severity="info">{authNotice}</Alert> : null}
 
-              <label>
-                Password
-                <div className="password-row">
-                  <input
-                    type={showAuthPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                    autoComplete={authMode === "register" ? "new-password" : "current-password"}
-                    minLength={8}
-                    required
-                  />
-                  <button
-                    type="button"
-                    className="password-toggle"
-                    onClick={() => setShowAuthPassword((value) => !value)}
-                    aria-label={showAuthPassword ? "Hide password" : "Show password"}
-                  >
-                    {showAuthPassword ? "Hide" : "Show"}
-                  </button>
-                </div>
-              </label>
+                  <Stack component="form" spacing={1.5} onSubmit={handleAuthSubmit}>
+                    {authMode === "register" ? (
+                      <Grid container spacing={1.25}>
+                        <Grid size={{ xs: 12, sm: 6 }}>
+                          <TextField
+                            label="Full name"
+                            value={registerFullName}
+                            onChange={(event) => setRegisterFullName(event.target.value)}
+                            autoComplete="name"
+                            inputProps={{ minLength: 2, maxLength: 80 }}
+                            required
+                          />
+                        </Grid>
+                        <Grid size={{ xs: 12, sm: 6 }}>
+                          <TextField
+                            label="Country"
+                            value={registerCountry}
+                            onChange={(event) => setRegisterCountry(event.target.value)}
+                            placeholder="India"
+                            autoComplete="country-name"
+                            inputProps={{ minLength: 2, maxLength: 80 }}
+                            required
+                          />
+                        </Grid>
+                      </Grid>
+                    ) : null}
 
-              {authMode === "register" ? (
-                <label>
-                  Country
-                  <input
-                    type="text"
-                    value={registerCountry}
-                    onChange={(event) => setRegisterCountry(event.target.value)}
-                    placeholder="India"
-                    autoComplete="country-name"
-                    minLength={2}
-                    maxLength={80}
-                    required
-                  />
-                </label>
-              ) : null}
-
-              <button type="submit" className="primary-btn" disabled={loading}>
-                {loading
-                  ? "Submitting..."
-                  : authMode === "register"
-                    ? "Create account"
-                    : "Sign in"}
-              </button>
-            </form>
-
-            {authMode === "login" ? (
-              <button
-                type="button"
-                className="ghost-btn auth-secondary"
-                onClick={() => {
-                  setShowRecoveryPanel(true);
-                  setRecoveryNotice("");
-                  setRecoveryEmail((current) => current || email);
-                }}
-              >
-                Forgot password?
-              </button>
-            ) : null}
-          </section>
-
-          {showRecoveryCard ? (
-            <section className="panel auth-panel recovery-panel" aria-labelledby="password-reset-title">
-              <div className="recovery-card-header">
-                <h2 id="password-reset-title">Reset password</h2>
-                <button
-                  type="button"
-                  className="ghost-btn"
-                  onClick={() => {
-                    setShowRecoveryPanel(false);
-                    setRecoveryNotice("");
-                  }}
-                >
-                  Back to sign in
-                </button>
-              </div>
-
-              <p className="tiny-note">Request a code, then set a new password for your account.</p>
-
-              <div className="recovery-card-body">
-                <form className="auth-form" onSubmit={handleRequestResetCode}>
-                  <label>
-                    Account email
-                    <input
+                    <TextField
+                      label="Email"
                       type="email"
-                      value={recoveryEmail}
-                      onChange={(event) => setRecoveryEmail(event.target.value)}
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
                       autoComplete="email"
                       required
                     />
-                  </label>
-                  <button type="submit" className="primary-btn" disabled={loading}>
-                    {loading ? "Sending..." : "Send reset code"}
-                  </button>
-                </form>
 
-                <form className="auth-form" onSubmit={handleResetPasswordSubmit}>
-                  <label>
-                    Reset code
-                    <input
-                      type="text"
-                      value={recoveryResetCode}
-                      onChange={(event) => setRecoveryResetCode(event.target.value)}
-                      autoComplete="one-time-code"
+                    <TextField
+                      label="Password"
+                      type={showAuthPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
+                      autoComplete={authMode === "register" ? "new-password" : "current-password"}
+                      inputProps={{ minLength: 8 }}
                       required
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <IconButton
+                              type="button"
+                              onClick={() => setShowAuthPassword((value) => !value)}
+                              aria-label={showAuthPassword ? "Hide password" : "Show password"}
+                              edge="end"
+                            >
+                              {showAuthPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                            </IconButton>
+                          </InputAdornment>
+                        )
+                      }}
                     />
-                  </label>
 
-                  <label>
-                    New password
-                    <div className="password-row">
-                      <input
+                    <Button type="submit" variant="contained" size="large" fullWidth disabled={loading}>
+                      {loading
+                        ? "Submitting..."
+                        : authMode === "register"
+                          ? "Create account"
+                          : "Sign in"}
+                    </Button>
+                  </Stack>
+
+                  {authMode === "login" ? (
+                    <Button
+                      variant="text"
+                      color="inherit"
+                      sx={{ alignSelf: "flex-start" }}
+                      onClick={() => {
+                        setShowRecoveryPanel(true);
+                        setRecoveryNotice("");
+                        setRecoveryEmail((current) => current || email);
+                      }}
+                    >
+                      Forgot password?
+                    </Button>
+                  ) : null}
+                </Stack>
+              </CardContent>
+            </Card>
+          }
+          secondary={
+            showRecoveryCard ? (
+              <Card
+                variant="outlined"
+                sx={{
+                  height: "100%",
+                  backgroundColor: "background.paper"
+                }}
+              >
+                <CardContent>
+                  <Stack spacing={1.5}>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center">
+                    <Typography id="password-reset-title" variant="h5">
+                        Reset password
+                      </Typography>
+                      <Button
+                        variant="text"
+                        color="inherit"
+                        onClick={() => {
+                          setShowRecoveryPanel(false);
+                          setRecoveryNotice("");
+                        }}
+                      >
+                        Back to sign in
+                      </Button>
+                    </Stack>
+
+                    <Typography variant="body2" color="text.secondary">
+                      Request a code, then set a new password for your account.
+                    </Typography>
+
+                    <Stack component="form" spacing={1.5} onSubmit={handleRequestResetCode}>
+                      <TextField
+                        label="Account email"
+                        type="email"
+                        value={recoveryEmail}
+                        onChange={(event) => setRecoveryEmail(event.target.value)}
+                        autoComplete="email"
+                        required
+                      />
+                      <Button type="submit" variant="contained" disabled={loading}>
+                        {loading ? "Sending..." : "Send reset code"}
+                      </Button>
+                    </Stack>
+
+                    <Stack component="form" spacing={1.5} onSubmit={handleResetPasswordSubmit}>
+                      <TextField
+                        label="Reset code"
+                        value={recoveryResetCode}
+                        onChange={(event) => setRecoveryResetCode(event.target.value)}
+                        autoComplete="one-time-code"
+                        required
+                      />
+
+                      <TextField
+                        label="New password"
                         type={showRecoveryPassword ? "text" : "password"}
                         value={recoveryNewPassword}
                         onChange={(event) => setRecoveryNewPassword(event.target.value)}
                         autoComplete="new-password"
-                        minLength={8}
+                        inputProps={{ minLength: 8 }}
                         required
+                        InputProps={{
+                          endAdornment: (
+                            <InputAdornment position="end">
+                              <IconButton
+                                type="button"
+                                onClick={() => setShowRecoveryPassword((value) => !value)}
+                                aria-label={showRecoveryPassword ? "Hide password" : "Show password"}
+                                edge="end"
+                              >
+                                {showRecoveryPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                              </IconButton>
+                            </InputAdornment>
+                          )
+                        }}
                       />
-                      <button
-                        type="button"
-                        className="password-toggle"
-                        onClick={() => setShowRecoveryPassword((value) => !value)}
-                        aria-label={showRecoveryPassword ? "Hide password" : "Show password"}
-                      >
-                        {showRecoveryPassword ? "Hide" : "Show"}
-                      </button>
-                    </div>
-                  </label>
 
-                  <button type="submit" className="primary-btn" disabled={loading}>
-                    {loading ? "Updating..." : "Update password"}
-                  </button>
-                </form>
-              </div>
+                      <Button type="submit" variant="contained" disabled={loading}>
+                        {loading ? "Updating..." : "Update password"}
+                      </Button>
+                    </Stack>
 
-              {recoveryNotice ? <p className="banner">{recoveryNotice}</p> : null}
-            </section>
-          ) : null}
-        </div>
-      </main>
+                    {recoveryNotice ? <Alert severity="info">{recoveryNotice}</Alert> : null}
+                  </Stack>
+                </CardContent>
+              </Card>
+            ) : undefined
+          }
+        />
+
+        <Snackbar
+          open={snackbar.open}
+          autoHideDuration={4000}
+          onClose={() => setSnackbar((current) => ({ ...current, open: false }))}
+          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        >
+          <Alert
+            onClose={() => setSnackbar((current) => ({ ...current, open: false }))}
+            severity={snackbar.severity}
+            sx={{ width: "100%" }}
+          >
+            {snackbar.message}
+          </Alert>
+        </Snackbar>
+      </>
     );
   }
 
   return (
-    <main className="app-shell">
-      <div className="workspace-layout">
-        <aside className="workspace-sidebar panel">
-          <div className="sidebar-brand">
-            <p className="eyebrow">Subscription Tracker</p>
-            <h1>Billing Workspace</h1>
-            <p className="tiny-note">Signed in as {user.profile.fullName ?? user.email}</p>
-          </div>
-
-          <nav className="sidebar-nav" aria-label="Primary sections">
-            {viewTabs.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                className={activeView === tab.id ? "sidebar-btn active" : "sidebar-btn"}
-                onClick={() => setActiveView(tab.id)}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </nav>
-
-          <div className="sidebar-metrics" aria-label="Workspace highlights">
-            <article className="topbar-metric">
-              <span>Monthly spend</span>
-              <strong>{formatCurrencyMinor(monthlyTotalMinor, settings.defaultCurrency)}</strong>
-            </article>
-            <article className="topbar-metric">
-              <span>Active services</span>
-              <strong>{activeSubscriptions.length}</strong>
-            </article>
-            <article className="topbar-metric">
-              <span>Next renewal</span>
-              <strong>{renewals[0]?.nextBillingDate ?? "No upcoming dates"}</strong>
-            </article>
-          </div>
-
-          <button
-            type="button"
-            className="ghost-btn signout-btn signout-btn-sidebar"
-            onClick={() => void handleLogout()}
-          >
-            Sign out
-          </button>
-        </aside>
-
-        <section className="workspace-main">
-          <header className="workspace-header panel">
-            <div className="workspace-copy">
-              <p className="eyebrow">Workspace overview</p>
-              <h2>{activeViewLabel}</h2>
-              <p className="topbar-subtitle">Date: {todayLabel}</p>
-            </div>
-
-            <div className="workspace-actions">
-              <button
-                type="button"
-                className="primary-btn"
-                onClick={() => {
-                  setEditingId(null);
-                  setActiveView("subscriptions");
-                }}
-              >
-                Add subscription
-              </button>
-              <button type="button" className="ghost-btn" onClick={() => setActiveView("settings")}>
-                Open settings
-              </button>
-            </div>
-          </header>
-
-          {error ? <p className="banner error">Error: {error}</p> : null}
-          {notice ? <p className="banner">{notice}</p> : null}
-          {shouldShowProfilePrompt ? (
-            <div className="banner profile-banner" role="status">
-              <p>
-                Complete your profile details (full name and country) to finish account setup.
-              </p>
-              <div className="profile-banner-actions">
-                <button type="button" className="ghost-btn" onClick={() => setActiveView("profile")}>
+    <>
+      <WorkspaceLayout
+        tabs={viewTabs}
+        activeTab={activeView}
+        onTabChange={(id) => setActiveView(id as AppView)}
+        onOpenMobileNav={() => setMobileNavOpen(true)}
+        mobileOpen={mobileNavOpen}
+        onCloseMobileNav={() => setMobileNavOpen(false)}
+        onLogout={() => {
+          void handleLogout();
+        }}
+        userLabel={user.profile.fullName ?? user.email}
+        monthlySpend={formatCurrencyMinor(monthlyTotalMinor, settings.defaultCurrency)}
+        activeServices={activeSubscriptions.length}
+        nextRenewal={renewals[0]?.nextBillingDate ?? "No upcoming dates"}
+        headerTitle={activeViewLabel}
+        headerSubtitle={`Date: ${todayLabel}`}
+        headerActions={
+          <>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={openCreateSubscriptionDialog}
+            >
+              Add subscription
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<SettingsIcon />}
+              onClick={() => setActiveView("settings")}
+            >
+              Open settings
+            </Button>
+          </>
+        }
+      >
+        {shouldShowProfilePrompt ? (
+          <Alert
+            severity="warning"
+            action={
+              <Stack direction="row" spacing={1}>
+                <Button color="inherit" size="small" onClick={() => setActiveView("profile")}>
                   Complete now
-                </button>
-                <button
-                  type="button"
-                  className="ghost-btn"
+                </Button>
+                <Button
+                  color="inherit"
+                  size="small"
                   onClick={() => setShowProfileCompletionPrompt(false)}
                 >
                   Dismiss
-                </button>
-              </div>
-            </div>
-          ) : null}
+                </Button>
+              </Stack>
+            }
+            sx={{ mb: 2 }}
+          >
+            Complete your profile details (full name and country) to finish account setup.
+          </Alert>
+        ) : null}
 
-          {activeView === "overview" ? (
-            <div className="overview-grid">
-              <section className="panel highlight-card" aria-labelledby="focus-title">
-                <p className="highlight-label">Current spending pulse</p>
-                <h2 id="focus-title">{formatCurrencyMinor(monthlyTotalMinor, settings.defaultCurrency)}</h2>
-                <p>
-                  Monthly baseline with <strong>{activeSubscriptions.length}</strong> active services.
-                </p>
-                <p className="highlight-muted">
-                  Yearly projection: {formatCurrencyMinor(yearlyTotalMinor, settings.defaultCurrency)}
-                </p>
+        {activeView === "overview" ? (
+          <Grid container spacing={1.5}>
+            <Grid size={{ xs: 12, xl: 4 }}>
+              <Card variant="outlined">
+                <CardContent>
+                  <Stack spacing={1.5}>
+                    <Typography variant="overline" color="text.secondary">
+                      Current spending pulse
+                    </Typography>
+                    <Typography variant="h3">
+                      {formatCurrencyMinor(monthlyTotalMinor, settings.defaultCurrency)}
+                    </Typography>
+                    <Typography color="text.secondary">
+                      Monthly baseline with <strong>{activeSubscriptions.length}</strong> active services.
+                    </Typography>
+                    <Typography color="text.secondary">
+                      Yearly projection: {formatCurrencyMinor(yearlyTotalMinor, settings.defaultCurrency)}
+                    </Typography>
 
-                <div className="highlight-kpis">
-                  <span>
-                    <strong>{subscriptions.length}</strong> total subscriptions
-                  </span>
-                  <span>
-                    <strong>{renewals.length}</strong> renewals in selected window
-                  </span>
-                </div>
+                    <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                      <Chip label={`${subscriptions.length} total subscriptions`} />
+                      <Chip label={`${renewals.length} renewals in selected window`} />
+                    </Stack>
 
-                <div className="highlight-actions">
-                  <button
-                    type="button"
-                    className="primary-btn"
-                    onClick={() => {
-                      setEditingId(null);
-                      setActiveView("subscriptions");
-                    }}
-                  >
-                    Add subscription
-                  </button>
-                  <button
-                    type="button"
-                    className="ghost-btn"
-                    onClick={() => setActiveView("settings")}
-                  >
-                    Open settings
-                  </button>
-                </div>
-              </section>
+                  </Stack>
+                </CardContent>
+              </Card>
+            </Grid>
 
-              <section className="panel stats-shell" aria-labelledby="summary-title">
-                <div className="panel-head">
-                  <h2 id="summary-title">Spend summary</h2>
-                </div>
-                <StatCards
-                  monthlyTotalMinor={monthlyTotalMinor}
-                  yearlyTotalMinor={yearlyTotalMinor}
-                  activeCount={activeSubscriptions.length}
-                  currency={settings.defaultCurrency}
-                />
-              </section>
+            <Grid size={{ xs: 12, xl: 8 }}>
+              <Card variant="outlined">
+                <CardContent>
+                  <Stack spacing={1.5}>
+                    <Typography id="summary-title" variant="h5">
+                      Spend summary
+                    </Typography>
+                    <StatCards
+                      monthlyTotalMinor={monthlyTotalMinor}
+                      yearlyTotalMinor={yearlyTotalMinor}
+                      activeCount={activeSubscriptions.length}
+                      currency={settings.defaultCurrency}
+                    />
+                  </Stack>
+                </CardContent>
+              </Card>
+            </Grid>
 
-              <div className="renewals-shell">
-                <UpcomingRenewals
-                  renewals={renewals}
-                  currency={settings.defaultCurrency}
-                  windowDays={upcomingWindow}
-                  onWindowChange={setUpcomingWindow}
-                />
-              </div>
+            <Grid size={{ xs: 12, lg: 7 }}>
+              <UpcomingRenewals
+                renewals={renewals}
+                currency={settings.defaultCurrency}
+                windowDays={upcomingWindow}
+                onWindowChange={setUpcomingWindow}
+              />
+            </Grid>
 
-              <section className="panel reminder-panel" aria-label="Today reminders">
-                <div className="panel-head">
-                  <h2>Reminder center</h2>
-                </div>
+            <Grid size={{ xs: 12, lg: 5 }}>
+              <Card variant="outlined">
+                <CardContent>
+                  <Stack spacing={1.5}>
+                    <Typography variant="h5">Reminder center</Typography>
+                    {reminderHits.length === 0 ? (
+                      <Typography color="text.secondary">No reminder triggers for today.</Typography>
+                    ) : (
+                      <List disablePadding>
+                        {reminderHits.map((hit) => {
+                          const normalizedDays = Math.max(
+                            0,
+                            daysUntil(hit.subscription.nextBillingDate, todayIsoDate)
+                          );
 
-                {reminderHits.length === 0 ? (
-                  <p className="empty-note">No reminder triggers for today.</p>
-                ) : (
-                  <ul className="reminder-list">
-                    {reminderHits.map((hit) => {
-                      const normalizedDays = Math.max(
-                        0,
-                        daysUntil(hit.subscription.nextBillingDate, todayIsoDate)
-                      );
+                          return (
+                            <ListItem
+                              key={`${hit.subscription.id}-${hit.subscription.nextBillingDate}-${hit.daysBefore}`}
+                              disableGutters
+                            >
+                              <ListItemText
+                                primary={hit.subscription.name}
+                                secondary={formatRelativeDue(normalizedDays)}
+                              />
+                            </ListItem>
+                          );
+                        })}
+                      </List>
+                    )}
+                  </Stack>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+        ) : null}
 
-                      return (
-                        <li key={`${hit.subscription.id}-${hit.subscription.nextBillingDate}-${hit.daysBefore}`}>
-                          <strong>{hit.subscription.name}</strong> {formatRelativeDue(normalizedDays)}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </section>
-            </div>
-          ) : null}
+        {activeView === "analytics" ? (
+          <AnalyticsDashboard
+            spendTrend={spendTrend}
+            categorySpend={categorySpend}
+            renewalBuckets={renewalBuckets}
+            summary={analyticsSummary}
+            currency={settings.defaultCurrency}
+            onAddSubscription={() => {
+              openCreateSubscriptionDialog();
+            }}
+          />
+        ) : null}
 
-          {activeView === "analytics" ? (
-            <AnalyticsDashboard
-              spendTrend={spendTrend}
-              categorySpend={categorySpend}
-              renewalBuckets={renewalBuckets}
-              summary={analyticsSummary}
+        {activeView === "subscriptions" ? (
+          <Stack spacing={1.5}>
+            <Card variant="outlined">
+              <CardContent>
+                <Stack
+                  direction={{ xs: "column", sm: "row" }}
+                  justifyContent="space-between"
+                  alignItems={{ xs: "flex-start", sm: "center" }}
+                  spacing={1}
+                >
+                  <Box>
+                    <Typography variant="h5">Active subscriptions</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Manage your recurring services with cleaner category filters and consistent cards.
+                    </Typography>
+                  </Box>
+                </Stack>
+              </CardContent>
+            </Card>
+
+            <SubscriptionGrid
+              subscriptions={subscriptions}
               currency={settings.defaultCurrency}
-              onAddSubscription={() => {
-                setEditingId(null);
-                setActiveView("subscriptions");
-              }}
+              onEdit={openEditSubscriptionDialog}
+              onDelete={handleDelete}
+              onExportIcs={handleExportIcs}
             />
-          ) : null}
 
-          {activeView === "subscriptions" ? (
-            <div className="manage-layout">
-              <div className="manage-left">
+            <Dialog
+              open={subscriptionDialogOpen}
+              onClose={closeSubscriptionDialog}
+              fullWidth
+              maxWidth="md"
+              PaperProps={{
+                sx: {
+                  backgroundColor: "transparent",
+                  boxShadow: "none",
+                  overflow: "visible"
+                }
+              }}
+            >
+              <DialogContent sx={{ p: 0 }}>
                 <SubscriptionForm
                   mode={editingSubscription ? "edit" : "create"}
                   currency={settings.defaultCurrency}
                   initialValue={editingSubscription}
                   onSubmit={handleFormSubmit}
-                  onCancelEdit={() => setEditingId(null)}
+                  onCancelEdit={closeSubscriptionDialog}
                 />
-              </div>
+              </DialogContent>
+            </Dialog>
+          </Stack>
+        ) : null}
 
-              <div className="manage-right">
-                <SubscriptionGrid
-                  subscriptions={subscriptions}
-                  currency={settings.defaultCurrency}
-                  onEdit={(id) => setEditingId(id)}
-                  onDelete={handleDelete}
-                  onExportIcs={handleExportIcs}
-                />
-              </div>
-            </div>
-          ) : null}
+        {activeView === "profile" ? (
+          <Grid container spacing={1.5}>
+            <Grid size={{ xs: 12, lg: 10 }}>
+              <Card variant="outlined" aria-labelledby="profile-title">
+                <CardContent>
+                  <Stack component="form" spacing={1.5} onSubmit={handleProfileSave}>
+                    <Typography id="profile-title" variant="h5">
+                      Profile details
+                    </Typography>
 
-          {activeView === "profile" ? (
-            <div className="profile-grid">
-              <section className="panel" aria-labelledby="profile-title">
-                <div className="panel-head">
-                  <h2 id="profile-title">Profile details</h2>
-                </div>
-
-                <form className="auth-form profile-form" onSubmit={handleProfileSave}>
-                  <label>
-                    Full name
-                    <input
-                      type="text"
+                    <TextField
+                      label="Full name"
                       value={profileFullName}
                       onChange={(event) => setProfileFullName(event.target.value)}
                       autoComplete="name"
-                      minLength={2}
-                      maxLength={80}
+                      inputProps={{ minLength: 2, maxLength: 80 }}
                       required
                     />
-                  </label>
 
-                  <div className="split">
-                    <label>
-                      Country
-                      <input
-                        type="text"
-                        value={profileCountry}
-                        onChange={(event) => setProfileCountry(event.target.value)}
-                        placeholder="India"
-                        autoComplete="country-name"
-                        minLength={2}
-                        maxLength={80}
-                        required
-                      />
-                    </label>
+                    <Grid container spacing={1.5}>
+                      <Grid size={{ xs: 12, sm: 6 }}>
+                        <TextField
+                          label="Country"
+                          value={profileCountry}
+                          onChange={(event) => setProfileCountry(event.target.value)}
+                          placeholder="India"
+                          autoComplete="country-name"
+                          inputProps={{ minLength: 2, maxLength: 80 }}
+                          required
+                        />
+                      </Grid>
 
-                    <label>
-                      Timezone (optional)
-                      <input
-                        type="text"
-                        value={profileTimeZone}
-                        onChange={(event) => setProfileTimeZone(event.target.value)}
-                        placeholder="America/New_York"
-                        autoComplete="off"
-                      />
-                    </label>
-                  </div>
+                      <Grid size={{ xs: 12, sm: 6 }}>
+                        <TextField
+                          label="Timezone (optional)"
+                          value={profileTimeZone}
+                          onChange={(event) => setProfileTimeZone(event.target.value)}
+                          placeholder="America/New_York"
+                        />
+                      </Grid>
+                    </Grid>
 
-                  <label>
-                    Phone (optional)
-                    <input
-                      type="tel"
+                    <TextField
+                      label="Phone (optional)"
                       value={profilePhone}
                       onChange={(event) => setProfilePhone(event.target.value)}
                       placeholder="+14155552671"
                       autoComplete="tel"
                     />
-                  </label>
 
-                  <label>
-                    Bio (optional)
-                    <textarea
+                    <TextField
+                      id="profile-bio"
+                      label="Bio (optional)"
                       value={profileBio}
                       onChange={(event) => setProfileBio(event.target.value)}
                       rows={4}
-                      maxLength={280}
+                      multiline
+                      inputProps={{ maxLength: 280 }}
                       placeholder="Tell us a bit about your billing setup."
                     />
-                  </label>
 
-                  <button type="submit" className="primary-btn">
-                    Save profile
-                  </button>
-                </form>
-              </section>
-            </div>
-          ) : null}
+                    <Button type="submit" variant="contained">
+                      Save profile
+                    </Button>
+                  </Stack>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+        ) : null}
 
-          {activeView === "settings" ? (
-            <div className="settings-grid">
-              <section className="panel" aria-labelledby="app-settings-title">
-                <div className="panel-head">
-                  <h2 id="app-settings-title">App settings</h2>
-                </div>
+        {activeView === "settings" ? (
+          <Grid container spacing={1.5}>
+            <Grid size={{ xs: 12, lg: 6 }}>
+              <Card variant="outlined" aria-labelledby="app-settings-title">
+                <CardContent>
+                  <Stack spacing={1.5}>
+                    <Typography id="app-settings-title" variant="h5">
+                      App settings
+                    </Typography>
 
-                <div className="control-grid">
-                  <label>
-                    Currency
-                    <select
-                      value={settings.defaultCurrency}
-                      onChange={(event) => void handleCurrencyChange(event.target.value)}
-                    >
-                      <option value="USD">USD</option>
-                      <option value="EUR">EUR</option>
-                      <option value="GBP">GBP</option>
-                      <option value="INR">INR</option>
-                      <option value="CAD">CAD</option>
-                    </select>
-                  </label>
+                    <FormControl>
+                      <InputLabel id="currency-label">Currency</InputLabel>
+                      <Select
+                        labelId="currency-label"
+                        label="Currency"
+                        value={settings.defaultCurrency}
+                        onChange={(event) => void handleCurrencyChange(event.target.value)}
+                      >
+                        <MenuItem value="USD">USD</MenuItem>
+                        <MenuItem value="EUR">EUR</MenuItem>
+                        <MenuItem value="GBP">GBP</MenuItem>
+                        <MenuItem value="INR">INR</MenuItem>
+                        <MenuItem value="CAD">CAD</MenuItem>
+                      </Select>
+                    </FormControl>
 
-                  <label>
-                    Theme
-                    <select
-                      value={settings.themePreference}
-                      onChange={(event) =>
-                        void handleThemePreferenceChange(event.target.value as ThemePreference)
+                    <FormControl>
+                      <InputLabel id="theme-label">Theme</InputLabel>
+                      <Select
+                        labelId="theme-label"
+                        label="Theme"
+                        value={settings.themePreference}
+                        onChange={(event) =>
+                          void handleThemePreferenceChange(event.target.value as ThemePreference)
+                        }
+                      >
+                        <MenuItem value="system">System</MenuItem>
+                        <MenuItem value="light">Light</MenuItem>
+                        <MenuItem value="dark">Dark</MenuItem>
+                      </Select>
+                    </FormControl>
+
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={settings.notificationsEnabled}
+                          disabled={!supportsNotifications()}
+                          onChange={(event) => void handleEnableNotifications(event.target.checked)}
+                        />
                       }
-                    >
-                      <option value="system">System</option>
-                      <option value="light">Light</option>
-                      <option value="dark">Dark</option>
-                    </select>
-                  </label>
-
-                  <label className="checkbox-row">
-                    <input
-                      type="checkbox"
-                      checked={settings.notificationsEnabled}
-                      disabled={!supportsNotifications()}
-                      onChange={(event) => void handleEnableNotifications(event.target.checked)}
+                      label="Browser reminders"
                     />
-                    Browser reminders
-                  </label>
-                </div>
 
-                {installPrompt ? (
-                  <button type="button" className="ghost-btn" onClick={() => void handleInstallApp()}>
-                    Install app
-                  </button>
-                ) : null}
-              </section>
+                    {installPrompt ? (
+                      <Button
+                        variant="outlined"
+                        startIcon={<InstallDesktopIcon />}
+                        onClick={() => void handleInstallApp()}
+                      >
+                        Install app
+                      </Button>
+                    ) : null}
+                  </Stack>
+                </CardContent>
+              </Card>
+            </Grid>
 
-              <section className="panel" aria-labelledby="data-controls-title">
-                <div className="panel-head">
-                  <h2 id="data-controls-title">Backup & restore</h2>
-                </div>
+            <Grid size={{ xs: 12, lg: 6 }}>
+              <Card variant="outlined" aria-labelledby="data-controls-title">
+                <CardContent>
+                  <Stack spacing={1.5}>
+                    <Typography id="data-controls-title" variant="h5">
+                      Backup & restore
+                    </Typography>
 
-                <div className="data-actions">
-                  <button type="button" className="ghost-btn" onClick={() => void handleExportBackup()}>
-                    Export backup (JSON)
-                  </button>
-                  <button type="button" className="ghost-btn" onClick={handleImportClick}>
-                    Import backup (JSON)
-                  </button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="application/json"
-                    onChange={(event) => void handleImportFile(event)}
-                    hidden
-                  />
-                </div>
+                    <Button
+                      variant="outlined"
+                      startIcon={<DownloadIcon />}
+                      onClick={() => void handleExportBackup()}
+                    >
+                      Export backup (JSON)
+                    </Button>
 
-                <p className="tiny-note">
-                  Import replaces your account data with the selected backup file. Keep periodic exports.
-                </p>
-              </section>
-            </div>
-          ) : null}
-        </section>
-      </div>
-    </main>
+                    <Button variant="outlined" startIcon={<UploadIcon />} onClick={handleImportClick}>
+                      Import backup (JSON)
+                    </Button>
+
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="application/json"
+                      onChange={(event) => void handleImportFile(event)}
+                      hidden
+                    />
+
+                    <Typography variant="body2" color="text.secondary">
+                      Import replaces your account data with the selected backup file. Keep periodic
+                      exports.
+                    </Typography>
+                  </Stack>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+        ) : null}
+      </WorkspaceLayout>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar((current) => ({ ...current, open: false }))}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+      >
+        <Alert
+          onClose={() => setSnackbar((current) => ({ ...current, open: false }))}
+          severity={snackbar.severity}
+          sx={{ width: "100%" }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+    </>
   );
 };
 

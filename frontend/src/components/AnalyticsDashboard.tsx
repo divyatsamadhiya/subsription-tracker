@@ -1,18 +1,15 @@
 import { motion, useReducedMotion } from "framer-motion";
 import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis
-} from "recharts";
+  Alert,
+  Button,
+  Card,
+  CardContent,
+  Chip,
+  Grid,
+  Stack,
+  Typography
+} from "@mui/material";
+import { BarChart, LineChart, PieChart } from "@mui/x-charts";
 import { categoryLabel, formatCurrencyMinor } from "../lib/format";
 import type {
   AnalyticsSummary,
@@ -30,16 +27,7 @@ interface AnalyticsDashboardProps {
   onAddSubscription: () => void;
 }
 
-const CATEGORY_COLORS = ["#246bff", "#109d82", "#a37016", "#b656f5", "#ff5c7c"];
-
-const compactCurrency = (amountMinor: number, currency: string): string => {
-  return new Intl.NumberFormat(undefined, {
-    style: "currency",
-    currency,
-    notation: "compact",
-    maximumFractionDigits: 1
-  }).format(amountMinor / 100);
-};
+const CATEGORY_COLORS = ["#6750A4", "#625B71", "#7D5260", "#5A7A96", "#6F7972"];
 
 export const AnalyticsDashboard = ({
   spendTrend,
@@ -56,13 +44,21 @@ export const AnalyticsDashboard = ({
 
   if (summary.activeCount === 0) {
     return (
-      <section className="panel analytics-empty" aria-labelledby="analytics-empty-title">
-        <h2 id="analytics-empty-title">Subscription analytics</h2>
-        <p className="empty-note">No active subscriptions yet. Add one to unlock charts and metrics.</p>
-        <button type="button" className="primary-btn" onClick={onAddSubscription}>
-          Add subscription
-        </button>
-      </section>
+      <Card variant="outlined" aria-labelledby="analytics-empty-title">
+        <CardContent>
+          <Stack spacing={1.25}>
+            <Typography id="analytics-empty-title" variant="h5">
+              Subscription analytics
+            </Typography>
+            <Alert severity="info">
+              No active subscriptions yet. Add one to unlock charts and metrics.
+            </Alert>
+            <Button type="button" variant="contained" onClick={onAddSubscription}>
+              Add subscription
+            </Button>
+          </Stack>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -70,32 +66,27 @@ export const AnalyticsDashboard = ({
     {
       label: "Monthly baseline",
       value: formatCurrencyMinor(summary.monthlyBaselineMinor, currency),
-      hint: "Current recurring spend",
-      tone: "blue"
+      hint: "Current recurring spend"
     },
     {
       label: "6-month projection",
       value: formatCurrencyMinor(summary.projectedSixMonthMinor, currency),
-      hint: "Forecasted charges in next 6 months",
-      tone: "teal"
+      hint: "Forecasted charges in next 6 months"
     },
     {
       label: "Active subscriptions",
       value: String(summary.activeCount),
-      hint: "Currently billing",
-      tone: "amber"
+      hint: "Currently billing"
     },
     {
       label: "Renewals in 30 days",
       value: String(summary.renewalCount30Days),
-      hint: "Near-term billing events",
-      tone: "blue"
+      hint: "Near-term billing events"
     }
   ] as const;
 
   return (
     <motion.div
-      className="analytics-grid"
       initial={reduceMotion ? false : "hidden"}
       animate={reduceMotion ? undefined : "visible"}
       variants={{
@@ -108,177 +99,157 @@ export const AnalyticsDashboard = ({
         }
       }}
     >
-      <motion.section
-        className="panel analytics-kpi-panel"
-        variants={{
-          hidden: { opacity: 0, y: 8 },
-          visible: { opacity: 1, y: 0 }
-        }}
-        transition={cardTransition}
-        aria-labelledby="analytics-title"
-      >
-        <div className="panel-head">
-          <div>
-            <h2 id="analytics-title">Subscription analytics</h2>
-            <p className="panel-subtitle">Visual summary of spending and upcoming billing activity</p>
-          </div>
-        </div>
+      <Grid container spacing={1.25}>
+        <Grid size={12}>
+          <motion.div
+            variants={{ hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0 } }}
+            transition={cardTransition}
+          >
+            <Card variant="outlined" aria-labelledby="analytics-title">
+              <CardContent>
+                <Stack spacing={1.25}>
+                  <Stack>
+                    <Typography id="analytics-title" variant="h5">
+                      Subscription analytics
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Visual summary of spending and upcoming billing activity
+                    </Typography>
+                  </Stack>
 
-        <div className="analytics-kpis" aria-label="Analytics summary">
-          {kpis.map((kpi) => (
-            <article key={kpi.label} className={`analytics-kpi tone-${kpi.tone}`}>
-              <p className="stat-kicker">{kpi.label}</p>
-              <strong>{kpi.value}</strong>
-              <p className="stat-hint">{kpi.hint}</p>
-            </article>
-          ))}
-        </div>
-      </motion.section>
+                  <Grid container spacing={1.25} aria-label="Analytics summary">
+                    {kpis.map((kpi) => (
+                      <Grid key={kpi.label} size={{ xs: 12, sm: 6, lg: 3 }}>
+                        <Card variant="outlined">
+                          <CardContent>
+                            <Stack spacing={0.5}>
+                              <Typography variant="overline" color="text.secondary">
+                                {kpi.label}
+                              </Typography>
+                              <Typography variant="h5">{kpi.value}</Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                {kpi.hint}
+                              </Typography>
+                            </Stack>
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                    ))}
+                  </Grid>
+                </Stack>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </Grid>
 
-      <motion.section
-        className="panel chart-panel"
-        variants={{
-          hidden: { opacity: 0, y: 8 },
-          visible: { opacity: 1, y: 0 }
-        }}
-        transition={cardTransition}
-        aria-labelledby="spend-trend-title"
-      >
-        <div className="panel-head">
-          <h2 id="spend-trend-title">Spend trend (6 months)</h2>
-        </div>
-        <div className="chart-wrap">
-          <ResponsiveContainer width="100%" height={280}>
-            <AreaChart data={spendTrend} margin={{ top: 8, right: 10, left: 4, bottom: 6 }}>
-              <defs>
-                <linearGradient id="spendTrendFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#246bff" stopOpacity={0.35} />
-                  <stop offset="95%" stopColor="#246bff" stopOpacity={0.03} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" />
-              <XAxis dataKey="monthLabel" tickLine={false} axisLine={false} />
-              <YAxis
-                width={84}
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(value) => compactCurrency(Number(value), currency)}
-              />
-              <Tooltip
-                formatter={(value) => formatCurrencyMinor(Number(value), currency)}
-                contentStyle={{
-                  borderRadius: 12,
-                  border: "1px solid var(--line)",
-                  background: "var(--surface)"
-                }}
-              />
-              <Area
-                type="monotone"
-                dataKey="amountMinor"
-                stroke="#246bff"
-                strokeWidth={2}
-                fill="url(#spendTrendFill)"
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      </motion.section>
+        <Grid size={{ xs: 12, lg: 6 }}>
+          <motion.div
+            variants={{ hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0 } }}
+            transition={cardTransition}
+          >
+            <Card variant="outlined" aria-labelledby="spend-trend-title">
+              <CardContent>
+                <Stack spacing={1.25}>
+                  <Typography id="spend-trend-title" variant="h5">
+                    Spend trend (6 months)
+                  </Typography>
+                  <LineChart
+                    height={240}
+                    xAxis={[{ scaleType: "point", data: spendTrend.map((row) => row.monthLabel) }]}
+                    series={[
+                      {
+                        data: spendTrend.map((row) => row.amountMinor / 100),
+                        label: `Amount (${currency})`
+                      }
+                    ]}
+                    margin={{ left: 60, right: 20, top: 20, bottom: 30 }}
+                  />
+                </Stack>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </Grid>
 
-      <motion.section
-        className="panel chart-panel"
-        variants={{
-          hidden: { opacity: 0, y: 8 },
-          visible: { opacity: 1, y: 0 }
-        }}
-        transition={cardTransition}
-        aria-labelledby="category-split-title"
-      >
-        <div className="panel-head">
-          <h2 id="category-split-title">Category split</h2>
-        </div>
-        {categorySpend.length === 0 ? (
-          <p className="empty-note">No category spend data available.</p>
-        ) : (
-          <div className="chart-wrap">
-            <ResponsiveContainer width="100%" height={280}>
-              <PieChart>
-                <Pie
-                  data={categorySpend}
-                  dataKey="amountMinor"
-                  nameKey="category"
-                  innerRadius={62}
-                  outerRadius={98}
-                  paddingAngle={2}
-                  label={false}
-                  labelLine={false}
-                >
-                  {categorySpend.map((entry, index) => (
-                    <Cell key={entry.category} fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  formatter={(value, _name, payload) => {
-                    const row = payload?.payload as CategorySpendPoint | undefined;
-                    const label = row ? categoryLabel(row.category) : "Category";
-                    return [`${formatCurrencyMinor(Number(value), currency)}`, label];
-                  }}
-                  contentStyle={{
-                    borderRadius: 12,
-                    border: "1px solid var(--line)",
-                    background: "var(--surface)"
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-        {categorySpend.length > 0 ? (
-          <ul className="chart-legend">
-            {categorySpend.map((entry, index) => (
-              <li key={entry.category}>
-                <span
-                  className="legend-swatch"
-                  style={{ backgroundColor: CATEGORY_COLORS[index % CATEGORY_COLORS.length] }}
-                />
-                <span>{categoryLabel(entry.category)}</span>
-                <strong>{Math.round(entry.share * 100)}%</strong>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-      </motion.section>
+        <Grid size={{ xs: 12, lg: 6 }}>
+          <motion.div
+            variants={{ hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0 } }}
+            transition={cardTransition}
+          >
+            <Card variant="outlined" aria-labelledby="category-split-title">
+              <CardContent>
+                <Stack spacing={1.25}>
+                  <Typography id="category-split-title" variant="h5">
+                    Category split
+                  </Typography>
 
-      <motion.section
-        className="panel chart-panel full-width"
-        variants={{
-          hidden: { opacity: 0, y: 8 },
-          visible: { opacity: 1, y: 0 }
-        }}
-        transition={cardTransition}
-        aria-labelledby="renewal-buckets-title"
-      >
-        <div className="panel-head">
-          <h2 id="renewal-buckets-title">Renewals next 30 days</h2>
-        </div>
-        <div className="chart-wrap chart-wrap-short">
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={renewalBuckets} margin={{ top: 8, right: 10, left: 4, bottom: 6 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" />
-              <XAxis dataKey="bucketLabel" tickLine={false} axisLine={false} />
-              <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
-              <Tooltip
-                formatter={(value) => [`${String(value)} renewals`, "Count"]}
-                contentStyle={{
-                  borderRadius: 12,
-                  border: "1px solid var(--line)",
-                  background: "var(--surface)"
-                }}
-              />
-              <Bar dataKey="count" fill="#109d82" radius={[6, 6, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </motion.section>
+                  {categorySpend.length === 0 ? (
+                    <Typography variant="body2" color="text.secondary">
+                      No category spend data available.
+                    </Typography>
+                  ) : (
+                    <>
+                      <PieChart
+                        height={240}
+                        colors={CATEGORY_COLORS}
+                        series={[
+                          {
+                            data: categorySpend.map((entry) => ({
+                              id: entry.category,
+                              value: entry.amountMinor,
+                              label: categoryLabel(entry.category)
+                            })),
+                            innerRadius: 64,
+                            outerRadius: 100,
+                            paddingAngle: 2
+                          }
+                        ]}
+                      />
+                      <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                        {categorySpend.map((entry, index) => (
+                          <Chip
+                            key={entry.category}
+                            label={`${categoryLabel(entry.category)} ${Math.round(entry.share * 100)}%`}
+                            sx={{ borderColor: CATEGORY_COLORS[index % CATEGORY_COLORS.length] }}
+                            variant="outlined"
+                          />
+                        ))}
+                      </Stack>
+                    </>
+                  )}
+                </Stack>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </Grid>
+
+        <Grid size={12}>
+          <motion.div
+            variants={{ hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0 } }}
+            transition={cardTransition}
+          >
+            <Card variant="outlined" aria-labelledby="renewal-buckets-title">
+              <CardContent>
+                <Stack spacing={1.25}>
+                  <Typography id="renewal-buckets-title" variant="h5">
+                    Renewals next 30 days
+                  </Typography>
+                  <BarChart
+                    height={220}
+                    xAxis={[
+                      {
+                        scaleType: "band",
+                        data: renewalBuckets.map((row) => row.bucketLabel)
+                      }
+                    ]}
+                    series={[{ data: renewalBuckets.map((row) => row.count), label: "Renewals" }]}
+                    margin={{ left: 40, right: 20, top: 20, bottom: 30 }}
+                  />
+                </Stack>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </Grid>
+      </Grid>
     </motion.div>
   );
 };
