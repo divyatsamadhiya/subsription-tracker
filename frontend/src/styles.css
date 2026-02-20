@@ -601,6 +601,99 @@ select {
   font-size: 1.24rem;
 }
 
+.analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 0.92rem;
+}
+
+.analytics-kpi-panel {
+  grid-column: span 12;
+}
+
+.analytics-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.62rem;
+}
+
+.analytics-kpi {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface-soft);
+  padding: 0.82rem;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.analytics-kpi strong {
+  font-size: 1.16rem;
+}
+
+.analytics-kpi.tone-blue {
+  border-color: color-mix(in srgb, var(--brand) 40%, var(--line));
+}
+
+.analytics-kpi.tone-teal {
+  border-color: color-mix(in srgb, var(--mint) 42%, var(--line));
+}
+
+.analytics-kpi.tone-amber {
+  border-color: color-mix(in srgb, var(--amber) 40%, var(--line));
+}
+
+.chart-panel {
+  grid-column: span 6;
+}
+
+.chart-panel.full-width {
+  grid-column: span 12;
+}
+
+.chart-wrap {
+  width: 100%;
+  min-height: 280px;
+}
+
+.chart-wrap-short {
+  min-height: 240px;
+}
+
+.chart-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.38rem;
+}
+
+.chart-legend li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-soft);
+  padding: 0.38rem 0.52rem;
+  font-size: 0.82rem;
+}
+
+.legend-swatch {
+  width: 0.68rem;
+  height: 0.68rem;
+  border-radius: 999px;
+}
+
+.analytics-empty {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.analytics-empty .primary-btn {
+  justify-self: start;
+}
+
 .tab-row {
   display: flex;
   gap: 0.34rem;
@@ -912,14 +1005,18 @@ select {
 }
 
 @media (max-width: 1080px) {
-  .overview-grid {
+  .overview-grid,
+  .analytics-grid {
     grid-template-columns: repeat(8, minmax(0, 1fr));
   }
 
   .highlight-card,
   .stats-shell,
   .renewals-shell,
-  .reminder-panel {
+  .reminder-panel,
+  .analytics-kpi-panel,
+  .chart-panel,
+  .chart-panel.full-width {
     grid-column: span 8;
   }
 }
@@ -939,7 +1036,8 @@ select {
   .split,
   .control-grid,
   .stats-grid,
-  .sidebar-metrics {
+  .sidebar-metrics,
+  .analytics-kpis {
     grid-template-columns: 1fr;
   }
 
