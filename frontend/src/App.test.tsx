@@ -80,13 +80,15 @@ describe("App auth and profile flows", () => {
 
     render(<App />);
 
-    expect(screen.queryByLabelText("Full name")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Full name/i)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("tab", { name: "Create account" }));
 
-    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "john@example.com" } });
-    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "Password123" } });
-    fireEvent.change(screen.getByLabelText("Full name"), { target: { value: "John Doe" } });
-    fireEvent.change(screen.getByLabelText("Country"), { target: { value: "India" } });
+    fireEvent.change(screen.getByLabelText(/Email/i), { target: { value: "john@example.com" } });
+    fireEvent.change(screen.getByLabelText(/Password/i, { selector: "input" }), {
+      target: { value: "Password123" }
+    });
+    fireEvent.change(screen.getByLabelText(/Full name/i), { target: { value: "John Doe" } });
+    fireEvent.change(screen.getByLabelText(/Country/i), { target: { value: "India" } });
 
     fireEvent.click(screen.getByRole("button", { name: "Create account" }));
 
@@ -98,6 +100,30 @@ describe("App auth and profile flows", () => {
         country: "India"
       });
     });
+  });
+
+  it("toggles password visibility for sign in and recovery forms", async () => {
+    mockedUseAppStore.mockReturnValue(makeStoreState() as never);
+
+    render(<App />);
+
+    const authPasswordInput = screen.getByLabelText(/Password/i, { selector: "input" });
+    expect(authPasswordInput).toHaveAttribute("type", "password");
+
+    fireEvent.click(screen.getByRole("button", { name: "Show password" }));
+    expect(authPasswordInput).toHaveAttribute("type", "text");
+    expect(screen.getByRole("button", { name: "Hide password" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Forgot password/i }));
+
+    const recoveryPasswordInput = await screen.findByLabelText(/New password/i, {
+      selector: "input"
+    });
+    expect(recoveryPasswordInput).toHaveAttribute("type", "password");
+
+    const showButtons = screen.getAllByRole("button", { name: "Show password" });
+    fireEvent.click(showButtons[showButtons.length - 1]);
+    expect(recoveryPasswordInput).toHaveAttribute("type", "text");
   });
 
   it("shows soft prompt for legacy user and opens profile tab", async () => {
@@ -183,4 +209,45 @@ describe("App auth and profile flows", () => {
       expect(screen.getByRole("heading", { name: "Add Subscription" })).toBeInTheDocument();
     });
   });
+
+  it("creates a subscription from the Material form", async () => {
+    const addSubscription = vi.fn().mockResolvedValue(undefined);
+    mockedUseAppStore.mockReturnValue(
+      makeStoreState({
+        user: authUser,
+        profile: authUser.profile,
+        subscriptions: [],
+        addSubscription
+      }) as never
+    );
+
+    render(<App />);
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Add subscription" })[0]);
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Add Subscription" })).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByPlaceholderText("Netflix, Figma, Notion..."), {
+      target: { value: "Notion" }
+    });
+    fireEvent.change(screen.getByRole("spinbutton", { name: /Amount/i }), {
+      target: { value: "12.99" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add Subscription" }));
+
+    await waitFor(() => {
+      expect(addSubscription).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "Notion",
+          amountMinor: 1299,
+          billingCycle: "monthly",
+          category: "other",
+          isActive: true
+        })
+      );
+    });
+  });
+
 });

@@ -1,3 +1,15 @@
+import {
+  Card,
+  CardContent,
+  Chip,
+  List,
+  ListItem,
+  ListItemText,
+  Stack,
+  ToggleButton,
+  ToggleButtonGroup,
+  Typography
+} from "@mui/material";
 import { daysUntil } from "../lib/date";
 import { formatCurrencyMinor, formatRelativeDue } from "../lib/format";
 import type { Subscription } from "../types";
@@ -9,6 +21,18 @@ interface UpcomingRenewalsProps {
   onWindowChange: (window: 7 | 30) => void;
 }
 
+const urgencyColor = (days: number): "error" | "warning" | "default" => {
+  if (days === 0) {
+    return "error";
+  }
+
+  if (days <= 3) {
+    return "warning";
+  }
+
+  return "default";
+};
+
 export const UpcomingRenewals = ({
   renewals,
   currency,
@@ -16,62 +40,72 @@ export const UpcomingRenewals = ({
   onWindowChange
 }: UpcomingRenewalsProps) => {
   return (
-    <section className="panel" aria-labelledby="upcoming-renewals-title">
-      <div className="panel-head">
-        <div>
-          <h2 id="upcoming-renewals-title">Upcoming renewals</h2>
-          <p className="panel-subtitle">Prioritized by next billing date</p>
-        </div>
-        <div className="tab-row" role="tablist" aria-label="Renewal time window">
-          <button
-            type="button"
-            className={windowDays === 7 ? "tab-btn active" : "tab-btn"}
-            onClick={() => onWindowChange(7)}
-            role="tab"
-            aria-selected={windowDays === 7}
+    <Card variant="outlined" aria-labelledby="upcoming-renewals-title">
+      <CardContent>
+        <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" spacing={1.25}>
+          <Stack spacing={0.5}>
+            <Typography id="upcoming-renewals-title" variant="h5">
+              Upcoming renewals
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Prioritized by next billing date
+            </Typography>
+          </Stack>
+
+          <ToggleButtonGroup
+            color="primary"
+            value={windowDays}
+            exclusive
+            size="small"
+            onChange={(_event, value: 7 | 30 | null) => {
+              if (value) {
+                onWindowChange(value);
+              }
+            }}
+            aria-label="Renewal time window"
           >
-            Next 7 days
-          </button>
-          <button
-            type="button"
-            className={windowDays === 30 ? "tab-btn active" : "tab-btn"}
-            onClick={() => onWindowChange(30)}
-            role="tab"
-            aria-selected={windowDays === 30}
-          >
-            Next 30 days
-          </button>
-        </div>
-      </div>
+            <ToggleButton value={7}>Next 7 days</ToggleButton>
+            <ToggleButton value={30}>Next 30 days</ToggleButton>
+          </ToggleButtonGroup>
+        </Stack>
 
-      {renewals.length === 0 ? (
-        <p className="empty-note">No renewals in this window.</p>
-      ) : (
-        <ul className="renewal-list">
-          {renewals.map((subscription) => {
-            const dueInDays = Math.max(0, daysUntil(subscription.nextBillingDate));
-            const urgencyClass =
-              dueInDays === 0 ? "due-now" : dueInDays <= 3 ? "due-soon" : "due-later";
-
-            return (
-              <li
-                key={`${subscription.id}-${subscription.nextBillingDate}`}
-                className={`renewal-item ${urgencyClass}`}
-              >
-                <div className="renewal-main">
-                  <h3>{subscription.name}</h3>
-                  <p>Next charge: {subscription.nextBillingDate}</p>
-                </div>
-
-                <div className="renewal-side">
-                  <strong>{formatCurrencyMinor(subscription.amountMinor, currency)}</strong>
-                  <span className={`due-pill ${urgencyClass}`}>{formatRelativeDue(dueInDays)}</span>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </section>
+        {renewals.length === 0 ? (
+          <Typography sx={{ mt: 1 }} color="text.secondary">
+            No renewals in this window.
+          </Typography>
+        ) : (
+          <List sx={{ mt: 0.5 }}>
+            {renewals.map((subscription) => {
+              const dueInDays = Math.max(0, daysUntil(subscription.nextBillingDate));
+              return (
+                <ListItem
+                  key={`${subscription.id}-${subscription.nextBillingDate}`}
+                  divider
+                  disableGutters
+                  secondaryAction={
+                    <Stack alignItems="flex-end" spacing={0.5}>
+                      <Typography variant="subtitle2">
+                        {formatCurrencyMinor(subscription.amountMinor, currency)}
+                      </Typography>
+                      <Chip
+                        size="small"
+                        color={urgencyColor(dueInDays)}
+                        label={formatRelativeDue(dueInDays)}
+                      />
+                    </Stack>
+                  }
+                >
+                  <ListItemText
+                    primary={subscription.name}
+                    secondary={`Next charge: ${subscription.nextBillingDate}`}
+                    sx={{ pr: { xs: 11, sm: 13 } }}
+                  />
+                </ListItem>
+              );
+            })}
+          </List>
+        )}
+      </CardContent>
+    </Card>
   );
 };

@@ -249,6 +249,9 @@ export const useAppStore = create<AppState>((set) => ({
 
     try {
       await api.logout();
+    } catch {
+      // Even if server logout fails, clear local session state immediately.
+    } finally {
       set({
         user: null,
         profile: {},
@@ -257,12 +260,6 @@ export const useAppStore = create<AppState>((set) => ({
         loading: false,
         error: null
       });
-    } catch (error) {
-      set({
-        loading: false,
-        error: userMessage(error, "Logout failed.")
-      });
-      throw error;
     }
   },
 

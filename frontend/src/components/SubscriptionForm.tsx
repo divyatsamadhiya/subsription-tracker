@@ -1,4 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
+import {
+  Alert,
+  Button,
+  Card,
+  CardContent,
+  Checkbox,
+  FormControl,
+  FormControlLabel,
+  FormGroup,
+  Grid,
+  MenuItem,
+  Stack,
+  TextField,
+  Typography
+} from "@mui/material";
 import { BILLING_CYCLE_OPTIONS, CATEGORY_OPTIONS, type Subscription } from "../types";
 import { billingCycleLabel, categoryLabel } from "../lib/format";
 import { parseSubscriptionForm } from "../lib/schemas";
@@ -143,172 +158,166 @@ export const SubscriptionForm = ({
   };
 
   return (
-    <section className="panel panel-form" aria-labelledby="subscription-form-title">
-      <div className="panel-head">
-        <h2 id="subscription-form-title">{heading}</h2>
-        {mode === "edit" ? (
-          <button type="button" className="ghost-btn" onClick={onCancelEdit}>
-            Cancel
-          </button>
-        ) : null}
-      </div>
+    <Card variant="outlined" aria-labelledby="subscription-form-title">
+      <CardContent>
+        <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1.25}>
+          <Typography id="subscription-form-title" variant="h5">
+            {heading}
+          </Typography>
+          <Button variant="text" color="inherit" onClick={onCancelEdit}>
+            {mode === "edit" ? "Cancel" : "Close"}
+          </Button>
+        </Stack>
 
-      <form className="subscription-form" onSubmit={handleSubmit}>
-        <label>
-          Name
-          <input
-            type="text"
+        <Stack component="form" spacing={1.5} onSubmit={handleSubmit}>
+          <TextField
+            id="subscription-name"
+            label="Name"
             value={form.name}
             onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
             placeholder="Netflix, Figma, Notion..."
             required
           />
-        </label>
 
-        <div className="split">
-          <label>
-            Amount ({currency})
-            <input
-              type="number"
-              value={form.amount}
-              min="0"
-              step="0.01"
-              onChange={(event) =>
-                setForm((current) => ({ ...current, amount: event.target.value }))
-              }
-              required
-            />
-          </label>
-
-          <label>
-            Category
-            <select
-              value={form.category}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  category: event.target.value as FormState["category"]
-                }))
-              }
-            >
-              {CATEGORY_OPTIONS.map((category) => (
-                <option key={category} value={category}>
-                  {categoryLabel(category)}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        <div className="split">
-          <label>
-            Billing cycle
-            <select
-              value={form.billingCycle}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  billingCycle: event.target.value as FormState["billingCycle"]
-                }))
-              }
-            >
-              {BILLING_CYCLE_OPTIONS.map((cycle) => (
-                <option key={cycle} value={cycle}>
-                  {billingCycleLabel(cycle)}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          {form.billingCycle === "custom_days" ? (
-            <label>
-              Every (days)
-              <input
+          <Grid container spacing={1.5}>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField
+                id="subscription-amount"
+                label={`Amount (${currency})`}
                 type="number"
-                min="1"
-                step="1"
-                value={form.customIntervalDays}
+                value={form.amount}
+                inputProps={{ min: 0, step: 0.01 }}
                 onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    customIntervalDays: event.target.value
-                  }))
+                  setForm((current) => ({ ...current, amount: event.target.value }))
                 }
                 required
               />
-            </label>
-          ) : (
-            <label>
-              Next billing date
-              <input
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField
+                id="subscription-category"
+                select
+                  label="Category"
+                  value={form.category}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      category: event.target.value as FormState["category"]
+                    }))
+                  }
+                  SelectProps={{ displayEmpty: false }}
+                >
+                  {CATEGORY_OPTIONS.map((category) => (
+                    <MenuItem key={category} value={category}>
+                      {categoryLabel(category)}
+                    </MenuItem>
+                  ))}
+              </TextField>
+            </Grid>
+          </Grid>
+
+          <Grid container spacing={1.5}>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField
+                id="subscription-billing-cycle"
+                select
+                  label="Billing cycle"
+                  value={form.billingCycle}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      billingCycle: event.target.value as FormState["billingCycle"]
+                    }))
+                  }
+                  SelectProps={{ displayEmpty: false }}
+                >
+                  {BILLING_CYCLE_OPTIONS.map((cycle) => (
+                    <MenuItem key={cycle} value={cycle}>
+                      {billingCycleLabel(cycle)}
+                    </MenuItem>
+                  ))}
+              </TextField>
+            </Grid>
+
+            <Grid size={{ xs: 12, sm: 6 }}>
+              {form.billingCycle === "custom_days" ? (
+                <TextField
+                  id="subscription-custom-days"
+                  label="Every (days)"
+                  type="number"
+                  value={form.customIntervalDays}
+                  inputProps={{ min: 1, step: 1 }}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, customIntervalDays: event.target.value }))
+                  }
+                  required
+                />
+              ) : null}
+
+              <TextField
+                id="subscription-next-billing-date"
+                sx={form.billingCycle === "custom_days" ? { mt: 1.25 } : undefined}
+                label="Next billing date"
                 type="date"
                 value={form.nextBillingDate}
                 onChange={(event) =>
                   setForm((current) => ({ ...current, nextBillingDate: event.target.value }))
                 }
+                InputLabelProps={{ shrink: true }}
                 required
               />
-            </label>
-          )}
-        </div>
+            </Grid>
+          </Grid>
 
-        {form.billingCycle === "custom_days" ? (
-          <label>
-            Next billing date
-            <input
-              type="date"
-              value={form.nextBillingDate}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, nextBillingDate: event.target.value }))
-              }
-              required
-            />
-          </label>
-        ) : null}
-
-        <fieldset className="reminder-group">
-          <legend>Reminder days before</legend>
-          <div className="chips">
-            {REMINDER_DAY_OPTIONS.map((day) => (
-              <label key={day} className="chip-toggle">
-                <input
-                  type="checkbox"
-                  checked={form.reminderDaysBefore.includes(day)}
-                  onChange={() => toggleReminderDay(day)}
+          <FormControl>
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>
+              Reminder days before
+            </Typography>
+            <FormGroup row>
+              {REMINDER_DAY_OPTIONS.map((day) => (
+                <FormControlLabel
+                  key={day}
+                  control={
+                    <Checkbox
+                      checked={form.reminderDaysBefore.includes(day)}
+                      onChange={() => toggleReminderDay(day)}
+                    />
+                  }
+                  label={`${day} day${day === 1 ? "" : "s"}`}
                 />
-                <span>{day} day{day === 1 ? "" : "s"}</span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
+              ))}
+            </FormGroup>
+          </FormControl>
 
-        <label>
-          Notes
-          <textarea
-            rows={3}
+          <TextField
+            id="subscription-notes"
+            label="Notes"
+            multiline
+            rows={2}
             value={form.notes}
             onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
             placeholder="Cancellation URL, account email, discount expiry..."
           />
-        </label>
 
-        <label className="checkbox-row">
-          <input
-            type="checkbox"
-            checked={form.isActive}
-            onChange={(event) =>
-              setForm((current) => ({ ...current, isActive: event.target.checked }))
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={form.isActive}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, isActive: event.target.checked }))
+                }
+              />
             }
+            label="Active subscription"
           />
-          Active subscription
-        </label>
 
-        {formError ? <p className="form-error">{formError}</p> : null}
+          {formError ? <Alert severity="error">{formError}</Alert> : null}
 
-        <button type="submit" className="primary-btn" disabled={isSubmitting}>
-          {isSubmitting ? "Saving..." : mode === "create" ? "Add Subscription" : "Update Subscription"}
-        </button>
-      </form>
-    </section>
+          <Button type="submit" variant="contained" disabled={isSubmitting}>
+            {isSubmitting ? "Saving..." : mode === "create" ? "Add Subscription" : "Update Subscription"}
+          </Button>
+        </Stack>
+      </CardContent>
+    </Card>
   );
 };

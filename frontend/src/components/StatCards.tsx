@@ -1,3 +1,4 @@
+import { Card, CardContent, Grid, Stack, Typography } from "@mui/material";
 import { formatCurrencyMinor } from "../lib/format";
 
 interface StatCardsProps {
@@ -17,38 +18,39 @@ export const StatCards = ({
     {
       label: "Monthly baseline",
       value: formatCurrencyMinor(monthlyTotalMinor, currency),
-      hint: "Current recurring spend",
-      meta: "Live",
-      tone: "teal"
+      hint: "Current recurring spend"
     },
     {
       label: "Yearly forecast",
       value: formatCurrencyMinor(yearlyTotalMinor, currency),
-      hint: "Projected annual outflow",
-      meta: "12 months",
-      tone: "blue"
+      hint: "Projected annual outflow"
     },
     {
       label: "Active subscriptions",
       value: String(activeCount),
-      hint: "Services currently enabled",
-      meta: "Now",
-      tone: "amber"
+      hint: "Services currently enabled"
     }
   ] as const;
 
   return (
-    <div className="stats-grid" aria-label="Spending summary">
+    <Grid container spacing={1.25} aria-label="Spending summary">
       {cards.map((card) => (
-        <article key={card.label} className={`stat-card tone-${card.tone}`}>
-          <div className="stat-top">
-            <p className="stat-kicker">{card.label}</p>
-            <span className="stat-meta">{card.meta}</span>
-          </div>
-          <strong>{card.value}</strong>
-          <p className="stat-hint">{card.hint}</p>
-        </article>
+        <Grid key={card.label} size={{ xs: 12, md: 4 }}>
+          <Card variant="outlined">
+            <CardContent>
+              <Stack spacing={1}>
+                <Typography variant="overline" color="text.secondary">
+                  {card.label}
+                </Typography>
+                <Typography variant="h5">{card.value}</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {card.hint}
+                </Typography>
+              </Stack>
+            </CardContent>
+          </Card>
+        </Grid>
       ))}
-    </div>
+    </Grid>
   );
 };
