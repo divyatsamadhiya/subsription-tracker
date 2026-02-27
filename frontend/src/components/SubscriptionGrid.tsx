@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Button,
   Card,
@@ -46,17 +46,7 @@ export const SubscriptionGrid = ({
   onToggleActive
 }: SubscriptionGridProps) => {
   const [pendingDelete, setPendingDelete] = useState<Subscription | null>(null);
-  const [deleteReady, setDeleteReady] = useState(false);
   const [pendingToggleId, setPendingToggleId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!pendingDelete) {
-      setDeleteReady(false);
-      return;
-    }
-    const timer = setTimeout(() => setDeleteReady(true), 1500);
-    return () => clearTimeout(timer);
-  }, [pendingDelete]);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
 
@@ -279,7 +269,6 @@ export const SubscriptionGrid = ({
           <Button
             color="error"
             variant="contained"
-            disabled={!deleteReady}
             disableElevation
             onClick={async () => {
               if (!pendingDelete) {
@@ -289,7 +278,7 @@ export const SubscriptionGrid = ({
               setPendingDelete(null);
             }}
           >
-            {deleteReady ? "Delete" : "Confirming…"}
+            Delete
           </Button>
         </DialogActions>
       </Dialog>
