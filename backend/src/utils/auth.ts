@@ -1,8 +1,9 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { authCookieMaxAgeMs, authCookieName, config, isProduction } from "../config.js";
+import { authCookieMaxAgeMs, authCookieName, config, isProduction, sessionSalt } from "../config.js";
 
 const jwtIssuer = "pulseboard";
+const jwtSigningSecret = `${config.jwtSecret}:${sessionSalt}`;
 
 export const hashPassword = async (password: string): Promise<string> => {
   return bcrypt.hash(password, 10);
@@ -16,14 +17,14 @@ export const comparePassword = async (
 };
 
 export const signUserToken = (userId: string): string => {
-  return jwt.sign({ sub: userId }, config.jwtSecret, {
+  return jwt.sign({ sub: userId }, jwtSigningSecret, {
     expiresIn: "7d",
     issuer: jwtIssuer
   });
 };
 
 export const verifyUserToken = (token: string): string => {
-  const payload = jwt.verify(token, config.jwtSecret, {
+  const payload = jwt.verify(token, jwtSigningSecret, {
     issuer: jwtIssuer
   }) as jwt.JwtPayload;
 
