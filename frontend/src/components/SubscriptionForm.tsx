@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  Alert,
   Autocomplete,
   Avatar,
   Box,
@@ -143,7 +142,7 @@ export const SubscriptionForm = ({
     initialValue ? fromSubscription(initialValue) : defaultFormState()
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [calendarAnchorEl, setCalendarAnchorEl] = useState<HTMLElement | null>(null);
   const [calendarViewDate, setCalendarViewDate] = useState<Date>(() => {
     return fromIsoDate(defaultFormState().nextBillingDate) ?? new Date();
@@ -249,7 +248,7 @@ export const SubscriptionForm = ({
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    setFormError(null);
+    setFieldErrors({});
     setIsSubmitting(true);
 
     const parsed = parseSubscriptionForm({
@@ -266,8 +265,14 @@ export const SubscriptionForm = ({
 
     if (!parsed.success) {
       setIsSubmitting(false);
-      const issue = parsed.error.issues[0];
-      setFormError(issue?.message ?? "Invalid form input");
+      const errors: Record<string, string> = {};
+      for (const issue of parsed.error.issues) {
+        const field = issue.path[0];
+        if (typeof field === "string" && !errors[field]) {
+          errors[field] = issue.message;
+        }
+      }
+      setFieldErrors(errors);
       return;
     }
 
@@ -398,7 +403,8 @@ export const SubscriptionForm = ({
                 id="subscription-name"
                 label="Company name"
                 placeholder="Netflix, Figma, Notion..."
-                helperText="Pick from suggestions (with icons) or type your own."
+                error={Boolean(fieldErrors.name)}
+                helperText={fieldErrors.name ?? "Pick from suggestions (with icons) or type your own."}
                 required
               />
             )}
@@ -412,6 +418,8 @@ export const SubscriptionForm = ({
                 type="number"
                 value={form.amount}
                 inputProps={{ min: 0, step: 0.01 }}
+                error={Boolean(fieldErrors.amount)}
+                helperText={fieldErrors.amount}
                 onChange={(event) =>
                   setForm((current) => ({ ...current, amount: event.target.value }))
                 }
@@ -472,6 +480,8 @@ export const SubscriptionForm = ({
                   type="number"
                   value={form.customIntervalDays}
                   inputProps={{ min: 1, step: 1 }}
+                  error={Boolean(fieldErrors.customIntervalDays)}
+                  helperText={fieldErrors.customIntervalDays}
                   onChange={(event) =>
                     setForm((current) => ({ ...current, customIntervalDays: event.target.value }))
                   }
@@ -488,7 +498,8 @@ export const SubscriptionForm = ({
                 onChange={(event) =>
                   setForm((current) => ({ ...current, nextBillingDate: event.target.value }))
                 }
-                helperText="Use calendar to pick year, month, and date."
+                error={Boolean(fieldErrors.nextBillingDate)}
+                helperText={fieldErrors.nextBillingDate ?? "Use calendar to pick year, month, and date."}
                 required
                 InputLabelProps={{ shrink: true }}
                 InputProps={{
@@ -664,8 +675,6 @@ export const SubscriptionForm = ({
             }
             label="Active subscription"
           />
-
-          {formError ? <Alert severity="error">{formError}</Alert> : null}
 
           <Button type="submit" variant="contained" disabled={isSubmitting}>
             {isSubmitting ? "Saving..." : mode === "create" ? "Add Subscription" : "Update Subscription"}

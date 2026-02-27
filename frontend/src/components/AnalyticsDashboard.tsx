@@ -1,15 +1,18 @@
 import { motion, useReducedMotion } from "framer-motion";
 import {
-  Alert,
+  Box,
   Button,
   Card,
   CardContent,
   Chip,
   Grid,
   Stack,
-  Typography
+  Typography,
+  useMediaQuery,
+  useTheme
 } from "@mui/material";
 import { BarChart, LineChart, PieChart } from "@mui/x-charts";
+import AutoGraphRoundedIcon from "@mui/icons-material/AutoGraphRounded";
 import { categoryLabel, formatCurrencyMinor } from "../lib/format";
 import type {
   AnalyticsSummary,
@@ -27,7 +30,6 @@ interface AnalyticsDashboardProps {
   onAddSubscription: () => void;
 }
 
-const CATEGORY_COLORS = ["#6750A4", "#625B71", "#7D5260", "#5A7A96", "#6F7972"];
 
 export const AnalyticsDashboard = ({
   spendTrend,
@@ -37,6 +39,17 @@ export const AnalyticsDashboard = ({
   currency,
   onAddSubscription
 }: AnalyticsDashboardProps) => {
+  const theme = useTheme();
+  const isSmall = useMediaQuery(theme.breakpoints.down("sm"));
+  const chartHeight = isSmall ? 200 : 260;
+  const categoryColors = [
+    theme.palette.primary.main,
+    theme.palette.secondary.main,
+    theme.palette.error.main,
+    theme.palette.warning.main,
+    theme.palette.success.main
+  ];
+
   const reduceMotion = useReducedMotion();
   const cardTransition = reduceMotion
     ? { duration: 0 }
@@ -46,13 +59,16 @@ export const AnalyticsDashboard = ({
     return (
       <Card variant="outlined" aria-labelledby="analytics-empty-title">
         <CardContent>
-          <Stack spacing={1.25}>
-            <Typography id="analytics-empty-title" variant="h5">
-              Subscription analytics
-            </Typography>
-            <Alert severity="info">
-              No active subscriptions yet. Add one to unlock charts and metrics.
-            </Alert>
+          <Stack spacing={2} alignItems="center" sx={{ py: 5 }}>
+            <AutoGraphRoundedIcon sx={{ fontSize: 52, color: "text.disabled" }} />
+            <Stack alignItems="center" spacing={0.5}>
+              <Typography id="analytics-empty-title" variant="h6" color="text.secondary">
+                No analytics yet
+              </Typography>
+              <Typography variant="body2" color="text.disabled" textAlign="center">
+                Add your first subscription to unlock charts and spend insights.
+              </Typography>
+            </Stack>
             <Button type="button" variant="contained" onClick={onAddSubscription}>
               Add subscription
             </Button>
@@ -154,7 +170,7 @@ export const AnalyticsDashboard = ({
                     Spend trend (6 months)
                   </Typography>
                   <LineChart
-                    height={240}
+                    height={chartHeight}
                     xAxis={[{ scaleType: "point", data: spendTrend.map((row) => row.monthLabel) }]}
                     series={[
                       {
@@ -188,28 +204,47 @@ export const AnalyticsDashboard = ({
                     </Typography>
                   ) : (
                     <>
-                      <PieChart
-                        height={240}
-                        colors={CATEGORY_COLORS}
-                        series={[
-                          {
-                            data: categorySpend.map((entry) => ({
-                              id: entry.category,
-                              value: entry.amountMinor,
-                              label: categoryLabel(entry.category)
-                            })),
-                            innerRadius: 64,
-                            outerRadius: 100,
-                            paddingAngle: 2
-                          }
-                        ]}
-                      />
+                      <Box sx={{ position: "relative" }}>
+                        <PieChart
+                          height={chartHeight}
+                          colors={categoryColors}
+                          slotProps={{ legend: { hidden: true } }}
+                          series={[
+                            {
+                              data: categorySpend.map((entry) => ({
+                                id: entry.category,
+                                value: entry.amountMinor,
+                                label: categoryLabel(entry.category)
+                              })),
+                              innerRadius: 64,
+                              outerRadius: 100,
+                              paddingAngle: 2
+                            }
+                          ]}
+                        />
+                        <Stack
+                          alignItems="center"
+                          justifyContent="center"
+                          sx={{
+                            position: "absolute",
+                            inset: 0,
+                            pointerEvents: "none"
+                          }}
+                        >
+                          <Typography variant="h6" fontWeight={700} lineHeight={1.2}>
+                            {formatCurrencyMinor(summary.monthlyBaselineMinor, currency)}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            / month
+                          </Typography>
+                        </Stack>
+                      </Box>
                       <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                         {categorySpend.map((entry, index) => (
                           <Chip
                             key={entry.category}
                             label={`${categoryLabel(entry.category)} ${Math.round(entry.share * 100)}%`}
-                            sx={{ borderColor: CATEGORY_COLORS[index % CATEGORY_COLORS.length] }}
+                            sx={{ borderColor: categoryColors[index % categoryColors.length] }}
                             variant="outlined"
                           />
                         ))}
@@ -234,7 +269,7 @@ export const AnalyticsDashboard = ({
                     Renewals next 30 days
                   </Typography>
                   <BarChart
-                    height={220}
+                    height={chartHeight}
                     xAxis={[
                       {
                         scaleType: "band",

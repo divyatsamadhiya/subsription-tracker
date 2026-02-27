@@ -10,6 +10,7 @@ import {
   AppBar,
   Box,
   Button,
+  Divider,
   Drawer,
   IconButton,
   ListItemIcon,
@@ -43,6 +44,7 @@ interface WorkspaceLayoutProps {
   headerTitle: string;
   headerSubtitle: string;
   headerActions: ReactNode;
+  mobileActions?: ReactNode;
   children: ReactNode;
 }
 
@@ -80,6 +82,7 @@ export const WorkspaceLayout = ({
   headerTitle,
   headerSubtitle,
   headerActions,
+  mobileActions,
   children
 }: WorkspaceLayoutProps) => {
   const navContent = (
@@ -88,7 +91,6 @@ export const WorkspaceLayout = ({
         variant="outlined"
         sx={{
           p: 1.75,
-          borderRadius: "14px",
           borderColor: "divider",
           backgroundColor: "background.paper"
         }}
@@ -104,7 +106,7 @@ export const WorkspaceLayout = ({
         </Typography>
       </Paper>
 
-      <Paper variant="outlined" sx={{ borderRadius: "14px", py: 0.75 }}>
+      <Paper variant="outlined" sx={{ py: 0.75 }}>
         <List disablePadding>
           {tabs.map((tab) => (
             <ListItemButton
@@ -117,7 +119,7 @@ export const WorkspaceLayout = ({
               sx={{
                 mx: 1,
                 my: 0.25,
-                borderRadius: "10px",
+                borderRadius: (theme) => `${theme.shape.borderRadius}px`,
                 px: 1,
                 py: 0.9,
                 "& .MuiListItemIcon-root": {
@@ -147,18 +149,31 @@ export const WorkspaceLayout = ({
         </List>
       </Paper>
 
-      <Paper variant="outlined" sx={{ p: 1.75, borderRadius: "14px" }}>
-        <Stack spacing={1.5}>
-          <Typography variant="overline" color="text.secondary">
-            Monthly spend
-          </Typography>
-          <Typography variant="h5">{monthlySpend}</Typography>
-          <Typography variant="body2" color="text.secondary">
-            Active services: {activeServices}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Next renewal: {nextRenewal}
-          </Typography>
+      <Paper variant="outlined" sx={{ p: 1.75 }}>
+        <Stack spacing={1}>
+          <Stack spacing={0.25}>
+            <Typography variant="overline" color="text.secondary">
+              Monthly spend
+            </Typography>
+            <Typography variant="h4" color="primary">
+              {monthlySpend}
+            </Typography>
+          </Stack>
+          <Divider />
+          <Stack direction="row" justifyContent="space-between" alignItems="center">
+            <Typography variant="caption" color="text.secondary">
+              Active services
+            </Typography>
+            <Typography variant="subtitle2">{activeServices}</Typography>
+          </Stack>
+          <Stack direction="row" justifyContent="space-between" alignItems="center">
+            <Typography variant="caption" color="text.secondary">
+              Next renewal
+            </Typography>
+            <Typography variant="subtitle2" sx={{ textAlign: "right", maxWidth: "60%" }}>
+              {nextRenewal}
+            </Typography>
+          </Stack>
         </Stack>
       </Paper>
 
@@ -180,9 +195,10 @@ export const WorkspaceLayout = ({
           <IconButton edge="start" onClick={onOpenMobileNav} aria-label="Open navigation">
             <MenuIcon />
           </IconButton>
-          <Typography variant="h5" sx={{ ml: 1 }}>
+          <Typography variant="h5" sx={{ ml: 1, flexGrow: 1 }}>
             {headerTitle}
           </Typography>
+          {mobileActions}
         </Toolbar>
       </AppBar>
 
@@ -222,7 +238,7 @@ export const WorkspaceLayout = ({
       </Box>
 
       <Box component="main" sx={{ flexGrow: 1, p: { xs: 1.5, md: 2 }, mt: { xs: 8, md: 0 } }}>
-        <Paper variant="outlined" sx={{ p: { xs: 1.5, md: 2 }, borderRadius: "14px", mb: 2 }}>
+        <Paper variant="outlined" sx={{ p: { xs: 1.5, md: 2 }, mb: 2 }}>
           <Stack
             direction={{ xs: "column", md: "row" }}
             justifyContent="space-between"

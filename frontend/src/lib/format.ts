@@ -20,6 +20,15 @@ export const billingCycleLabel = (value: string): string => {
   return value.replace("_", " ").replace(/\b\w/g, (character) => character.toUpperCase());
 };
 
+export const formatIsoDate = (isoDate: string): string => {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  return new Intl.DateTimeFormat(undefined, {
+    year: "numeric",
+    month: "long",
+    day: "numeric"
+  }).format(new Date(year, month - 1, day));
+};
+
 export const formatRelativeDue = (days: number): string => {
   if (days === 0) {
     return "Due today";
