@@ -10,8 +10,9 @@ import {
   ToggleButtonGroup,
   Typography
 } from "@mui/material";
+import EventAvailableRoundedIcon from "@mui/icons-material/EventAvailableRounded";
 import { daysUntil } from "../lib/date";
-import { formatCurrencyMinor, formatRelativeDue } from "../lib/format";
+import { formatCurrencyMinor, formatIsoDate, formatRelativeDue } from "../lib/format";
 import type { Subscription } from "../types";
 
 interface UpcomingRenewalsProps {
@@ -70,9 +71,19 @@ export const UpcomingRenewals = ({
         </Stack>
 
         {renewals.length === 0 ? (
-          <Typography sx={{ mt: 1 }} color="text.secondary">
-            No renewals in this window.
-          </Typography>
+          <Stack spacing={1} alignItems="center" sx={{ py: 4 }}>
+            <EventAvailableRoundedIcon sx={{ fontSize: 40, color: "text.disabled" }} />
+            <Stack alignItems="center" spacing={0.25}>
+              <Typography variant="body2" color="text.secondary">
+                No renewals in the next {windowDays} days.
+              </Typography>
+              {windowDays === 7 && (
+                <Typography variant="caption" color="text.disabled">
+                  Switch to 30 days to see more.
+                </Typography>
+              )}
+            </Stack>
+          </Stack>
         ) : (
           <List sx={{ mt: 0.5 }}>
             {renewals.map((subscription) => {
@@ -97,8 +108,8 @@ export const UpcomingRenewals = ({
                 >
                   <ListItemText
                     primary={subscription.name}
-                    secondary={`Next charge: ${subscription.nextBillingDate}`}
-                    sx={{ pr: { xs: 11, sm: 13 } }}
+                    secondary={`Next charge: ${formatIsoDate(subscription.nextBillingDate)}`}
+                    sx={{ pr: 14 }}
                   />
                 </ListItem>
               );

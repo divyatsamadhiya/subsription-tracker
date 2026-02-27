@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Box, Container, Grid } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 
 interface AuthLayoutProps {
   primary: ReactNode;
@@ -16,8 +17,9 @@ export const AuthLayout = ({ primary, panel, secondary, reverse = false }: AuthL
         py: { xs: 2, md: 3 },
         display: "flex",
         alignItems: "center",
-        background:
-          "radial-gradient(1100px 520px at -8% -18%, rgba(153, 120, 255, 0.18), transparent 55%), radial-gradient(760px 420px at 100% 0%, rgba(69, 143, 255, 0.14), transparent 62%)"
+        background: (theme) =>
+          `radial-gradient(1100px 520px at -8% -18%, ${alpha(theme.palette.primary.main, 0.18)}, transparent 55%), ` +
+          `radial-gradient(760px 420px at 100% 0%, ${alpha(theme.palette.info.main, 0.14)}, transparent 62%)`
       }}
     >
       <Container maxWidth="xl" sx={{ px: { xs: 1.25, md: 2.5 } }}>

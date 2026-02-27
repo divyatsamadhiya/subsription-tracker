@@ -20,7 +20,7 @@ const baseTheme = (mode: PaletteMode) =>
           })
     },
     shape: {
-      borderRadius: 12
+      borderRadius: 14
     },
     typography: {
       fontFamily: '"Plus Jakarta Sans", "Segoe UI", sans-serif',
@@ -100,26 +100,12 @@ const baseTheme = (mode: PaletteMode) =>
       }
     },
     components: {
-      MuiPaper: {
-        styleOverrides: {
-          root: {
-            borderRadius: 14
-          }
-        }
-      },
-      MuiCard: {
-        styleOverrides: {
-          root: {
-            borderRadius: 14
-          }
-        }
-      },
       MuiCardContent: {
         styleOverrides: {
           root: {
-            padding: 14,
+            padding: 16,
             "&:last-child": {
-              paddingBottom: 14
+              paddingBottom: 16
             }
           }
         }

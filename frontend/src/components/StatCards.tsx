@@ -18,17 +18,20 @@ export const StatCards = ({
     {
       label: "Monthly baseline",
       value: formatCurrencyMinor(monthlyTotalMinor, currency),
-      hint: "Current recurring spend"
+      hint: "Current recurring spend",
+      accentColor: "primary.main"
     },
     {
       label: "Yearly forecast",
       value: formatCurrencyMinor(yearlyTotalMinor, currency),
-      hint: "Projected annual outflow"
+      hint: "Projected annual outflow",
+      accentColor: "success.main"
     },
     {
       label: "Active subscriptions",
       value: String(activeCount),
-      hint: "Services currently enabled"
+      hint: "Services currently enabled",
+      accentColor: "secondary.main"
     }
   ] as const;
 
@@ -36,7 +39,10 @@ export const StatCards = ({
     <Grid container spacing={1.25} aria-label="Spending summary">
       {cards.map((card) => (
         <Grid key={card.label} size={{ xs: 12, md: 4 }}>
-          <Card variant="outlined">
+          <Card
+            variant="outlined"
+            sx={{ borderTopColor: card.accentColor, borderTopWidth: 3 }}
+          >
             <CardContent>
               <Stack spacing={1}>
                 <Typography variant="overline" color="text.secondary">

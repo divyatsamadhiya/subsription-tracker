@@ -1,6 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  Alert,
   Button,
   Card,
   CardActions,
@@ -17,7 +16,8 @@ import {
   ToggleButtonGroup,
   Typography
 } from "@mui/material";
-import { categoryLabel, formatCurrencyMinor } from "../lib/format";
+import InboxRoundedIcon from "@mui/icons-material/InboxRounded";
+import { billingCycleLabel, categoryLabel, formatCurrencyMinor, formatIsoDate } from "../lib/format";
 import { CATEGORY_OPTIONS, type Subscription } from "../types";
 
 interface SubscriptionGridProps {
@@ -31,6 +31,13 @@ interface SubscriptionGridProps {
 type StatusFilter = "active" | "paused" | "all";
 type CategoryFilter = (typeof CATEGORY_OPTIONS)[number] | "all";
 
+const filterChipSx = {
+  minWidth: { xs: 172, sm: 204 },
+  height: 34,
+  justifyContent: "center",
+  "& .MuiChip-label": { px: 2 }
+} as const;
+
 export const SubscriptionGrid = ({
   subscriptions,
   currency,
@@ -39,7 +46,17 @@ export const SubscriptionGrid = ({
   onToggleActive
 }: SubscriptionGridProps) => {
   const [pendingDelete, setPendingDelete] = useState<Subscription | null>(null);
+  const [deleteReady, setDeleteReady] = useState(false);
   const [pendingToggleId, setPendingToggleId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!pendingDelete) {
+      setDeleteReady(false);
+      return;
+    }
+    const timer = setTimeout(() => setDeleteReady(true), 1500);
+    return () => clearTimeout(timer);
+  }, [pendingDelete]);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
 
@@ -95,14 +112,14 @@ export const SubscriptionGrid = ({
             Subscription library
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Consistent cards with filterable status and category views.
+            Manage, filter, and track all your subscriptions in one place.
           </Typography>
         </Stack>
 
         <Stack direction="row" spacing={0.75}>
           <Chip label={`${subscriptions.length} total`} />
           <Chip color="success" variant="outlined" label={`${activeCount} active`} />
-          <Chip variant="outlined" label={`${pausedCount} paused`} />
+          <Chip color="warning" variant="outlined" label={`${pausedCount} paused`} />
         </Stack>
       </Stack>
 
@@ -138,14 +155,7 @@ export const SubscriptionGrid = ({
           color={categoryFilter === "all" ? "primary" : "default"}
           variant={categoryFilter === "all" ? "filled" : "outlined"}
           label={`All categories (${visibleSubscriptions.length})`}
-          sx={{
-            minWidth: { xs: 172, sm: 204 },
-            height: 34,
-            justifyContent: "center",
-            "& .MuiChip-label": {
-              px: 2
-            }
-          }}
+          sx={filterChipSx}
           onClick={() => setCategoryFilter("all")}
         />
         {categoryCounts
@@ -158,28 +168,36 @@ export const SubscriptionGrid = ({
               color={categoryFilter === entry.category ? "primary" : "default"}
               variant={categoryFilter === entry.category ? "filled" : "outlined"}
               label={`${categoryLabel(entry.category)} (${entry.count})`}
-              sx={{
-                minWidth: { xs: 172, sm: 204 },
-                height: 34,
-                justifyContent: "center",
-                "& .MuiChip-label": {
-                  px: 2
-                }
-              }}
+              sx={filterChipSx}
               onClick={() => setCategoryFilter(entry.category)}
             />
           ))}
       </Stack>
 
       {visibleSubscriptions.length === 0 ? (
-        <Alert severity="info">
-          No subscriptions match the current filters. Try switching to another status or category.
-        </Alert>
+        <Stack spacing={1.5} alignItems="center" sx={{ py: 6 }}>
+          <InboxRoundedIcon sx={{ fontSize: 48, color: "text.disabled" }} />
+          <Stack alignItems="center" spacing={0.5}>
+            <Typography variant="h6" color="text.secondary">
+              No subscriptions found
+            </Typography>
+            <Typography variant="body2" color="text.disabled">
+              Try a different status filter or category.
+            </Typography>
+          </Stack>
+        </Stack>
       ) : (
         <Grid container spacing={1.25}>
           {visibleSubscriptions.map((subscription) => (
             <Grid size={{ xs: 12, md: 6, xl: 4 }} key={subscription.id}>
-              <Card variant="outlined" sx={{ height: "100%" }}>
+              <Card
+                variant="outlined"
+                sx={{
+                  height: "100%",
+                  borderLeftColor: subscription.isActive ? "success.main" : "warning.main",
+                  borderLeftWidth: 3
+                }}
+              >
                 <CardContent>
                   <Stack spacing={1}>
                     <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
@@ -192,7 +210,7 @@ export const SubscriptionGrid = ({
                       <Chip
                         size="small"
                         label={subscription.isActive ? "Active" : "Paused"}
-                        color={subscription.isActive ? "success" : "default"}
+                        color={subscription.isActive ? "success" : "warning"}
                       />
                     </Stack>
 
@@ -201,11 +219,11 @@ export const SubscriptionGrid = ({
                     </Typography>
 
                     <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
-                      <Chip size="small" label={`Next ${subscription.nextBillingDate}`} />
+                      <Chip size="small" label={`Renews ${formatIsoDate(subscription.nextBillingDate)}`} />
                       <Chip
                         size="small"
                         variant="outlined"
-                        label={subscription.billingCycle.replace("_", " ")}
+                        label={billingCycleLabel(subscription.billingCycle)}
                       />
                     </Stack>
 
@@ -222,7 +240,7 @@ export const SubscriptionGrid = ({
                   </Button>
                   <Button
                     size="small"
-                    color={subscription.isActive ? "warning" : "success"}
+                    color={subscription.isActive ? "inherit" : "success"}
                     disabled={pendingToggleId === subscription.id}
                     onClick={async () => {
                       setPendingToggleId(subscription.id);
@@ -252,7 +270,7 @@ export const SubscriptionGrid = ({
         <DialogContent>
           <DialogContentText>
             {pendingDelete
-              ? `Delete ${pendingDelete.name}? This action cannot be undone.`
+              ? `Permanently delete "${pendingDelete.name}"? This cannot be undone.`
               : "Delete this subscription?"}
           </DialogContentText>
         </DialogContent>
@@ -260,16 +278,18 @@ export const SubscriptionGrid = ({
           <Button onClick={() => setPendingDelete(null)}>Cancel</Button>
           <Button
             color="error"
+            variant="contained"
+            disabled={!deleteReady}
+            disableElevation
             onClick={async () => {
               if (!pendingDelete) {
                 return;
               }
-
               await onDelete(pendingDelete.id);
               setPendingDelete(null);
             }}
           >
-            Delete
+            {deleteReady ? "Delete" : "Confirming…"}
           </Button>
         </DialogActions>
       </Dialog>

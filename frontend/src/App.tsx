@@ -4,6 +4,7 @@ import {
   Box,
   Button,
   Card,
+  CircularProgress,
   CardContent,
   Chip,
   Dialog,
@@ -62,7 +63,7 @@ import {
   getUpcomingRenewals,
   nowIsoDate
 } from "./lib/date";
-import { formatCurrencyMinor, formatRelativeDue } from "./lib/format";
+import { formatCurrencyMinor, formatIsoDate, formatRelativeDue } from "./lib/format";
 import { downloadTextFile } from "./lib/ics";
 import {
   collectReminderHits,
@@ -545,8 +546,20 @@ const App = () => {
 
   if (loading && !hydrated) {
     return (
-      <Box sx={{ minHeight: "100vh", display: "grid", placeItems: "center" }}>
-        <Typography color="text.secondary">Preparing your account workspace...</Typography>
+      <Box
+        sx={{
+          minHeight: "100vh",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 2
+        }}
+      >
+        <CircularProgress size={40} />
+        <Typography variant="body2" color="text.secondary">
+          Preparing your workspace…
+        </Typography>
       </Box>
     );
   }
@@ -951,9 +964,9 @@ const App = () => {
         userLabel={user.profile.fullName ?? user.email}
         monthlySpend={formatCurrencyMinor(monthlyTotalMinor, settings.defaultCurrency)}
         activeServices={activeSubscriptions.length}
-        nextRenewal={renewals[0]?.nextBillingDate ?? "No upcoming dates"}
+        nextRenewal={renewals[0] ? formatIsoDate(renewals[0].nextBillingDate) : "No upcoming dates"}
         headerTitle={activeViewLabel}
-        headerSubtitle={`Date: ${todayLabel}`}
+        headerSubtitle={todayLabel}
         headerActions={
           <>
             <Button
@@ -971,6 +984,15 @@ const App = () => {
               Open settings
             </Button>
           </>
+        }
+        mobileActions={
+          <IconButton
+            color="inherit"
+            aria-label="Add subscription"
+            onClick={openCreateSubscriptionDialog}
+          >
+            <AddIcon />
+          </IconButton>
         }
       >
         {shouldShowProfilePrompt ? (
