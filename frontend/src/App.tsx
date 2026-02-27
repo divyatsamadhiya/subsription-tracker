@@ -63,7 +63,7 @@ import {
   nowIsoDate
 } from "./lib/date";
 import { formatCurrencyMinor, formatRelativeDue } from "./lib/format";
-import { downloadTextFile, generateSubscriptionIcs } from "./lib/ics";
+import { downloadTextFile } from "./lib/ics";
 import {
   collectReminderHits,
   dispatchBrowserReminder,
@@ -73,7 +73,7 @@ import {
   supportsNotifications
 } from "./lib/notifications";
 import { useAppStore } from "./store/useAppStore";
-import type { Subscription, ThemePreference } from "./types";
+import type { ThemePreference } from "./types";
 
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: string[];
@@ -372,14 +372,31 @@ const App = () => {
     }
   };
 
-  const handleExportIcs = (subscription: Subscription) => {
-    const ics = generateSubscriptionIcs(subscription);
-    const safeName = subscription.name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "");
-    downloadTextFile(`${safeName || "subscription"}.ics`, ics, "text/calendar;charset=utf-8");
-    showFeedback(`Exported ${subscription.name} reminder.`);
+  const handleToggleSubscriptionActive = async (
+    id: string,
+    nextActive: boolean
+  ): Promise<void> => {
+    const target = subscriptions.find((subscription) => subscription.id === id);
+    if (!target) {
+      return;
+    }
+
+    try {
+      await updateSubscription(id, {
+        name: target.name,
+        amountMinor: target.amountMinor,
+        billingCycle: target.billingCycle,
+        customIntervalDays: target.customIntervalDays,
+        nextBillingDate: target.nextBillingDate,
+        category: target.category,
+        reminderDaysBefore: target.reminderDaysBefore,
+        isActive: nextActive,
+        notes: target.notes
+      });
+      showFeedback(nextActive ? "Subscription activated." : "Subscription paused.");
+    } catch {
+      // Error feedback is managed by store state.
+    }
   };
 
   const handleInstallApp = async () => {
@@ -1109,7 +1126,7 @@ const App = () => {
               currency={settings.defaultCurrency}
               onEdit={openEditSubscriptionDialog}
               onDelete={handleDelete}
-              onExportIcs={handleExportIcs}
+              onToggleActive={handleToggleSubscriptionActive}
             />
 
             <Dialog
