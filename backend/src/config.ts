@@ -1,6 +1,14 @@
+import crypto from "node:crypto";
 import dotenv from "dotenv";
 
 dotenv.config();
+
+/**
+ * Random salt generated on each server start.
+ * Tokens signed in a previous process become invalid after a restart,
+ * forcing users to log in again.
+ */
+export const sessionSalt = crypto.randomBytes(16).toString("hex");
 
 const required = (value: string | undefined, key: string, fallbackForTest?: string): string => {
   if (!value) {
