@@ -31,6 +31,8 @@ interface AnalyticsDashboardProps {
 }
 
 
+const HiddenLegend = () => null;
+
 export const AnalyticsDashboard = ({
   spendTrend,
   categorySpend,
@@ -59,16 +61,14 @@ export const AnalyticsDashboard = ({
     return (
       <Card variant="outlined" aria-labelledby="analytics-empty-title">
         <CardContent>
-          <Stack spacing={2} alignItems="center" sx={{ py: 5 }}>
+          <Stack spacing={1.5} alignItems="center" sx={{ py: 5 }}>
             <AutoGraphRoundedIcon sx={{ fontSize: 52, color: "text.disabled" }} />
-            <Stack alignItems="center" spacing={0.5}>
-              <Typography id="analytics-empty-title" variant="h6" color="text.secondary">
-                No analytics yet
-              </Typography>
-              <Typography variant="body2" color="text.disabled" textAlign="center">
-                Add your first subscription to unlock charts and spend insights.
-              </Typography>
-            </Stack>
+            <Typography id="analytics-empty-title" variant="h6" color="text.secondary">
+              No analytics yet
+            </Typography>
+            <Typography variant="body2" color="text.disabled" textAlign="center">
+              Add your first subscription to unlock charts and spend insights.
+            </Typography>
             <Button type="button" variant="contained" onClick={onAddSubscription}>
               Add subscription
             </Button>
@@ -208,7 +208,7 @@ export const AnalyticsDashboard = ({
                         <PieChart
                           height={chartHeight}
                           colors={categoryColors}
-                          slotProps={{ legend: { hidden: true } }}
+                          slots={{ legend: HiddenLegend }}
                           series={[
                             {
                               data: categorySpend.map((entry) => ({

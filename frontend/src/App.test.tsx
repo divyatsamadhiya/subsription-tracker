@@ -199,9 +199,9 @@ describe("App auth and profile flows", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Analytics" }));
 
-    expect(screen.getByText("No active subscriptions yet. Add one to unlock charts and metrics.")).toBeInTheDocument();
+    expect(screen.getByText("Add your first subscription to unlock charts and spend insights.")).toBeInTheDocument();
 
-    const analyticsEmptyPanel = screen.getByRole("heading", { name: "Subscription analytics" })
+    const analyticsEmptyPanel = screen.getByRole("heading", { name: "No analytics yet" })
       .parentElement as HTMLElement;
     fireEvent.click(within(analyticsEmptyPanel).getByRole("button", { name: "Add subscription" }));
 
