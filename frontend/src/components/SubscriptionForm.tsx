@@ -310,6 +310,7 @@ export const SubscriptionForm = ({
         <Stack component="form" spacing={1.5} onSubmit={handleSubmit}>
           <Autocomplete<SubscriptionSuggestionOption, false, false, true>
             freeSolo
+            forcePopupIcon
             selectOnFocus
             handleHomeEndKeys
             disablePortal

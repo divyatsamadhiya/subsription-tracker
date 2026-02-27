@@ -268,13 +268,11 @@ const App = () => {
 
   const openCreateSubscriptionDialog = () => {
     setEditingId(null);
-    setActiveView("subscriptions");
     setSubscriptionDialogOpen(true);
   };
 
   const openEditSubscriptionDialog = (id: string) => {
     setEditingId(id);
-    setActiveView("subscriptions");
     setSubscriptionDialogOpen(true);
   };
 
@@ -1151,29 +1149,6 @@ const App = () => {
               onToggleActive={handleToggleSubscriptionActive}
             />
 
-            <Dialog
-              open={subscriptionDialogOpen}
-              onClose={closeSubscriptionDialog}
-              fullWidth
-              maxWidth="md"
-              PaperProps={{
-                sx: {
-                  backgroundColor: "transparent",
-                  boxShadow: "none",
-                  overflow: "visible"
-                }
-              }}
-            >
-              <DialogContent sx={{ p: 0 }}>
-                <SubscriptionForm
-                  mode={editingSubscription ? "edit" : "create"}
-                  currency={settings.defaultCurrency}
-                  initialValue={editingSubscription}
-                  onSubmit={handleFormSubmit}
-                  onCancelEdit={closeSubscriptionDialog}
-                />
-              </DialogContent>
-            </Dialog>
           </Stack>
         ) : null}
 
@@ -1354,6 +1329,30 @@ const App = () => {
           </Grid>
         ) : null}
       </WorkspaceLayout>
+
+      <Dialog
+        open={subscriptionDialogOpen}
+        onClose={closeSubscriptionDialog}
+        fullWidth
+        maxWidth="md"
+        PaperProps={{
+          sx: {
+            backgroundColor: "transparent",
+            boxShadow: "none",
+            overflow: "visible"
+          }
+        }}
+      >
+        <DialogContent sx={{ p: 0 }}>
+          <SubscriptionForm
+            mode={editingSubscription ? "edit" : "create"}
+            currency={settings.defaultCurrency}
+            initialValue={editingSubscription}
+            onSubmit={handleFormSubmit}
+            onCancelEdit={closeSubscriptionDialog}
+          />
+        </DialogContent>
+      </Dialog>
 
       <Snackbar
         open={snackbar.open}
