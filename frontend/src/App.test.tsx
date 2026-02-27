@@ -250,4 +250,41 @@ describe("App auth and profile flows", () => {
     });
   });
 
+  it("supports adding a custom subscription name not present in suggestions", async () => {
+    const addSubscription = vi.fn().mockResolvedValue(undefined);
+    mockedUseAppStore.mockReturnValue(
+      makeStoreState({
+        user: authUser,
+        profile: authUser.profile,
+        subscriptions: [],
+        addSubscription
+      }) as never
+    );
+
+    render(<App />);
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Add subscription" })[0]);
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Add Subscription" })).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByPlaceholderText("Netflix, Figma, Notion..."), {
+      target: { value: "Local Gym Pro" }
+    });
+    fireEvent.change(screen.getByRole("spinbutton", { name: /Amount/i }), {
+      target: { value: "25" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add Subscription" }));
+
+    await waitFor(() => {
+      expect(addSubscription).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "Local Gym Pro",
+          amountMinor: 2500
+        })
+      );
+    });
+  });
+
 });

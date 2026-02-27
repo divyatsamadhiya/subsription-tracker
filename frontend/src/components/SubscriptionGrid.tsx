@@ -25,7 +25,7 @@ interface SubscriptionGridProps {
   currency: string;
   onEdit: (id: string) => void;
   onDelete: (id: string) => Promise<void>;
-  onExportIcs: (subscription: Subscription) => void;
+  onToggleActive: (id: string, nextActive: boolean) => Promise<void>;
 }
 
 type StatusFilter = "active" | "paused" | "all";
@@ -36,9 +36,10 @@ export const SubscriptionGrid = ({
   currency,
   onEdit,
   onDelete,
-  onExportIcs
+  onToggleActive
 }: SubscriptionGridProps) => {
   const [pendingDelete, setPendingDelete] = useState<Subscription | null>(null);
+  const [pendingToggleId, setPendingToggleId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
 
@@ -219,8 +220,22 @@ export const SubscriptionGrid = ({
                   <Button size="small" onClick={() => onEdit(subscription.id)}>
                     Edit
                   </Button>
-                  <Button size="small" onClick={() => onExportIcs(subscription)}>
-                    Export .ics
+                  <Button
+                    size="small"
+                    color={subscription.isActive ? "warning" : "success"}
+                    disabled={pendingToggleId === subscription.id}
+                    onClick={async () => {
+                      setPendingToggleId(subscription.id);
+                      try {
+                        await onToggleActive(subscription.id, !subscription.isActive);
+                      } finally {
+                        setPendingToggleId((current) =>
+                          current === subscription.id ? null : current
+                        );
+                      }
+                    }}
+                  >
+                    {subscription.isActive ? "Pause" : "Activate"}
                   </Button>
                   <Button size="small" color="error" onClick={() => setPendingDelete(subscription)}>
                     Delete
