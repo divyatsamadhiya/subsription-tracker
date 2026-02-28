@@ -1,14 +1,12 @@
 import { profileResponseSchema, userProfilePatchSchema } from "../domain/schemas.js";
 import type { ProfileResponse } from "../domain/types.js";
+import type { User } from "../generated/prisma/client.js";
 import { logger } from "../logger/logger.js";
-import type { UserDocument } from "../models/User.js";
-import { UserModel } from "../models/User.js";
+import { prisma } from "../prisma.js";
 import { HttpError } from "../utils/http.js";
 import { isProfileComplete, toUserProfile } from "../utils/serializers.js";
 
-type PersistedUser = UserDocument & { _id: { toString(): string } };
-
-const toProfileResponse = (user: PersistedUser | null): ProfileResponse => {
+const toProfileResponse = (user: User | null): ProfileResponse => {
   if (!user) {
     throw new HttpError(401, "User account no longer exists");
   }
@@ -21,7 +19,7 @@ const toProfileResponse = (user: PersistedUser | null): ProfileResponse => {
 };
 
 export const getProfileForUser = async (userId: string): Promise<ProfileResponse> => {
-  const user = (await UserModel.findById(userId)) as PersistedUser | null;
+  const user = await prisma.user.findUnique({ where: { id: userId } });
   const profileResponse = toProfileResponse(user);
   logger.info("Profile fetched", { userId, profileComplete: profileResponse.profileComplete });
   return profileResponse;
@@ -32,36 +30,26 @@ export const updateProfileForUser = async (
   patchInput: unknown
 ): Promise<ProfileResponse> => {
   const patch = userProfilePatchSchema.parse(patchInput);
-  const user = (await UserModel.findById(userId)) as (PersistedUser & { save: () => Promise<unknown> }) | null;
+  const user = await prisma.user.findUnique({ where: { id: userId } });
 
   if (!user) {
     logger.warn("Profile update failed: user account no longer exists", { userId });
     throw new HttpError(401, "User account no longer exists");
   }
 
-  if (patch.fullName !== undefined) {
-    user.fullName = patch.fullName;
-  }
+  const data: Record<string, unknown> = {};
+  if (patch.fullName !== undefined) data.fullName = patch.fullName;
+  if (patch.country !== undefined) data.country = patch.country;
+  if (patch.timeZone !== undefined) data.timeZone = patch.timeZone;
+  if ("phone" in patch) data.phone = patch.phone;
+  if ("bio" in patch) data.bio = patch.bio;
 
-  if (patch.country !== undefined) {
-    user.country = patch.country;
-  }
+  const updatedUser = await prisma.user.update({
+    where: { id: userId },
+    data
+  });
 
-  if (patch.timeZone !== undefined) {
-    user.timeZone = patch.timeZone ?? undefined;
-  }
-
-  if ("phone" in patch) {
-    user.phone = patch.phone ?? undefined;
-  }
-
-  if ("bio" in patch) {
-    user.bio = patch.bio ?? undefined;
-  }
-
-  await user.save();
-
-  const profileResponse = toProfileResponse(user);
+  const profileResponse = toProfileResponse(updatedUser);
   logger.info("Profile updated", { userId, profileComplete: profileResponse.profileComplete });
   return profileResponse;
 };

@@ -3,7 +3,7 @@
 Pulseboard is a full-stack subscription tracking app in a monorepo:
 
 - `frontend`: React + Vite + TypeScript
-- `backend`: Express + MongoDB + JWT cookie auth
+- `backend`: Express + PostgreSQL (Prisma ORM) + JWT cookie auth
 
 ## License
 
@@ -13,7 +13,7 @@ This project is licensed under the MIT License. See `LICENSE`.
 
 - Node.js 20+
 - npm 10+
-- MongoDB instance
+- PostgreSQL 14+
 
 ## Quick Start
 
@@ -46,7 +46,7 @@ This starts:
 
 Required:
 
-- `MONGODB_URI`
+- `DATABASE_URL` (PostgreSQL connection string, e.g. `postgresql://user@localhost:5432/pulseboard`)
 - `JWT_SECRET`
 
 Optional/defaulted:

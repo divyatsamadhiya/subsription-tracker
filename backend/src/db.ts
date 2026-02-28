@@ -1,7 +1,9 @@
-import mongoose from "mongoose";
-import { config } from "./config.js";
+import { prisma } from "./prisma.js";
 
-export const connectMongo = async (): Promise<void> => {
-  mongoose.set("sanitizeFilter", true);
-  await mongoose.connect(config.mongoUri);
+export const connectDatabase = async (): Promise<void> => {
+  await prisma.$connect();
+};
+
+export const disconnectDatabase = async (): Promise<void> => {
+  await prisma.$disconnect();
 };

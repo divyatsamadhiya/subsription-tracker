@@ -5,19 +5,19 @@ import {
   type Subscription,
   type UserProfile
 } from "../domain/types.js";
-import type { SubscriptionDocument } from "../models/Subscription.js";
-import type { SettingsDocument } from "../models/Settings.js";
-import type { UserDocument } from "../models/User.js";
+import type {
+  User as PrismaUser,
+  Settings as PrismaSettings,
+  Subscription as PrismaSubscription
+} from "../generated/prisma/client.js";
 
-type WithId<T> = T & { _id: { toString(): string } };
-
-export const toUserProfile = (user: UserDocument): UserProfile => {
+export const toUserProfile = (user: PrismaUser): UserProfile => {
   return {
-    fullName: user.fullName,
-    country: user.country,
-    timeZone: user.timeZone,
-    phone: user.phone,
-    bio: user.bio
+    fullName: user.fullName ?? undefined,
+    country: user.country ?? undefined,
+    timeZone: user.timeZone ?? undefined,
+    phone: user.phone ?? undefined,
+    bio: user.bio ?? undefined
   };
 };
 
@@ -25,10 +25,10 @@ export const isProfileComplete = (profile: UserProfile): boolean => {
   return Boolean(profile.fullName && profile.country);
 };
 
-export const toAuthUser = (user: WithId<UserDocument>): AuthUser => {
+export const toAuthUser = (user: PrismaUser): AuthUser => {
   const profile = toUserProfile(user);
   return {
-    id: user._id.toString(),
+    id: user.id,
     email: user.email,
     profile,
     profileComplete: isProfileComplete(profile),
@@ -37,32 +37,32 @@ export const toAuthUser = (user: WithId<UserDocument>): AuthUser => {
   };
 };
 
-export const toSettings = (settings: SettingsDocument | null): AppSettings => {
+export const toSettings = (settings: PrismaSettings | null): AppSettings => {
   if (!settings) {
     return DEFAULT_SETTINGS;
   }
 
   return {
     defaultCurrency: settings.defaultCurrency,
-    weekStartsOn: settings.weekStartsOn,
+    weekStartsOn: settings.weekStartsOn as 0 | 1,
     notificationsEnabled: settings.notificationsEnabled,
     themePreference: settings.themePreference
   };
 };
 
-export const toSubscription = (subscription: SubscriptionDocument): Subscription => {
+export const toSubscription = (subscription: PrismaSubscription): Subscription => {
   return {
     id: subscription.id,
     name: subscription.name,
     amountMinor: subscription.amountMinor,
     currency: subscription.currency,
     billingCycle: subscription.billingCycle,
-    customIntervalDays: subscription.customIntervalDays,
+    customIntervalDays: subscription.customIntervalDays ?? undefined,
     nextBillingDate: subscription.nextBillingDate,
     category: subscription.category,
     reminderDaysBefore: subscription.reminderDaysBefore,
     isActive: subscription.isActive,
-    notes: subscription.notes,
+    notes: subscription.notes ?? undefined,
     createdAt: subscription.createdAt.toISOString(),
     updatedAt: subscription.updatedAt.toISOString()
   };

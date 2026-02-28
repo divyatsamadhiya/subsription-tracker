@@ -1,11 +1,10 @@
 import { appSettingsSchema, updateSettingsSchema } from "../domain/schemas.js";
 import { DEFAULT_SETTINGS, type AppSettings } from "../domain/types.js";
-import { SettingsModel } from "../models/Settings.js";
-import { SubscriptionModel } from "../models/Subscription.js";
+import { prisma } from "../prisma.js";
 import { logger } from "../logger/logger.js";
 
 const ensureSettings = async (userId: string): Promise<AppSettings> => {
-  const existing = await SettingsModel.findOne({ userId });
+  const existing = await prisma.settings.findUnique({ where: { userId } });
 
   if (existing) {
     return appSettingsSchema.parse({
@@ -16,9 +15,11 @@ const ensureSettings = async (userId: string): Promise<AppSettings> => {
     });
   }
 
-  const created = await SettingsModel.create({
-    userId,
-    ...DEFAULT_SETTINGS
+  const created = await prisma.settings.create({
+    data: {
+      userId,
+      ...DEFAULT_SETTINGS
+    }
   });
 
   logger.info("Default settings created", { userId });
@@ -44,14 +45,17 @@ export const updateSettingsForUser = async (
   const patch = updateSettingsSchema.parse(patchInput);
   const previous = await ensureSettings(userId);
 
-  const updatedDoc = await SettingsModel.findOneAndUpdate(
-    { userId },
-    { ...patch },
-    { new: true, upsert: true, setDefaultsOnInsert: true, runValidators: true }
-  );
+  const updatedDoc = await prisma.settings.upsert({
+    where: { userId },
+    update: { ...patch },
+    create: { userId, ...DEFAULT_SETTINGS, ...patch }
+  });
 
   if (patch.defaultCurrency && patch.defaultCurrency !== previous.defaultCurrency) {
-    await SubscriptionModel.updateMany({ userId }, { $set: { currency: patch.defaultCurrency } });
+    await prisma.subscription.updateMany({
+      where: { userId },
+      data: { currency: patch.defaultCurrency }
+    });
     logger.info("Subscription currency updated from settings change", {
       userId,
       currency: patch.defaultCurrency

@@ -4,15 +4,17 @@ import {
   subscriptionSchema
 } from "../domain/schemas.js";
 import { DEFAULT_SETTINGS, type BackupFileV1 } from "../domain/types.js";
-import { SettingsModel } from "../models/Settings.js";
-import { SubscriptionModel } from "../models/Subscription.js";
+import { prisma } from "../prisma.js";
 import { toSubscription } from "../utils/serializers.js";
 import { logger } from "../logger/logger.js";
 
 export const exportBackupForUser = async (userId: string): Promise<BackupFileV1> => {
   const [settingsDoc, subscriptionsDocs] = await Promise.all([
-    SettingsModel.findOne({ userId }),
-    SubscriptionModel.find({ userId }).sort({ nextBillingDate: 1, name: 1 })
+    prisma.settings.findUnique({ where: { userId } }),
+    prisma.subscription.findMany({
+      where: { userId },
+      orderBy: [{ nextBillingDate: "asc" }, { name: "asc" }]
+    })
   ]);
 
   const backup: BackupFileV1 = {
@@ -56,22 +58,24 @@ export const importBackupForUser = async (userId: string, input: unknown): Promi
   const backup = backupFileSchema.parse(normalizedInput);
 
   await Promise.all([
-    SubscriptionModel.deleteMany({ userId }),
-    SettingsModel.deleteMany({ userId })
+    prisma.subscription.deleteMany({ where: { userId } }),
+    prisma.settings.deleteMany({ where: { userId } })
   ]);
 
-  await SettingsModel.create({
-    userId,
-    ...backup.settings
+  await prisma.settings.create({
+    data: {
+      userId,
+      ...backup.settings
+    }
   });
 
   if (backup.subscriptions.length > 0) {
-    await SubscriptionModel.insertMany(
-      backup.subscriptions.map((subscription) => ({
+    await prisma.subscription.createMany({
+      data: backup.subscriptions.map((subscription) => ({
         userId,
         ...subscription
       }))
-    );
+    });
   }
 
   logger.info("Backup imported", { userId, count: backup.subscriptions.length });

@@ -1,16 +1,26 @@
 import { config } from "./config.js";
-import { connectMongo } from "./db.js";
+import { connectDatabase, disconnectDatabase } from "./db.js";
 import { createApp } from "./app.js";
 import { logger } from "./logger/logger.js";
 
 const bootstrap = async (): Promise<void> => {
-  await connectMongo();
+  await connectDatabase();
 
   const app = createApp();
 
-  app.listen(config.port, () => {
+  const server = app.listen(config.port, () => {
     logger.info("Pulseboard backend listening", { url: `http://localhost:${config.port}` });
   });
+
+  const shutdown = async () => {
+    logger.info("Shutting down gracefully...");
+    server.close();
+    await disconnectDatabase();
+    process.exit(0);
+  };
+
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
 };
 
 bootstrap().catch((error: unknown) => {

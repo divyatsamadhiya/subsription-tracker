@@ -56,7 +56,7 @@ const parseOrigins = (value: string | undefined): string[] => {
 export const config = {
   nodeEnv: process.env.NODE_ENV ?? "development",
   port: Number(process.env.PORT ?? 4000),
-  mongoUri: required(process.env.MONGODB_URI, "MONGODB_URI", "mongodb://127.0.0.1:27017/pulseboard-test"),
+  databaseUrl: required(process.env.DATABASE_URL, "DATABASE_URL", "postgresql://localhost:5432/pulseboard_test"),
   jwtSecret: required(process.env.JWT_SECRET, "JWT_SECRET", "pulseboard-test-secret"),
   frontendOrigins: parseOrigins(process.env.FRONTEND_ORIGIN),
   email: {

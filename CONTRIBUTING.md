@@ -6,7 +6,7 @@ Thanks for contributing to Pulseboard.
 
 - Node.js 20+
 - npm 10+
-- MongoDB
+- PostgreSQL 14+
 
 ## Local Setup
 

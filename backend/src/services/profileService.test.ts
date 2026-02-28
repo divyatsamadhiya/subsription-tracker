@@ -1,9 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../models/User.js", () => ({
-  UserModel: {
-    findById: vi.fn()
-  }
+vi.mock("../prisma.js", async () => ({
+  prisma: (await import("../test/mockPrisma.js")).mockPrisma
 }));
 
 vi.mock("../logger/logger.js", () => ({
@@ -15,24 +13,25 @@ vi.mock("../logger/logger.js", () => ({
   }
 }));
 
-import { UserModel } from "../models/User.js";
+import { prisma } from "../prisma.js";
 import { getProfileForUser, updateProfileForUser } from "./profileService.js";
 
 const makeUser = (overrides?: Partial<Record<string, unknown>>) => {
   const now = new Date("2026-01-01T00:00:00.000Z");
 
   return {
-    _id: { toString: () => "user_1" },
+    id: "user_1",
     email: "john@example.com",
     passwordHash: "hashed",
     fullName: "John Doe",
     country: "United States",
     timeZone: "America/New_York",
-    phone: undefined,
-    bio: undefined,
+    phone: null,
+    bio: null,
     createdAt: now,
     updatedAt: now,
-    save: vi.fn().mockResolvedValue(undefined),
+    passwordResetTokenHash: null,
+    passwordResetExpiresAt: null,
     ...overrides
   };
 };
@@ -43,7 +42,7 @@ describe("profileService", () => {
   });
 
   it("returns a normalized profile response", async () => {
-    vi.mocked(UserModel.findById).mockResolvedValue(makeUser() as never);
+    vi.mocked(prisma.user.findUnique).mockResolvedValue(makeUser() as never);
 
     const response = await getProfileForUser("user_1");
 
@@ -53,8 +52,8 @@ describe("profileService", () => {
   });
 
   it("returns incomplete profile state for legacy user", async () => {
-    vi.mocked(UserModel.findById).mockResolvedValue(
-      makeUser({ fullName: undefined, country: undefined, timeZone: undefined }) as never
+    vi.mocked(prisma.user.findUnique).mockResolvedValue(
+      makeUser({ fullName: null, country: null, timeZone: null }) as never
     );
 
     const response = await getProfileForUser("user_1");
@@ -63,8 +62,18 @@ describe("profileService", () => {
   });
 
   it("updates profile fields and clears nullable optional values", async () => {
-    const user = makeUser({ phone: "+14155552671", bio: "hello there" });
-    vi.mocked(UserModel.findById).mockResolvedValue(user as never);
+    vi.mocked(prisma.user.findUnique).mockResolvedValue(
+      makeUser({ phone: "+14155552671", bio: "hello there" }) as never
+    );
+    vi.mocked(prisma.user.update).mockResolvedValue(
+      makeUser({
+        fullName: "Jane Doe",
+        country: "India",
+        timeZone: null,
+        phone: null,
+        bio: null
+      }) as never
+    );
 
     const response = await updateProfileForUser("user_1", {
       fullName: "Jane Doe",
@@ -74,12 +83,17 @@ describe("profileService", () => {
       bio: null
     });
 
-    expect(user.save).toHaveBeenCalledTimes(1);
-    expect(user.fullName).toBe("Jane Doe");
-    expect(user.country).toBe("India");
-    expect(user.timeZone).toBeUndefined();
-    expect(user.phone).toBeUndefined();
-    expect(user.bio).toBeUndefined();
+    expect(prisma.user.update).toHaveBeenCalledTimes(1);
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: "user_1" },
+      data: {
+        fullName: "Jane Doe",
+        country: "India",
+        timeZone: null,
+        phone: null,
+        bio: null
+      }
+    });
     expect(response.profile.country).toBe("India");
     expect(response.profileComplete).toBe(true);
   });

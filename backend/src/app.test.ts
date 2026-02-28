@@ -1,4 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
+
+vi.mock("./prisma.js", async () => ({
+  prisma: (await import("./test/mockPrisma.js")).mockPrisma
+}));
+
 import { createApp } from "./app.js";
 import { config } from "./config.js";
 
