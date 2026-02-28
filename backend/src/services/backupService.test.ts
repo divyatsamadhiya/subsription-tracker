@@ -1,19 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../models/Settings.js", () => ({
-  SettingsModel: {
-    findOne: vi.fn(),
-    deleteMany: vi.fn(),
-    create: vi.fn()
-  }
-}));
-
-vi.mock("../models/Subscription.js", () => ({
-  SubscriptionModel: {
-    find: vi.fn(),
-    deleteMany: vi.fn(),
-    insertMany: vi.fn()
-  }
+vi.mock("../prisma.js", async () => ({
+  prisma: (await import("../test/mockPrisma.js")).mockPrisma
 }));
 
 vi.mock("../logger/logger.js", () => ({
@@ -25,14 +13,15 @@ vi.mock("../logger/logger.js", () => ({
   }
 }));
 
-import { SettingsModel } from "../models/Settings.js";
-import { SubscriptionModel } from "../models/Subscription.js";
+import { prisma } from "../prisma.js";
 import { exportBackupForUser, importBackupForUser } from "./backupService.js";
 
 const makeSubscription = (id: string) => {
   const now = new Date("2026-01-01T00:00:00.000Z");
   return {
+    pk: "pk_1",
     id,
+    userId: "user_1",
     name: "Netflix",
     amountMinor: 999,
     currency: "USD",
@@ -41,6 +30,7 @@ const makeSubscription = (id: string) => {
     category: "entertainment",
     reminderDaysBefore: [1, 3, 7],
     isActive: true,
+    notes: null,
     createdAt: now,
     updatedAt: now
   };
@@ -52,14 +42,13 @@ describe("backupService", () => {
   });
 
   it("exports backup with existing settings and subscriptions", async () => {
-    const sort = vi.fn().mockResolvedValue([makeSubscription("sub_1")]);
-    vi.mocked(SettingsModel.findOne).mockResolvedValue({
+    vi.mocked(prisma.settings.findUnique).mockResolvedValue({
       defaultCurrency: "USD",
       weekStartsOn: 0,
       notificationsEnabled: false,
       themePreference: "dark"
     } as never);
-    vi.mocked(SubscriptionModel.find).mockReturnValue({ sort } as never);
+    vi.mocked(prisma.subscription.findMany).mockResolvedValue([makeSubscription("sub_1")] as never);
 
     const backup = await exportBackupForUser("user_1");
 
@@ -70,9 +59,8 @@ describe("backupService", () => {
   });
 
   it("exports backup with default settings when settings are missing", async () => {
-    const sort = vi.fn().mockResolvedValue([]);
-    vi.mocked(SettingsModel.findOne).mockResolvedValue(null as never);
-    vi.mocked(SubscriptionModel.find).mockReturnValue({ sort } as never);
+    vi.mocked(prisma.settings.findUnique).mockResolvedValue(null as never);
+    vi.mocked(prisma.subscription.findMany).mockResolvedValue([] as never);
 
     const backup = await exportBackupForUser("user_1");
 
@@ -82,10 +70,10 @@ describe("backupService", () => {
   });
 
   it("imports backup and inserts subscriptions", async () => {
-    vi.mocked(SubscriptionModel.deleteMany).mockResolvedValue({ acknowledged: true } as never);
-    vi.mocked(SettingsModel.deleteMany).mockResolvedValue({ acknowledged: true } as never);
-    vi.mocked(SettingsModel.create).mockResolvedValue({} as never);
-    vi.mocked(SubscriptionModel.insertMany).mockResolvedValue([] as never);
+    vi.mocked(prisma.subscription.deleteMany).mockResolvedValue({ count: 0 } as never);
+    vi.mocked(prisma.settings.deleteMany).mockResolvedValue({ count: 0 } as never);
+    vi.mocked(prisma.settings.create).mockResolvedValue({} as never);
+    vi.mocked(prisma.subscription.createMany).mockResolvedValue({ count: 1 } as never);
 
     await importBackupForUser("user_1", {
       version: "1.0",
@@ -98,22 +86,30 @@ describe("backupService", () => {
       },
       subscriptions: [
         {
-          ...makeSubscription("sub_1"),
+          id: "sub_1",
+          name: "Netflix",
+          amountMinor: 999,
+          currency: "USD",
+          billingCycle: "monthly",
+          nextBillingDate: "2026-01-08",
+          category: "entertainment",
+          reminderDaysBefore: [1, 3, 7],
+          isActive: true,
           createdAt: "2026-01-01T00:00:00.000Z",
           updatedAt: "2026-01-01T00:00:00.000Z"
         }
       ]
     });
 
-    expect(SubscriptionModel.deleteMany).toHaveBeenCalledWith({ userId: "user_1" });
-    expect(SettingsModel.create).toHaveBeenCalled();
-    expect(SubscriptionModel.insertMany).toHaveBeenCalledTimes(1);
+    expect(prisma.subscription.deleteMany).toHaveBeenCalledWith({ where: { userId: "user_1" } });
+    expect(prisma.settings.create).toHaveBeenCalled();
+    expect(prisma.subscription.createMany).toHaveBeenCalledTimes(1);
   });
 
-  it("imports backup without insertMany when subscriptions are empty", async () => {
-    vi.mocked(SubscriptionModel.deleteMany).mockResolvedValue({ acknowledged: true } as never);
-    vi.mocked(SettingsModel.deleteMany).mockResolvedValue({ acknowledged: true } as never);
-    vi.mocked(SettingsModel.create).mockResolvedValue({} as never);
+  it("imports backup without createMany when subscriptions are empty", async () => {
+    vi.mocked(prisma.subscription.deleteMany).mockResolvedValue({ count: 0 } as never);
+    vi.mocked(prisma.settings.deleteMany).mockResolvedValue({ count: 0 } as never);
+    vi.mocked(prisma.settings.create).mockResolvedValue({} as never);
 
     await importBackupForUser("user_1", {
       version: "1.0",
@@ -127,7 +123,7 @@ describe("backupService", () => {
       subscriptions: []
     });
 
-    expect(SubscriptionModel.insertMany).not.toHaveBeenCalled();
+    expect(prisma.subscription.createMany).not.toHaveBeenCalled();
   });
 
   it("rejects invalid backup payload", async () => {

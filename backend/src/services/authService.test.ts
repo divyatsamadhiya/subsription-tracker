@@ -1,18 +1,8 @@
 import { createHash } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../models/User.js", () => ({
-  UserModel: {
-    findOne: vi.fn(),
-    create: vi.fn(),
-    findById: vi.fn()
-  }
-}));
-
-vi.mock("../models/Settings.js", () => ({
-  SettingsModel: {
-    create: vi.fn()
-  }
+vi.mock("../prisma.js", async () => ({
+  prisma: (await import("../test/mockPrisma.js")).mockPrisma
 }));
 
 vi.mock("../utils/auth.js", () => ({
@@ -34,8 +24,7 @@ vi.mock("./passwordResetEmailService.js", () => ({
   sendPasswordResetEmail: vi.fn()
 }));
 
-import { UserModel } from "../models/User.js";
-import { SettingsModel } from "../models/Settings.js";
+import { prisma } from "../prisma.js";
 import { comparePassword, hashPassword, signUserToken } from "../utils/auth.js";
 import { sendPasswordResetEmail } from "./passwordResetEmailService.js";
 import {
@@ -49,7 +38,7 @@ import {
 const makeUser = (
   overrides?: Partial<
     Record<
-      | "_id"
+      | "id"
       | "email"
       | "passwordHash"
       | "fullName"
@@ -68,19 +57,18 @@ const makeUser = (
   const now = new Date("2026-01-01T00:00:00.000Z");
 
   return {
-    _id: { toString: () => "user_1" },
+    id: "user_1",
     email: "john@example.com",
     passwordHash: "hashed",
     fullName: "John Doe",
     country: "United States",
     timeZone: "America/New_York",
-    phone: undefined,
-    bio: undefined,
+    phone: null,
+    bio: null,
     createdAt: now,
     updatedAt: now,
-    passwordResetTokenHash: undefined,
-    passwordResetExpiresAt: undefined,
-    save: vi.fn().mockResolvedValue(undefined),
+    passwordResetTokenHash: null,
+    passwordResetExpiresAt: null,
     ...overrides
   };
 };
@@ -91,10 +79,10 @@ describe("authService", () => {
   });
 
   it("registers a new user successfully", async () => {
-    vi.mocked(UserModel.findOne).mockResolvedValue(null as never);
+    vi.mocked(prisma.user.findUnique).mockResolvedValue(null as never);
     vi.mocked(hashPassword).mockResolvedValue("hash_123");
-    vi.mocked(UserModel.create).mockResolvedValue(makeUser({ country: "India" }) as never);
-    vi.mocked(SettingsModel.create).mockResolvedValue({} as never);
+    vi.mocked(prisma.user.create).mockResolvedValue(makeUser({ country: "India" }) as never);
+    vi.mocked(prisma.settings.create).mockResolvedValue({} as never);
     vi.mocked(signUserToken).mockReturnValue("token_abc");
 
     const result = await registerUser({
@@ -104,9 +92,9 @@ describe("authService", () => {
       country: "India"
     });
 
-    expect(UserModel.findOne).toHaveBeenCalledWith({ email: "john@example.com" });
+    expect(prisma.user.findUnique).toHaveBeenCalledWith({ where: { email: "john@example.com" } });
     expect(hashPassword).toHaveBeenCalledWith("Password123");
-    expect(SettingsModel.create).toHaveBeenCalled();
+    expect(prisma.settings.create).toHaveBeenCalled();
     expect(signUserToken).toHaveBeenCalledWith("user_1");
     expect(result.token).toBe("token_abc");
     expect(result.user.email).toBe("john@example.com");
@@ -116,7 +104,7 @@ describe("authService", () => {
   });
 
   it("fails registration for duplicate email", async () => {
-    vi.mocked(UserModel.findOne).mockResolvedValue(makeUser() as never);
+    vi.mocked(prisma.user.findUnique).mockResolvedValue(makeUser() as never);
 
     await expect(
       registerUser({
@@ -139,7 +127,7 @@ describe("authService", () => {
   });
 
   it("logs user in successfully", async () => {
-    vi.mocked(UserModel.findOne).mockResolvedValue(makeUser() as never);
+    vi.mocked(prisma.user.findUnique).mockResolvedValue(makeUser() as never);
     vi.mocked(comparePassword).mockResolvedValue(true);
     vi.mocked(signUserToken).mockReturnValue("token_abc");
 
@@ -151,7 +139,7 @@ describe("authService", () => {
   });
 
   it("fails login when email does not exist", async () => {
-    vi.mocked(UserModel.findOne).mockResolvedValue(null as never);
+    vi.mocked(prisma.user.findUnique).mockResolvedValue(null as never);
 
     await expect(
       loginUser({ email: "john@example.com", password: "Password123" })
@@ -159,7 +147,7 @@ describe("authService", () => {
   });
 
   it("fails login when password is invalid", async () => {
-    vi.mocked(UserModel.findOne).mockResolvedValue(makeUser() as never);
+    vi.mocked(prisma.user.findUnique).mockResolvedValue(makeUser() as never);
     vi.mocked(comparePassword).mockResolvedValue(false);
 
     await expect(
@@ -168,18 +156,18 @@ describe("authService", () => {
   });
 
   it("returns the current user", async () => {
-    vi.mocked(UserModel.findById).mockResolvedValue(makeUser() as never);
+    vi.mocked(prisma.user.findUnique).mockResolvedValue(makeUser() as never);
 
     const user = await getCurrentUser("user_1");
 
-    expect(UserModel.findById).toHaveBeenCalledWith("user_1");
+    expect(prisma.user.findUnique).toHaveBeenCalledWith({ where: { id: "user_1" } });
     expect(user.email).toBe("john@example.com");
     expect(user.profileComplete).toBe(true);
   });
 
   it("marks legacy user profile as incomplete when required fields are missing", async () => {
-    vi.mocked(UserModel.findById).mockResolvedValue(
-      makeUser({ fullName: undefined, country: undefined, timeZone: undefined }) as never
+    vi.mocked(prisma.user.findUnique).mockResolvedValue(
+      makeUser({ fullName: null, country: null, timeZone: null }) as never
     );
 
     const user = await getCurrentUser("user_1");
@@ -188,7 +176,7 @@ describe("authService", () => {
   });
 
   it("fails current user lookup when user is missing", async () => {
-    vi.mocked(UserModel.findById).mockResolvedValue(null as never);
+    vi.mocked(prisma.user.findUnique).mockResolvedValue(null as never);
 
     await expect(getCurrentUser("missing_user")).rejects.toMatchObject({
       status: 401,
@@ -198,15 +186,21 @@ describe("authService", () => {
 
   it("generates a password reset code for an existing user", async () => {
     const user = makeUser();
-    vi.mocked(UserModel.findOne).mockResolvedValue(user as never);
+    vi.mocked(prisma.user.findUnique).mockResolvedValue(user as never);
+    vi.mocked(prisma.user.update).mockResolvedValue(user as never);
     vi.mocked(sendPasswordResetEmail).mockResolvedValue(undefined);
 
     const result = await requestPasswordReset({ email: "john@example.com" });
 
     expect(result.message).toBe("If this email exists, a reset code has been generated.");
-    expect(user.save).toHaveBeenCalledTimes(1);
-    expect(user.passwordResetTokenHash).toHaveLength(64);
-    expect(user.passwordResetExpiresAt).toBeInstanceOf(Date);
+    expect(prisma.user.update).toHaveBeenCalledTimes(1);
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: "user_1" },
+      data: expect.objectContaining({
+        passwordResetTokenHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+        passwordResetExpiresAt: expect.any(Date)
+      })
+    });
     expect(sendPasswordResetEmail).toHaveBeenCalledTimes(1);
     expect(sendPasswordResetEmail).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -216,7 +210,7 @@ describe("authService", () => {
   });
 
   it("returns a generic response when reset is requested for unknown email", async () => {
-    vi.mocked(UserModel.findOne).mockResolvedValue(null as never);
+    vi.mocked(prisma.user.findUnique).mockResolvedValue(null as never);
 
     const result = await requestPasswordReset({ email: "missing@example.com" });
 
@@ -228,7 +222,8 @@ describe("authService", () => {
 
   it("fails reset code request when email delivery fails", async () => {
     const user = makeUser();
-    vi.mocked(UserModel.findOne).mockResolvedValue(user as never);
+    vi.mocked(prisma.user.findUnique).mockResolvedValue(user as never);
+    vi.mocked(prisma.user.update).mockResolvedValue(user as never);
     vi.mocked(sendPasswordResetEmail).mockRejectedValue(new Error("delivery failed"));
 
     await expect(requestPasswordReset({ email: "john@example.com" })).rejects.toMatchObject({
@@ -236,9 +231,14 @@ describe("authService", () => {
       message: "Password reset is temporarily unavailable. Please try again later."
     });
 
-    expect(user.save).toHaveBeenCalledTimes(2);
-    expect(user.passwordResetTokenHash).toBeUndefined();
-    expect(user.passwordResetExpiresAt).toBeUndefined();
+    expect(prisma.user.update).toHaveBeenCalledTimes(2);
+    expect(prisma.user.update).toHaveBeenLastCalledWith({
+      where: { id: "user_1" },
+      data: {
+        passwordResetTokenHash: null,
+        passwordResetExpiresAt: null
+      }
+    });
   });
 
   it("resets password with a valid reset code", async () => {
@@ -248,8 +248,9 @@ describe("authService", () => {
       passwordResetExpiresAt: new Date(Date.now() + 60_000)
     });
 
-    vi.mocked(UserModel.findOne).mockResolvedValue(user as never);
+    vi.mocked(prisma.user.findUnique).mockResolvedValue(user as never);
     vi.mocked(hashPassword).mockResolvedValue("new_hash_123");
+    vi.mocked(prisma.user.update).mockResolvedValue(user as never);
 
     await expect(
       resetPassword({
@@ -260,10 +261,15 @@ describe("authService", () => {
     ).resolves.toBeUndefined();
 
     expect(hashPassword).toHaveBeenCalledWith("NewPassword123");
-    expect(user.passwordHash).toBe("new_hash_123");
-    expect(user.passwordResetTokenHash).toBeUndefined();
-    expect(user.passwordResetExpiresAt).toBeUndefined();
-    expect(user.save).toHaveBeenCalledTimes(1);
+    expect(prisma.user.update).toHaveBeenCalledTimes(1);
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: "user_1" },
+      data: {
+        passwordHash: "new_hash_123",
+        passwordResetTokenHash: null,
+        passwordResetExpiresAt: null
+      }
+    });
   });
 
   it("fails password reset with an invalid reset code", async () => {
@@ -272,7 +278,7 @@ describe("authService", () => {
       passwordResetExpiresAt: new Date(Date.now() + 60_000)
     });
 
-    vi.mocked(UserModel.findOne).mockResolvedValue(user as never);
+    vi.mocked(prisma.user.findUnique).mockResolvedValue(user as never);
 
     await expect(
       resetPassword({
@@ -289,7 +295,7 @@ describe("authService", () => {
       passwordResetExpiresAt: new Date(Date.now() - 60_000)
     });
 
-    vi.mocked(UserModel.findOne).mockResolvedValue(user as never);
+    vi.mocked(prisma.user.findUnique).mockResolvedValue(user as never);
 
     await expect(
       resetPassword({

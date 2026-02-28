@@ -1,0 +1,88 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum BillingCycle {
+  weekly
+  monthly
+  yearly
+  custom_days
+}
+
+enum SubscriptionCategory {
+  entertainment
+  productivity
+  utilities
+  health
+  other
+}
+
+enum ThemePreference {
+  system
+  light
+  dark
+}
+
+model User {
+  id                     String    @id @default(uuid())
+  email                  String    @unique
+  passwordHash           String
+  fullName               String?
+  country                String?
+  timeZone               String?
+  phone                  String?
+  bio                    String?
+  passwordResetTokenHash String?
+  passwordResetExpiresAt DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  settings      Settings?
+  subscriptions Subscription[]
+
+  @@map("users")
+}
+
+model Settings {
+  id                   String          @id @default(uuid())
+  userId               String          @unique
+  defaultCurrency      String          @db.VarChar(3)
+  weekStartsOn         Int             @default(0)
+  notificationsEnabled Boolean         @default(false)
+  themePreference      ThemePreference @default(system)
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("settings")
+}
+
+model Subscription {
+  pk                 String               @id @default(uuid())
+  userId             String
+  id                 String
+  name               String
+  amountMinor        Int
+  currency           String               @db.VarChar(3)
+  billingCycle       BillingCycle
+  customIntervalDays Int?
+  nextBillingDate    String
+  category           SubscriptionCategory
+  reminderDaysBefore Int[]
+  isActive           Boolean              @default(true)
+  notes              String?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, id])
+  @@index([userId, nextBillingDate])
+  @@map("subscriptions")
+}

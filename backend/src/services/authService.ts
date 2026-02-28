@@ -14,8 +14,7 @@ import {
   type AuthUser,
   type ForgotPasswordResponse
 } from "../domain/types.js";
-import { SettingsModel } from "../models/Settings.js";
-import { UserModel } from "../models/User.js";
+import { prisma } from "../prisma.js";
 import {
   comparePassword,
   hashPassword,
@@ -40,27 +39,31 @@ const hashResetToken = (value: string): string => {
 export const registerUser = async (input: unknown): Promise<AuthWithToken> => {
   const payload = registerInputSchema.parse(input);
 
-  const existing = await UserModel.findOne({ email: payload.email });
+  const existing = await prisma.user.findUnique({ where: { email: payload.email } });
   if (existing) {
     logger.warn("Registration blocked: duplicate account attempt");
     throw new HttpError(400, "Registration failed");
   }
 
   const passwordHash = await hashPassword(payload.password);
-  const user = await UserModel.create({
-    email: payload.email,
-    passwordHash,
-    fullName: payload.fullName,
-    country: payload.country,
-    timeZone: payload.timeZone
+  const user = await prisma.user.create({
+    data: {
+      email: payload.email,
+      passwordHash,
+      fullName: payload.fullName,
+      country: payload.country,
+      timeZone: payload.timeZone
+    }
   });
 
-  await SettingsModel.create({
-    userId: user._id,
-    ...DEFAULT_SETTINGS
+  await prisma.settings.create({
+    data: {
+      userId: user.id,
+      ...DEFAULT_SETTINGS
+    }
   });
 
-  const token = signUserToken(user._id.toString());
+  const token = signUserToken(user.id);
   const response = authResponseSchema.parse({ user: toAuthUser(user) });
 
   logger.info("User registration succeeded", { userId: response.user.id });
@@ -74,7 +77,7 @@ export const registerUser = async (input: unknown): Promise<AuthWithToken> => {
 export const loginUser = async (input: unknown): Promise<AuthWithToken> => {
   const payload = loginInputSchema.parse(input);
 
-  const user = await UserModel.findOne({ email: payload.email });
+  const user = await prisma.user.findUnique({ where: { email: payload.email } });
   if (!user) {
     logger.warn("Login failed: invalid credentials");
     throw new HttpError(401, "Invalid email or password");
@@ -86,7 +89,7 @@ export const loginUser = async (input: unknown): Promise<AuthWithToken> => {
     throw new HttpError(401, "Invalid email or password");
   }
 
-  const token = signUserToken(user._id.toString());
+  const token = signUserToken(user.id);
   const response = authResponseSchema.parse({ user: toAuthUser(user) });
 
   logger.info("Login succeeded", { userId: response.user.id });
@@ -98,7 +101,7 @@ export const loginUser = async (input: unknown): Promise<AuthWithToken> => {
 };
 
 export const getCurrentUser = async (userId: string): Promise<AuthUser> => {
-  const user = await UserModel.findById(userId);
+  const user = await prisma.user.findUnique({ where: { id: userId } });
 
   if (!user) {
     logger.warn("Current user lookup failed", { userId });
@@ -113,7 +116,7 @@ export const getCurrentUser = async (userId: string): Promise<AuthUser> => {
 export const requestPasswordReset = async (input: unknown): Promise<ForgotPasswordResponse> => {
   const payload = forgotPasswordInputSchema.parse(input);
   const message = "If this email exists, a reset code has been generated.";
-  const user = await UserModel.findOne({ email: payload.email });
+  const user = await prisma.user.findUnique({ where: { email: payload.email } });
 
   if (!user) {
     logger.info("Password reset requested for unknown account");
@@ -123,9 +126,13 @@ export const requestPasswordReset = async (input: unknown): Promise<ForgotPasswo
   const resetCode = String(randomInt(100_000, 1_000_000));
   const expiresAt = new Date(Date.now() + resetTokenTtlMs);
 
-  user.passwordResetTokenHash = hashResetToken(resetCode);
-  user.passwordResetExpiresAt = expiresAt;
-  await user.save();
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      passwordResetTokenHash: hashResetToken(resetCode),
+      passwordResetExpiresAt: expiresAt
+    }
+  });
 
   try {
     await sendPasswordResetEmail({
@@ -134,19 +141,23 @@ export const requestPasswordReset = async (input: unknown): Promise<ForgotPasswo
       expiresAt
     });
   } catch (error) {
-    user.passwordResetTokenHash = undefined;
-    user.passwordResetExpiresAt = undefined;
-    await user.save();
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordResetTokenHash: null,
+        passwordResetExpiresAt: null
+      }
+    });
 
     logger.error("Password reset email delivery failed", {
-      userId: user._id.toString(),
+      userId: user.id,
       message: error instanceof Error ? error.message : "Unknown email delivery error"
     });
     throw new HttpError(503, "Password reset is temporarily unavailable. Please try again later.");
   }
 
   logger.info("Password reset code generated and delivered", {
-    userId: user._id.toString(),
+    userId: user.id,
     expiresAt: expiresAt.toISOString()
   });
 
@@ -155,7 +166,7 @@ export const requestPasswordReset = async (input: unknown): Promise<ForgotPasswo
 
 export const resetPassword = async (input: unknown): Promise<void> => {
   const payload = resetPasswordInputSchema.parse(input);
-  const user = await UserModel.findOne({ email: payload.email });
+  const user = await prisma.user.findUnique({ where: { email: payload.email } });
 
   if (!user) {
     logger.warn("Password reset failed: invalid reset request");
@@ -169,21 +180,25 @@ export const resetPassword = async (input: unknown): Promise<void> => {
     user.passwordResetExpiresAt.getTime() > Date.now();
 
   if (!hasActiveToken) {
-    logger.warn("Password reset failed: code missing or expired", { userId: user._id.toString() });
+    logger.warn("Password reset failed: code missing or expired", { userId: user.id });
     throw new HttpError(400, "Invalid or expired reset code");
   }
 
   if (hashResetToken(payload.resetToken) !== user.passwordResetTokenHash) {
-    logger.warn("Password reset failed: code mismatch", { userId: user._id.toString() });
+    logger.warn("Password reset failed: code mismatch", { userId: user.id });
     throw new HttpError(400, "Invalid or expired reset code");
   }
 
-  user.passwordHash = await hashPassword(payload.newPassword);
-  user.passwordResetTokenHash = undefined;
-  user.passwordResetExpiresAt = undefined;
-  await user.save();
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      passwordHash: await hashPassword(payload.newPassword),
+      passwordResetTokenHash: null,
+      passwordResetExpiresAt: null
+    }
+  });
 
-  logger.info("Password reset succeeded", { userId: user._id.toString() });
+  logger.info("Password reset succeeded", { userId: user.id });
 };
 
 export const toAuthResponse = (user: AuthUser): AuthResponse => {
