@@ -7,16 +7,24 @@ import type { UserRole } from "../domain/types.js";
 
 export const requireAuth = (req: Request, res: Response, next: NextFunction): void => {
   void (async () => {
-    const token = req.cookies[authCookieName] as string | undefined;
-
-    if (!token) {
-      logger.warn("Auth rejected: missing cookie token", { path: req.originalUrl });
-      res.status(401).json({ error: "Authentication required" });
-      return;
-    }
-
     try {
-      const decoded = verifyUserToken(token);
+      const token = req.cookies[authCookieName] as string | undefined;
+
+      if (!token) {
+        logger.warn("Auth rejected: missing cookie token", { path: req.originalUrl });
+        res.status(401).json({ error: "Authentication required" });
+        return;
+      }
+
+      let decoded;
+      try {
+        decoded = verifyUserToken(token);
+      } catch {
+        logger.warn("Auth rejected: invalid token", { path: req.originalUrl });
+        res.status(401).json({ error: "Invalid authentication token" });
+        return;
+      }
+
       const user = await prisma.user.findUnique({
         where: { id: decoded.userId },
         select: {
@@ -37,23 +45,30 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction): vo
       authReq.userId = user.id;
       authReq.userRole = user.role;
       next();
-    } catch {
-      logger.warn("Auth rejected: invalid token", { path: req.originalUrl });
-      res.status(401).json({ error: "Invalid authentication token" });
+    } catch (error) {
+      next(error);
     }
   })();
 };
 
 export const optionalAuth = (req: Request, _res: Response, next: NextFunction): void => {
   void (async () => {
-    const token = req.cookies[authCookieName] as string | undefined;
-    if (!token) {
-      next();
-      return;
-    }
-
     try {
-      const decoded = verifyUserToken(token);
+      const token = req.cookies[authCookieName] as string | undefined;
+      if (!token) {
+        next();
+        return;
+      }
+
+      let decoded;
+      try {
+        decoded = verifyUserToken(token);
+      } catch {
+        // Continue unauthenticated on malformed/expired token.
+        next();
+        return;
+      }
+
       const user = await prisma.user.findUnique({
         where: { id: decoded.userId },
         select: {
@@ -69,11 +84,11 @@ export const optionalAuth = (req: Request, _res: Response, next: NextFunction): 
         authReq.userId = user.id;
         authReq.userRole = user.role;
       }
-    } catch {
-      // Continue unauthenticated on malformed/expired token.
-    }
 
-    next();
+      next();
+    } catch (error) {
+      next(error);
+    }
   })();
 };
 
