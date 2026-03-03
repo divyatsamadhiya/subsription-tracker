@@ -13,7 +13,10 @@
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
-    "migrate:mongo-to-pg": "tsx scripts/migrate-mongo-to-pg.ts"
+    "migrate:mongo-to-pg": "tsx scripts/migrate-mongo-to-pg.ts",
+    "admin:grant": "tsx scripts/grant-admin.ts",
+    "admin:revoke": "tsx scripts/revoke-admin.ts",
+    "admin:purge-deleted": "tsx scripts/purge-deleted-users.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.4.2",

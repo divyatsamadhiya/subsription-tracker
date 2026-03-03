@@ -7,6 +7,8 @@ export type SubscriptionCategory =
   | "health"
   | "other";
 
+export type UserRole = "user" | "admin";
+
 export interface Subscription {
   id: string;
   name: string;
@@ -42,6 +44,7 @@ export interface BackupFileV1 {
 export interface AuthUser {
   id: string;
   email: string;
+  role: UserRole;
   profile: UserProfile;
   profileComplete: boolean;
   createdAt: string;

@@ -1,5 +1,9 @@
 import { z } from "zod";
 import {
+  type AdminOverviewAnalytics,
+  type AdminSession,
+  type AdminUserDetail,
+  type AdminUserListResponse,
   BILLING_CYCLE_OPTIONS,
   CATEGORY_OPTIONS,
   type AppSettings,
@@ -14,6 +18,7 @@ import {
   type ResetPasswordInput,
   type Subscription,
   type SubscriptionInput,
+  type UserRole,
   type UserProfile,
   type UserProfilePatch
 } from "./types.js";
@@ -63,11 +68,14 @@ export const userProfilePatchSchema = z
 export const authUserSchema = z.object({
   id: z.string().min(1),
   email: z.string().email(),
+  role: z.enum(["user", "admin"]),
   profile: userProfileSchema,
   profileComplete: z.boolean(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime()
 }).strict() satisfies z.ZodType<AuthUser>;
+
+export const userRoleSchema = z.enum(["user", "admin"]) satisfies z.ZodType<UserRole>;
 
 export const authResponseSchema = z.object({
   user: authUserSchema
@@ -170,3 +178,110 @@ export const profileResponseSchema = z.object({
   profile: userProfileSchema,
   profileComplete: z.boolean()
 }).strict() satisfies z.ZodType<ProfileResponse>;
+
+export const adminActionReasonSchema = z
+  .object({
+    reason: z.string().trim().min(3).max(300)
+  })
+  .strict();
+
+export const adminUsersQuerySchema = z
+  .object({
+    search: z.string().trim().max(120).optional(),
+    status: z.enum(["active", "deleted", "all"]).optional(),
+    page: z.coerce.number().int().min(1).optional(),
+    pageSize: z.coerce.number().int().min(1).max(100).optional()
+  })
+  .strict();
+
+export const adminSessionSchema = z
+  .object({
+    user: authUserSchema
+  })
+  .strict() satisfies z.ZodType<AdminSession>;
+
+const currencySpendSchema = z
+  .object({
+    currency: z.string().length(3),
+    amountMinor: z.number().int()
+  })
+  .strict();
+
+export const adminUserListResponseSchema = z
+  .object({
+    users: z.array(
+      z
+        .object({
+          id: z.string().min(1),
+          email: z.string().email(),
+          role: userRoleSchema,
+          status: z.enum(["active", "deleted"]),
+          fullName: z.string().optional(),
+          country: z.string().optional(),
+          createdAt: z.string().datetime(),
+          deletedAt: z.string().datetime().optional(),
+          subscriptionCount: z.number().int().nonnegative(),
+          activeSubscriptionCount: z.number().int().nonnegative()
+        })
+        .strict()
+    ),
+    total: z.number().int().nonnegative(),
+    page: z.number().int().positive(),
+    pageSize: z.number().int().positive()
+  })
+  .strict() satisfies z.ZodType<AdminUserListResponse>;
+
+export const adminUserDetailSchema = z
+  .object({
+    id: z.string().min(1),
+    email: z.string().email(),
+    role: userRoleSchema,
+    status: z.enum(["active", "deleted"]),
+    profile: userProfileSchema,
+    createdAt: z.string().datetime(),
+    updatedAt: z.string().datetime(),
+    deletedAt: z.string().datetime().optional(),
+    deletedByAdminId: z.string().optional(),
+    deleteReason: z.string().optional(),
+    subscriptionSummary: z
+      .object({
+        totalSubscriptions: z.number().int().nonnegative(),
+        activeSubscriptions: z.number().int().nonnegative(),
+        monthlySpendByCurrency: z.array(currencySpendSchema)
+      })
+      .strict()
+  })
+  .strict() satisfies z.ZodType<AdminUserDetail>;
+
+export const adminOverviewAnalyticsSchema = z
+  .object({
+    users: z
+      .object({
+        active: z.number().int().nonnegative(),
+        deleted: z.number().int().nonnegative(),
+        newLast30Days: z.number().int().nonnegative()
+      })
+      .strict(),
+    subscriptions: z
+      .object({
+        activeTotal: z.number().int().nonnegative(),
+        totalByCategory: z.object({
+          entertainment: z.number().int().nonnegative(),
+          productivity: z.number().int().nonnegative(),
+          utilities: z.number().int().nonnegative(),
+          health: z.number().int().nonnegative(),
+          other: z.number().int().nonnegative()
+        })
+      })
+      .strict(),
+    monthlySpendByCurrency: z.array(currencySpendSchema),
+    signupTrend: z.array(
+      z
+        .object({
+          date: isoDateSchema,
+          count: z.number().int().nonnegative()
+        })
+        .strict()
+    )
+  })
+  .strict() satisfies z.ZodType<AdminOverviewAnalytics>;

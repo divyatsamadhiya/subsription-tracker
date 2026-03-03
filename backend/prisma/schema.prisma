@@ -28,15 +28,33 @@ enum ThemePreference {
   dark
 }
 
+enum UserRole {
+  user
+  admin
+}
+
+enum AdminAuditAction {
+  user_soft_deleted
+  user_restored
+  user_force_logged_out
+  user_role_granted
+  user_role_revoked
+}
+
 model User {
   id                     String    @id @default(uuid())
   email                  String    @unique
   passwordHash           String
+  role                   UserRole  @default(user)
+  sessionVersion         Int       @default(1)
   fullName               String?
   country                String?
   timeZone               String?
   phone                  String?
   bio                    String?
+  deletedAt              DateTime?
+  deletedByAdminId       String?
+  deleteReason           String?
   passwordResetTokenHash String?
   passwordResetExpiresAt DateTime?
   createdAt              DateTime  @default(now())
@@ -45,6 +63,8 @@ model User {
   settings      Settings?
   subscriptions Subscription[]
 
+  @@index([role])
+  @@index([deletedAt])
   @@map("users")
 }
 
@@ -85,4 +105,18 @@ model Subscription {
   @@unique([userId, id])
   @@index([userId, nextBillingDate])
   @@map("subscriptions")
+}
+
+model AdminAuditLog {
+  id          String           @id @default(uuid())
+  adminUserId String
+  targetUserId String?
+  action      AdminAuditAction
+  metadata    Json?
+  createdAt   DateTime         @default(now())
+
+  @@index([createdAt])
+  @@index([adminUserId])
+  @@index([targetUserId])
+  @@map("admin_audit_logs")
 }
