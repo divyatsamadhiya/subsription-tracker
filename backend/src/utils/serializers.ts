@@ -30,6 +30,7 @@ export const toAuthUser = (user: PrismaUser): AuthUser => {
   return {
     id: user.id,
     email: user.email,
+    role: user.role,
     profile,
     profileComplete: isProfileComplete(profile),
     createdAt: user.createdAt.toISOString(),

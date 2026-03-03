@@ -44,6 +44,7 @@ const makeStoreState = (overrides?: Partial<Record<string, unknown>>) => ({
 const authUser = {
   id: "user_1",
   email: "john@example.com",
+  role: "user" as const,
   profile: {
     fullName: "John Doe",
     country: "India"
@@ -132,6 +133,7 @@ describe("App auth and profile flows", () => {
         user: {
           id: "user_1",
           email: "john@example.com",
+          role: "user",
           profile: {},
           profileComplete: false,
           createdAt: "2026-01-01T00:00:00.000Z",

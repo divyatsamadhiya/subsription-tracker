@@ -8,6 +8,7 @@ import { subscriptionsRouter } from "./routes/subscriptions.js";
 import { settingsRouter } from "./routes/settings.js";
 import { backupRouter } from "./routes/backup.js";
 import { profileRouter } from "./routes/profile.js";
+import { adminRouter } from "./routes/admin.js";
 import { errorHandler, notFoundHandler } from "./middleware/error.js";
 import { requestLogger } from "./middleware/requestLogger.js";
 import { enforceTrustedOrigin } from "./middleware/originGuard.js";
@@ -50,6 +51,7 @@ export const createApp = () => {
   app.use("/api/v1/settings", settingsRouter);
   app.use("/api/v1/profile", profileRouter);
   app.use("/api/v1/backup", backupRouter);
+  app.use("/api/v1/admin", adminRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

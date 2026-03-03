@@ -21,7 +21,7 @@ const required = (value: string | undefined, key: string, fallbackForTest?: stri
 };
 
 const parseOrigins = (value: string | undefined): string[] => {
-  const raw = value ?? "http://localhost:5173";
+  const raw = value ?? "http://localhost:5173,http://localhost:5174";
   const origins = raw
     .split(",")
     .map((origin) => origin.trim())

@@ -57,6 +57,7 @@ export const userProfilePatchSchema: z.ZodType<UserProfilePatch> = z
 export const authUserSchema: z.ZodType<AuthUser> = z.object({
   id: z.string().min(1),
   email: z.string().email(),
+  role: z.enum(["user", "admin"]),
   profile: userProfileSchema,
   profileComplete: z.boolean(),
   createdAt: z.string().datetime(),

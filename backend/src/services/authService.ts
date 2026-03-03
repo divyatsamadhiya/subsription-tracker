@@ -63,7 +63,7 @@ export const registerUser = async (input: unknown): Promise<AuthWithToken> => {
     }
   });
 
-  const token = signUserToken(user.id);
+  const token = signUserToken({ userId: user.id, sessionVersion: user.sessionVersion });
   const response = authResponseSchema.parse({ user: toAuthUser(user) });
 
   logger.info("User registration succeeded", { userId: response.user.id });
@@ -83,13 +83,18 @@ export const loginUser = async (input: unknown): Promise<AuthWithToken> => {
     throw new HttpError(401, "Invalid email or password");
   }
 
+  if (user.deletedAt) {
+    logger.warn("Login failed: account deleted", { userId: user.id });
+    throw new HttpError(403, "This account has been deactivated");
+  }
+
   const validPassword = await comparePassword(payload.password, user.passwordHash);
   if (!validPassword) {
     logger.warn("Login failed: invalid credentials");
     throw new HttpError(401, "Invalid email or password");
   }
 
-  const token = signUserToken(user.id);
+  const token = signUserToken({ userId: user.id, sessionVersion: user.sessionVersion });
   const response = authResponseSchema.parse({ user: toAuthUser(user) });
 
   logger.info("Login succeeded", { userId: response.user.id });
@@ -108,6 +113,11 @@ export const getCurrentUser = async (userId: string): Promise<AuthUser> => {
     throw new HttpError(401, "User account no longer exists");
   }
 
+  if (user.deletedAt) {
+    logger.warn("Current user lookup failed: account deleted", { userId });
+    throw new HttpError(401, "User account no longer exists");
+  }
+
   const authUser = authUserSchema.parse(toAuthUser(user));
   logger.info("Current user lookup succeeded", { userId });
   return authUser;
@@ -118,7 +128,7 @@ export const requestPasswordReset = async (input: unknown): Promise<ForgotPasswo
   const message = "If this email exists, a reset code has been generated.";
   const user = await prisma.user.findUnique({ where: { email: payload.email } });
 
-  if (!user) {
+  if (!user || user.deletedAt) {
     logger.info("Password reset requested for unknown account");
     return forgotPasswordResponseSchema.parse({ message });
   }
@@ -168,7 +178,7 @@ export const resetPassword = async (input: unknown): Promise<void> => {
   const payload = resetPasswordInputSchema.parse(input);
   const user = await prisma.user.findUnique({ where: { email: payload.email } });
 
-  if (!user) {
+  if (!user || user.deletedAt) {
     logger.warn("Password reset failed: invalid reset request");
     throw new HttpError(400, "Invalid or expired reset code");
   }

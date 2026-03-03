@@ -43,4 +43,15 @@ describe("app security configuration", () => {
 
     expect(hasProfileRoute).toBe(true);
   });
+
+  it("registers admin routes in middleware stack", () => {
+    const app = createApp();
+    const stack = (app as { _router?: { stack?: Array<{ regexp?: { toString(): string } }> } })._router
+      ?.stack ?? [];
+    const hasAdminRoute = stack.some((layer) =>
+      layer.regexp?.toString().includes("\\/api\\/v1\\/admin")
+    );
+
+    expect(hasAdminRoute).toBe(true);
+  });
 });

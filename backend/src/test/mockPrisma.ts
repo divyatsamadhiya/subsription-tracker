@@ -4,6 +4,8 @@ const makeMockModel = () => ({
   findUnique: vi.fn(),
   findFirst: vi.fn(),
   findMany: vi.fn(),
+  count: vi.fn(),
+  groupBy: vi.fn(),
   create: vi.fn(),
   createMany: vi.fn(),
   update: vi.fn(),
@@ -17,6 +19,7 @@ export const mockPrisma = {
   user: makeMockModel(),
   settings: makeMockModel(),
   subscription: makeMockModel(),
+  adminAuditLog: makeMockModel(),
   $connect: vi.fn(),
   $disconnect: vi.fn(),
   $transaction: vi.fn()

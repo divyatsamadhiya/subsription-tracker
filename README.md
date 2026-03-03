@@ -3,6 +3,7 @@
 Pulseboard is a full-stack subscription tracking app in a monorepo:
 
 - `frontend`: React + Vite + TypeScript
+- `admin-frontend`: React + Vite + TypeScript (admin console)
 - `backend`: Express + PostgreSQL (Prisma ORM) + JWT cookie auth
 
 ## License
@@ -40,6 +41,7 @@ npm run dev
 This starts:
 
 - Frontend at `http://localhost:5173`
+- Admin frontend at `http://localhost:5174`
 - Backend at `http://localhost:4000`
 
 ## Environment Variables
@@ -52,7 +54,7 @@ Required:
 Optional/defaulted:
 
 - `PORT` (default `4000`)
-- `FRONTEND_ORIGIN` (default `http://localhost:5173`, comma-separated list supported, `*` is not allowed)
+- `FRONTEND_ORIGIN` (default `http://localhost:5173,http://localhost:5174`, comma-separated list supported, `*` is not allowed)
 - `RESEND_API_KEY`
 - `RESET_EMAIL_FROM` (default `onboarding@resend.dev`)
 - `RESET_EMAIL_FROM_NAME` (default `Pulseboard`)
@@ -63,9 +65,12 @@ See `.env.example` for a full template.
 
 ## Scripts
 
-- `npm run dev`: Run backend and frontend in watch mode
-- `npm run test`: Run backend and frontend tests
-- `npm run build`: Build backend and frontend
+- `npm run dev`: Run backend, frontend, and admin frontend in watch mode
+- `npm run test`: Run backend, frontend, and admin frontend tests
+- `npm run build`: Build backend, frontend, and admin frontend
+- `npm run admin:grant -w backend -- --email=<user@example.com>`: Grant admin role
+- `npm run admin:revoke -w backend -- --email=<user@example.com>`: Revoke admin role
+- `npm run admin:purge-deleted -w backend -- --days=30`: Purge soft-deleted users older than retention
 
 ## API Surface
 
@@ -87,6 +92,13 @@ Base URL: `http://localhost:4000/api/v1`
 - `PATCH /settings`
 - `GET /backup/export`
 - `POST /backup/import`
+- `GET /admin/session`
+- `GET /admin/users`
+- `GET /admin/users/:userId`
+- `POST /admin/users/:userId/delete`
+- `POST /admin/users/:userId/restore`
+- `POST /admin/users/:userId/force-logout`
+- `GET /admin/analytics/overview`
 
 ## Security
 

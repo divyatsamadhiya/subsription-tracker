@@ -7,6 +7,8 @@ export type SubscriptionCategory =
   | "health"
   | "other";
 
+export type UserRole = "user" | "admin";
+
 export interface Subscription {
   id: string;
   name: string;
@@ -42,6 +44,7 @@ export interface BackupFileV1 {
 export interface AuthUser {
   id: string;
   email: string;
+  role: UserRole;
   profile: UserProfile;
   profileComplete: boolean;
   createdAt: string;
@@ -110,6 +113,76 @@ export interface SubscriptionInput {
   reminderDaysBefore: number[];
   isActive: boolean;
   notes?: string;
+}
+
+export type AdminUserStatus = "active" | "deleted";
+
+export interface AdminSession {
+  user: AuthUser;
+}
+
+export interface AdminUserListItem {
+  id: string;
+  email: string;
+  role: UserRole;
+  status: AdminUserStatus;
+  fullName?: string;
+  country?: string;
+  createdAt: string;
+  deletedAt?: string;
+  subscriptionCount: number;
+  activeSubscriptionCount: number;
+}
+
+export interface AdminUserListResponse {
+  users: AdminUserListItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface CurrencySpend {
+  currency: string;
+  amountMinor: number;
+}
+
+export interface AdminUserSubscriptionSummary {
+  totalSubscriptions: number;
+  activeSubscriptions: number;
+  monthlySpendByCurrency: CurrencySpend[];
+}
+
+export interface AdminUserDetail {
+  id: string;
+  email: string;
+  role: UserRole;
+  status: AdminUserStatus;
+  profile: UserProfile;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string;
+  deletedByAdminId?: string;
+  deleteReason?: string;
+  subscriptionSummary: AdminUserSubscriptionSummary;
+}
+
+export interface SignupTrendPoint {
+  date: string;
+  count: number;
+}
+
+export interface AdminOverviewAnalytics {
+  users: {
+    active: number;
+    deleted: number;
+    newLast30Days: number;
+  };
+  subscriptions: {
+    activeTotal: number;
+    totalByCategory: Record<SubscriptionCategory, number>;
+  };
+  monthlySpendByCurrency: CurrencySpend[];
+  signupTrend: SignupTrendPoint[];
 }
 
 export const CATEGORY_OPTIONS = [

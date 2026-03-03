@@ -49,7 +49,12 @@ const makeUser = (
       | "createdAt"
       | "updatedAt"
       | "passwordResetTokenHash"
-      | "passwordResetExpiresAt",
+      | "passwordResetExpiresAt"
+      | "role"
+      | "sessionVersion"
+      | "deletedAt"
+      | "deletedByAdminId"
+      | "deleteReason",
       unknown
     >
   >
@@ -65,6 +70,11 @@ const makeUser = (
     timeZone: "America/New_York",
     phone: null,
     bio: null,
+    role: "user",
+    sessionVersion: 1,
+    deletedAt: null,
+    deletedByAdminId: null,
+    deleteReason: null,
     createdAt: now,
     updatedAt: now,
     passwordResetTokenHash: null,
@@ -95,7 +105,7 @@ describe("authService", () => {
     expect(prisma.user.findUnique).toHaveBeenCalledWith({ where: { email: "john@example.com" } });
     expect(hashPassword).toHaveBeenCalledWith("Password123");
     expect(prisma.settings.create).toHaveBeenCalled();
-    expect(signUserToken).toHaveBeenCalledWith("user_1");
+    expect(signUserToken).toHaveBeenCalledWith({ userId: "user_1", sessionVersion: 1 });
     expect(result.token).toBe("token_abc");
     expect(result.user.email).toBe("john@example.com");
     expect(result.user.profile.fullName).toBe("John Doe");
@@ -134,8 +144,19 @@ describe("authService", () => {
     const result = await loginUser({ email: "john@example.com", password: "Password123" });
 
     expect(comparePassword).toHaveBeenCalledWith("Password123", "hashed");
+    expect(signUserToken).toHaveBeenCalledWith({ userId: "user_1", sessionVersion: 1 });
     expect(result.token).toBe("token_abc");
     expect(result.user.id).toBe("user_1");
+  });
+
+  it("fails login when account is soft-deleted", async () => {
+    vi.mocked(prisma.user.findUnique).mockResolvedValue(
+      makeUser({ deletedAt: new Date("2026-01-10T00:00:00.000Z") }) as never
+    );
+
+    await expect(
+      loginUser({ email: "john@example.com", password: "Password123" })
+    ).rejects.toMatchObject({ status: 403, message: "This account has been deactivated" });
   });
 
   it("fails login when email does not exist", async () => {
