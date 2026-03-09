@@ -53,11 +53,30 @@ const parseOrigins = (value: string | undefined): string[] => {
   return [...expanded];
 };
 
+const WEAK_JWT_SECRETS = new Set([
+  "change-this-to-a-long-random-secret",
+  "replace-with-strong-random-secret",
+  "secret",
+  "jwt-secret",
+  "pulseboard-secret"
+]);
+
+const validatedJwtSecret = (value: string): string => {
+  if (process.env.NODE_ENV === "test") return value;
+  if (WEAK_JWT_SECRETS.has(value) || value.length < 32) {
+    throw new Error(
+      "JWT_SECRET is too weak or a known placeholder. " +
+        'Generate one with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"'
+    );
+  }
+  return value;
+};
+
 export const config = {
   nodeEnv: process.env.NODE_ENV ?? "development",
   port: Number(process.env.PORT ?? 4000),
   databaseUrl: required(process.env.DATABASE_URL, "DATABASE_URL", "postgresql://localhost:5432/pulseboard_test"),
-  jwtSecret: required(process.env.JWT_SECRET, "JWT_SECRET", "pulseboard-test-secret"),
+  jwtSecret: validatedJwtSecret(required(process.env.JWT_SECRET, "JWT_SECRET", "pulseboard-test-secret")),
   frontendOrigins: parseOrigins(process.env.FRONTEND_ORIGIN),
   email: {
     fromAddress: process.env.RESET_EMAIL_FROM ?? "onboarding@resend.dev",

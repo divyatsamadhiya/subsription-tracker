@@ -145,7 +145,13 @@ export const profileResponseSchema = z.object({
 
 export const registerPayloadSchema = z.object({
   email: z.string().email().transform((value) => value.trim().toLowerCase()),
-  password: z.string().min(8).max(128),
+  password: z
+    .string()
+    .min(8, "Password must be at least 8 characters")
+    .max(128)
+    .regex(/[a-z]/, "Password must contain at least one lowercase letter")
+    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+    .regex(/\d/, "Password must contain at least one digit"),
   fullName: fullNameSchema,
   country: countrySchema,
   timeZone: timeZoneSchema.optional()
