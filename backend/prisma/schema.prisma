@@ -55,6 +55,8 @@ model User {
   deletedAt              DateTime?
   deletedByAdminId       String?
   deleteReason           String?
+  failedLoginAttempts    Int       @default(0)
+  lockedUntil            DateTime?
   passwordResetTokenHash String?
   passwordResetExpiresAt DateTime?
   createdAt              DateTime  @default(now())

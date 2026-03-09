@@ -41,6 +41,14 @@ const timeZoneSchema = z
   .trim()
   .min(1)
   .refine((value) => isValidTimeZone(value), { message: "Invalid timezone" });
+const passwordSchema = z
+  .string()
+  .min(8, "Password must be at least 8 characters")
+  .max(128)
+  .regex(/[a-z]/, "Password must contain at least one lowercase letter")
+  .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+  .regex(/\d/, "Password must contain at least one digit");
+
 const phoneSchema = z.string().trim().regex(/^\+[1-9]\d{6,14}$/, "Invalid phone format");
 const bioSchema = z.string().trim().max(280);
 
@@ -83,7 +91,7 @@ export const authResponseSchema = z.object({
 
 export const registerInputSchema = z.object({
   email: z.string().email().transform((value) => value.trim().toLowerCase()),
-  password: z.string().min(8).max(128),
+  password: passwordSchema,
   fullName: fullNameSchema,
   country: countrySchema,
   timeZone: timeZoneSchema.optional()
@@ -91,7 +99,7 @@ export const registerInputSchema = z.object({
 
 export const loginInputSchema = z.object({
   email: z.string().email().transform((value) => value.trim().toLowerCase()),
-  password: z.string().min(8).max(128)
+  password: z.string().min(1).max(128)
 }).strict() satisfies z.ZodType<LoginInput>;
 
 export const forgotPasswordInputSchema = z.object({
@@ -105,7 +113,7 @@ export const forgotPasswordResponseSchema = z.object({
 export const resetPasswordInputSchema = z.object({
   email: z.string().email().transform((value) => value.trim().toLowerCase()),
   resetToken: z.string().min(1),
-  newPassword: z.string().min(8).max(128)
+  newPassword: passwordSchema
 }).strict() satisfies z.ZodType<ResetPasswordInput>;
 
 export const subscriptionInputSchema = z

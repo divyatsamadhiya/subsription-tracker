@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import helmet from "helmet";
-import { config } from "./config.js";
+import { config, isProduction } from "./config.js";
 import { authRouter } from "./routes/auth.js";
 import { subscriptionsRouter } from "./routes/subscriptions.js";
 import { settingsRouter } from "./routes/settings.js";
@@ -20,7 +20,23 @@ export const createApp = () => {
 
   app.use(
     helmet({
-      crossOriginResourcePolicy: { policy: "cross-origin" }
+      crossOriginResourcePolicy: { policy: "cross-origin" },
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          imgSrc: ["'self'", "data:", "https:"],
+          connectSrc: ["'self'"],
+          fontSrc: ["'self'"],
+          objectSrc: ["'none'"],
+          frameAncestors: ["'none'"]
+        }
+      },
+      referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+      hsts: isProduction
+        ? { maxAge: 31536000, includeSubDomains: true, preload: true }
+        : false
     })
   );
   app.use(

@@ -75,6 +75,7 @@ import {
 } from "./lib/notifications";
 import { useAppStore } from "./store/useAppStore";
 import type { ThemePreference } from "./types";
+import { ZodError } from "zod";
 
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: string[];
@@ -433,8 +434,15 @@ const App = () => {
       setPassword("");
       setRegisterFullName("");
       setRegisterCountry("");
-    } catch {
-      setAuthNotice(authMode === "register" ? "Registration failed." : "Sign-in failed.");
+    } catch (err) {
+      const fallback = authMode === "register" ? "Registration failed." : "Sign-in failed.";
+      if (err instanceof ZodError) {
+        setAuthNotice(err.issues[0]?.message ?? fallback);
+      } else if (err instanceof Error) {
+        setAuthNotice(err.message);
+      } else {
+        setAuthNotice(fallback);
+      }
     }
   };
 
@@ -718,6 +726,11 @@ const App = () => {
                       onChange={(_event, value: AuthMode) => {
                         setAuthMode(value);
                         setAuthNotice("");
+                        setEmail("");
+                        setPassword("");
+                        setShowAuthPassword(false);
+                        setRegisterFullName("");
+                        setRegisterCountry("");
                         if (value === "login") {
                           setRecoveryNotice("");
                         }
