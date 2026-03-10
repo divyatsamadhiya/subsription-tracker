@@ -219,14 +219,31 @@ export default function SubscriptionsPage() {
         {visible.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
-              <CreditCard className="size-10 text-muted-foreground/40" />
-              <p className="mt-3 text-sm font-medium text-muted-foreground">
+              <motion.div
+                initial={{ scale: 0, rotate: -12 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ type: "spring", stiffness: 200, damping: 15 }}
+              >
+                <CreditCard className="size-10 text-muted-foreground/40" />
+              </motion.div>
+              <motion.p
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.15, duration: 0.3 }}
+                className="mt-3 text-sm font-medium text-muted-foreground"
+              >
                 No subscriptions found
-              </p>
-              <Button size="sm" className="mt-4 gap-2" onClick={openCreate}>
-                <Plus className="size-3.5" />
-                Add your first
-              </Button>
+              </motion.p>
+              <motion.div
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.25, duration: 0.3 }}
+              >
+                <Button size="sm" className="mt-4 gap-2" onClick={openCreate}>
+                  <Plus className="size-3.5" />
+                  Add your first
+                </Button>
+              </motion.div>
             </CardContent>
           </Card>
         ) : (

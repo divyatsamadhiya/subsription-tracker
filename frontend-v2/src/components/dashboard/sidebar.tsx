@@ -203,17 +203,17 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       </div>
 
       {/* Collapse toggle */}
-      <button
+      <motion.button
         onClick={onToggle}
         className="absolute -right-3 top-20 z-40 flex h-6 w-6 items-center justify-center rounded-full border border-border bg-background shadow-sm transition-colors hover:bg-accent"
         aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        whileHover={{ scale: 1.15 }}
+        whileTap={{ scale: 0.9 }}
       >
-        {collapsed ? (
-          <ChevronRight className="size-3" />
-        ) : (
+        <motion.div animate={{ rotate: collapsed ? 180 : 0 }} transition={{ duration: 0.2 }}>
           <ChevronLeft className="size-3" />
-        )}
-      </button>
+        </motion.div>
+      </motion.button>
     </motion.aside>
   );
 }

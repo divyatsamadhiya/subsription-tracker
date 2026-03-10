@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { motion } from "motion/react";
 import { Menu } from "lucide-react";
 import {
   Sheet,
@@ -74,20 +75,26 @@ export function MobileHeader() {
           </div>
           <Separator />
           <nav className="space-y-1 p-2">
-            {NAV_ITEMS.map(({ href, icon: Icon, label }) => (
-              <Link
+            {NAV_ITEMS.map(({ href, icon: Icon, label }, i) => (
+              <motion.div
                 key={href}
-                href={href}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                  isActive(href)
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                )}
+                initial={{ opacity: 0, x: -12 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.04, duration: 0.2 }}
               >
-                <Icon className="size-4" />
-                {label}
-              </Link>
+                <Link
+                  href={href}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                    isActive(href)
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                  )}
+                >
+                  <Icon className="size-4" />
+                  {label}
+                </Link>
+              </motion.div>
             ))}
           </nav>
           <Separator />
@@ -114,7 +121,15 @@ export function MobileHeader() {
         </SheetContent>
       </Sheet>
 
-      <h1 className="font-heading text-base font-semibold">{currentPage}</h1>
+      <motion.h1
+        key={currentPage}
+        initial={{ opacity: 0, x: -8 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.2 }}
+        className="font-heading text-base font-semibold"
+      >
+        {currentPage}
+      </motion.h1>
     </header>
   );
 }

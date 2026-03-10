@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { motion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
 import { Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -182,27 +182,38 @@ export function SubscriptionFormSheet({
               className="h-10"
               autoComplete="off"
             />
-            {filteredSuggestions.length > 0 && (
-              <div className="absolute top-full left-0 z-50 mt-1 w-full rounded-lg border border-border bg-popover shadow-lg">
-                {filteredSuggestions.map((s) => (
-                  <button
-                    key={s.name}
-                    type="button"
-                    className="flex w-full items-center justify-between px-3 py-2 text-sm hover:bg-accent transition-colors first:rounded-t-lg last:rounded-b-lg"
-                    onMouseDown={() => {
-                      setName(s.name);
-                      setCategory(s.category);
-                      setNameFocused(false);
-                    }}
-                  >
-                    <span>{s.name}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {categoryLabel(s.category)}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
+            <AnimatePresence>
+              {filteredSuggestions.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: -4, scale: 0.97 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -4, scale: 0.97 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute top-full left-0 z-50 mt-1 w-full rounded-lg border border-border bg-popover shadow-lg"
+                >
+                  {filteredSuggestions.map((s, i) => (
+                    <motion.button
+                      key={s.name}
+                      type="button"
+                      initial={{ opacity: 0, x: -8 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: i * 0.03, duration: 0.15 }}
+                      className="flex w-full items-center justify-between px-3 py-2 text-sm hover:bg-accent transition-colors first:rounded-t-lg last:rounded-b-lg"
+                      onMouseDown={() => {
+                        setName(s.name);
+                        setCategory(s.category);
+                        setNameFocused(false);
+                      }}
+                    >
+                      <span>{s.name}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {categoryLabel(s.category)}
+                      </span>
+                    </motion.button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Amount + Billing Cycle */}

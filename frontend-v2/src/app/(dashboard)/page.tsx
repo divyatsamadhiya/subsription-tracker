@@ -22,6 +22,7 @@ import {
 } from "@/lib/date";
 import type { SubscriptionCategory } from "@/lib/types";
 import { CATEGORY_OPTIONS } from "@/lib/types";
+import { AnimatedNumber } from "@/components/dashboard/animated-number";
 
 const container = {
   hidden: { opacity: 0 },
@@ -113,21 +114,29 @@ export default function OverviewPage() {
           icon={DollarSign}
           label="Monthly spend"
           value={formatCurrencyMinor(monthlyTotal, currency)}
+          numericValue={monthlyTotal / 100}
+          formatFn={(n) => formatCurrencyMinor(Math.round(n * 100), currency)}
         />
         <KpiCard
           icon={TrendingUp}
           label="Yearly projection"
           value={formatCurrencyMinor(yearlyTotal, currency)}
+          numericValue={yearlyTotal / 100}
+          formatFn={(n) => formatCurrencyMinor(Math.round(n * 100), currency)}
         />
         <KpiCard
           icon={CreditCard}
           label="Active subs"
           value={String(activeCount)}
+          numericValue={activeCount}
+          formatFn={(n) => String(Math.round(n))}
         />
         <KpiCard
           icon={CalendarClock}
           label={`Due in ${renewalWindow}d`}
           value={String(renewals.length)}
+          numericValue={renewals.length}
+          formatFn={(n) => String(Math.round(n))}
         />
       </motion.div>
 
@@ -257,10 +266,14 @@ function KpiCard({
   icon: Icon,
   label,
   value,
+  numericValue,
+  formatFn,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   value: string;
+  numericValue?: number;
+  formatFn?: (n: number) => string;
 }) {
   return (
     <Card className="relative overflow-hidden">
@@ -270,7 +283,11 @@ function KpiCard({
           <span className="text-xs font-medium">{label}</span>
         </div>
         <p className="mt-1.5 font-heading text-xl font-semibold tracking-tight">
-          {value}
+          {numericValue !== undefined && formatFn ? (
+            <AnimatedNumber value={numericValue} formatFn={formatFn} />
+          ) : (
+            value
+          )}
         </p>
       </CardContent>
     </Card>

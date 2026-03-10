@@ -84,13 +84,29 @@ export default function AnalyticsPage() {
         animate={{ opacity: 1, y: 0 }}
         className="flex flex-col items-center justify-center py-20"
       >
-        <BarChart3 className="size-12 text-muted-foreground/30" />
-        <p className="mt-4 font-heading text-lg font-semibold text-muted-foreground">
+        <motion.div
+          initial={{ scale: 0, rotate: -12 }}
+          animate={{ scale: 1, rotate: 0 }}
+          transition={{ type: "spring", stiffness: 200, damping: 15 }}
+        >
+          <BarChart3 className="size-12 text-muted-foreground/30" />
+        </motion.div>
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.15 }}
+          className="mt-4 font-heading text-lg font-semibold text-muted-foreground"
+        >
           No analytics yet
-        </p>
-        <p className="mt-1 text-sm text-muted-foreground">
+        </motion.p>
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.25 }}
+          className="mt-1 text-sm text-muted-foreground"
+        >
           Add some active subscriptions to see spending insights
-        </p>
+        </motion.p>
       </motion.div>
     );
   }

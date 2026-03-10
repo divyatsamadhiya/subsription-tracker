@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { DashboardProvider, useDashboard } from "@/lib/dashboard-context";
 import { Sidebar } from "@/components/dashboard/sidebar";
@@ -13,15 +14,28 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="flex min-h-svh items-center justify-center">
-        <Loader2 className="size-6 animate-spin text-primary" />
-      </div>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="flex min-h-svh items-center justify-center"
+      >
+        <motion.div
+          animate={{ scale: [1, 1.1, 1] }}
+          transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+        >
+          <Loader2 className="size-6 animate-spin text-primary" />
+        </motion.div>
+      </motion.div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex min-h-svh items-center justify-center p-6">
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex min-h-svh items-center justify-center p-6"
+      >
         <div className="text-center">
           <p className="text-sm text-destructive">{error}</p>
           <a
@@ -31,7 +45,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
             Back to login
           </a>
         </div>
-      </div>
+      </motion.div>
     );
   }
 
@@ -50,7 +64,16 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
         style={{ marginLeft: collapsed ? 68 : undefined }}
       >
         <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-8">
-          {children}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={undefined}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25 }}
+            >
+              {children}
+            </motion.div>
+          </AnimatePresence>
         </div>
       </main>
     </div>
