@@ -32,24 +32,26 @@ export const api = {
       body: JSON.stringify(patch),
     }),
 
-  getSettings: () => request<AppSettings>("/settings"),
+  getSettings: () =>
+    request<{ settings: AppSettings }>("/settings").then((r) => r.settings),
   updateSettings: (patch: Partial<AppSettings>) =>
-    request<AppSettings>("/settings", {
+    request<{ settings: AppSettings }>("/settings", {
       method: "PATCH",
       body: JSON.stringify(patch),
-    }),
+    }).then((r) => r.settings),
 
-  getSubscriptions: () => request<Subscription[]>("/subscriptions"),
+  getSubscriptions: () =>
+    request<{ subscriptions: Subscription[] }>("/subscriptions").then((r) => r.subscriptions),
   createSubscription: (data: Omit<Subscription, "id" | "createdAt" | "updatedAt">) =>
-    request<Subscription>("/subscriptions", {
+    request<{ subscription: Subscription }>("/subscriptions", {
       method: "POST",
       body: JSON.stringify(data),
-    }),
+    }).then((r) => r.subscription),
   updateSubscription: (id: string, data: Partial<Subscription>) =>
-    request<Subscription>(`/subscriptions/${id}`, {
+    request<{ subscription: Subscription }>(`/subscriptions/${id}`, {
       method: "PATCH",
       body: JSON.stringify(data),
-    }),
+    }).then((r) => r.subscription),
   deleteSubscription: (id: string) =>
     request<void>(`/subscriptions/${id}`, { method: "DELETE" }),
 };
