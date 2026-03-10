@@ -4,8 +4,12 @@ import { z, ZodError } from "zod";
 import { HttpError } from "../utils/http.js";
 
 vi.mock("../services/authService.js", () => ({
+  createGoogleOauthAuthorizationUrl: vi.fn(),
   getCurrentUser: vi.fn(),
+  getGoogleAuthFailureRedirectUrl: vi.fn(),
+  getGoogleAuthSuccessRedirectUrl: vi.fn(),
   loginUser: vi.fn(),
+  loginWithGoogleAuthorizationCode: vi.fn(),
   registerUser: vi.fn(),
   requestPasswordReset: vi.fn(),
   resetPassword: vi.fn(),
@@ -26,8 +30,12 @@ vi.mock("../logger/logger.js", () => ({
 }));
 
 import {
+  createGoogleOauthAuthorizationUrl,
   getCurrentUser,
+  getGoogleAuthFailureRedirectUrl,
+  getGoogleAuthSuccessRedirectUrl,
   loginUser,
+  loginWithGoogleAuthorizationCode,
   registerUser,
   requestPasswordReset
 } from "../services/authService.js";
@@ -40,7 +48,8 @@ const makeResponse = (): Response => {
     json: vi.fn().mockReturnThis(),
     send: vi.fn().mockReturnThis(),
     cookie: vi.fn().mockReturnThis(),
-    clearCookie: vi.fn().mockReturnThis()
+    clearCookie: vi.fn().mockReturnThis(),
+    redirect: vi.fn().mockReturnThis()
   } as unknown as Response;
 };
 
@@ -79,6 +88,72 @@ describe("authController", () => {
 
     expect(res.status).toHaveBeenCalledWith(401);
     expect(res.json).toHaveBeenCalledWith({ error: "Invalid email or password" });
+  });
+
+  it("starts Google auth by setting state cookie and redirecting", async () => {
+    vi.mocked(createGoogleOauthAuthorizationUrl).mockReturnValue(
+      "https://accounts.google.com/o/oauth2/v2/auth?state=state_123"
+    );
+    const req = { cookies: {} } as Request;
+    const res = makeResponse();
+
+    await authController.googleStart(req, res);
+
+    expect(res.cookie).toHaveBeenCalledWith(
+      "pulseboard_google_oauth_state",
+      expect.any(String),
+      expect.objectContaining({ httpOnly: true, sameSite: "lax" })
+    );
+    expect(res.redirect).toHaveBeenCalledWith(
+      302,
+      "https://accounts.google.com/o/oauth2/v2/auth?state=state_123"
+    );
+  });
+
+  it("rejects Google callback when state is invalid", async () => {
+    vi.mocked(getGoogleAuthFailureRedirectUrl).mockReturnValue(
+      "http://localhost:5173/?authError=invalid_google_state"
+    );
+    const req = {
+      cookies: { pulseboard_google_oauth_state: "cookie_state" },
+      query: { state: "query_state", code: "google-code" }
+    } as unknown as Request;
+    const res = makeResponse();
+
+    await authController.googleCallback(req, res);
+
+    expect(res.clearCookie).toHaveBeenCalledWith(
+      "pulseboard_google_oauth_state",
+      expect.objectContaining({ httpOnly: true, sameSite: "lax" })
+    );
+    expect(res.redirect).toHaveBeenCalledWith(
+      302,
+      "http://localhost:5173/?authError=invalid_google_state"
+    );
+    expect(loginWithGoogleAuthorizationCode).not.toHaveBeenCalled();
+  });
+
+  it("completes Google callback and sets auth cookie", async () => {
+    vi.mocked(loginWithGoogleAuthorizationCode).mockResolvedValue({
+      token: "google-token",
+      user: { id: "user_1" }
+    } as never);
+    vi.mocked(getGoogleAuthSuccessRedirectUrl).mockReturnValue("http://localhost:5173/");
+    const req = {
+      cookies: { pulseboard_google_oauth_state: "state_123" },
+      query: { state: "state_123", code: "google-code" }
+    } as unknown as Request;
+    const res = makeResponse();
+
+    await authController.googleCallback(req, res);
+
+    expect(loginWithGoogleAuthorizationCode).toHaveBeenCalledWith("google-code");
+    expect(res.cookie).toHaveBeenCalledWith(
+      "pulseboard_token",
+      "google-token",
+      expect.objectContaining({ httpOnly: true, sameSite: "lax" })
+    );
+    expect(res.redirect).toHaveBeenCalledWith(302, "http://localhost:5173/");
   });
 
   it("returns 400 when forgot-password validation fails", async () => {

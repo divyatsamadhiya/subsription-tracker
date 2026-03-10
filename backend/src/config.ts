@@ -72,12 +72,33 @@ const validatedJwtSecret = (value: string): string => {
   return value;
 };
 
+const optionalForTest = (value: string | undefined, fallbackForTest: string): string | undefined => {
+  if (value) {
+    return value;
+  }
+
+  if (process.env.NODE_ENV === "test") {
+    return fallbackForTest;
+  }
+
+  return undefined;
+};
+
 export const config = {
   nodeEnv: process.env.NODE_ENV ?? "development",
   port: Number(process.env.PORT ?? 4000),
   databaseUrl: required(process.env.DATABASE_URL, "DATABASE_URL", "postgresql://localhost:5432/pulseboard_test"),
   jwtSecret: validatedJwtSecret(required(process.env.JWT_SECRET, "JWT_SECRET", "pulseboard-test-secret")),
   frontendOrigins: parseOrigins(process.env.FRONTEND_ORIGIN),
+  frontendAppUrl: process.env.FRONTEND_APP_URL ?? process.env.FRONTEND_ORIGIN?.split(",")[0]?.trim() ?? "http://localhost:5173",
+  googleOauth: {
+    clientId: optionalForTest(process.env.GOOGLE_CLIENT_ID, "pulseboard-google-client-id"),
+    clientSecret: optionalForTest(process.env.GOOGLE_CLIENT_SECRET, "pulseboard-google-client-secret"),
+    redirectUri: optionalForTest(
+      process.env.GOOGLE_OAUTH_REDIRECT_URI,
+      "http://localhost:4000/api/v1/auth/google/callback"
+    )
+  },
   email: {
     fromAddress: process.env.RESET_EMAIL_FROM ?? "onboarding@resend.dev",
     fromName: process.env.RESET_EMAIL_FROM_NAME ?? "Pulseboard",

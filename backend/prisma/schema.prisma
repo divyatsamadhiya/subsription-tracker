@@ -44,7 +44,8 @@ enum AdminAuditAction {
 model User {
   id                     String    @id @default(uuid())
   email                  String    @unique
-  passwordHash           String
+  passwordHash           String?
+  googleSubject          String?   @unique
   role                   UserRole  @default(user)
   sessionVersion         Int       @default(1)
   fullName               String?
