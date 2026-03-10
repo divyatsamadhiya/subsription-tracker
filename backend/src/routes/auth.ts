@@ -8,10 +8,9 @@ export const authRouter = Router();
 
 const authWriteLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 12,
+  max: 8,
   standardHeaders: true,
   legacyHeaders: false,
-  skipSuccessfulRequests: true,
   message: {
     error: "Too many authentication attempts. Please try again later."
   }

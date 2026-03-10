@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { ZodError } from "zod";
 import { ApiError, api } from "../lib/api";
 import {
   DEFAULT_SETTINGS,
@@ -66,6 +67,10 @@ interface AppState {
 }
 
 const userMessage = (error: unknown, fallback: string): string => {
+  if (error instanceof ZodError) {
+    return error.issues[0]?.message ?? fallback;
+  }
+
   if (error instanceof ApiError) {
     return error.message;
   }

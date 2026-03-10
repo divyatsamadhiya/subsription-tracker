@@ -1,4 +1,4 @@
-import { createHash, randomInt } from "node:crypto";
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import {
   authResponseSchema,
   authUserSchema,
@@ -31,6 +31,8 @@ export interface AuthWithToken {
 }
 
 const resetTokenTtlMs = 15 * 60 * 1000;
+const maxFailedAttempts = 5;
+const lockoutDurationMs = 15 * 60 * 1000;
 
 const hashResetToken = (value: string): string => {
   return createHash("sha256").update(value).digest("hex");
@@ -88,10 +90,38 @@ export const loginUser = async (input: unknown): Promise<AuthWithToken> => {
     throw new HttpError(403, "This account has been deactivated");
   }
 
+  if (user.lockedUntil && user.lockedUntil.getTime() > Date.now()) {
+    logger.warn("Login failed: account temporarily locked", { userId: user.id });
+    throw new HttpError(423, "Account temporarily locked due to too many failed attempts. Please try again later.");
+  }
+
   const validPassword = await comparePassword(payload.password, user.passwordHash);
   if (!validPassword) {
-    logger.warn("Login failed: invalid credentials");
+    const attempts = user.failedLoginAttempts + 1;
+    const lockout = attempts >= maxFailedAttempts ? new Date(Date.now() + lockoutDurationMs) : null;
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        failedLoginAttempts: attempts,
+        lockedUntil: lockout
+      }
+    });
+
+    if (lockout) {
+      logger.warn("Account locked after repeated failures", { userId: user.id, attempts });
+      throw new HttpError(423, "Account temporarily locked due to too many failed attempts. Please try again later.");
+    }
+
+    logger.warn("Login failed: invalid credentials", { userId: user.id, attempts });
     throw new HttpError(401, "Invalid email or password");
+  }
+
+  if (user.failedLoginAttempts > 0) {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { failedLoginAttempts: 0, lockedUntil: null }
+    });
   }
 
   const token = signUserToken({ userId: user.id, sessionVersion: user.sessionVersion });
@@ -133,7 +163,7 @@ export const requestPasswordReset = async (input: unknown): Promise<ForgotPasswo
     return forgotPasswordResponseSchema.parse({ message });
   }
 
-  const resetCode = String(randomInt(100_000, 1_000_000));
+  const resetCode = randomBytes(4).toString("hex");
   const expiresAt = new Date(Date.now() + resetTokenTtlMs);
 
   await prisma.user.update({
@@ -194,7 +224,9 @@ export const resetPassword = async (input: unknown): Promise<void> => {
     throw new HttpError(400, "Invalid or expired reset code");
   }
 
-  if (hashResetToken(payload.resetToken) !== user.passwordResetTokenHash) {
+  const computedHash = Buffer.from(hashResetToken(payload.resetToken));
+  const storedHash = Buffer.from(user.passwordResetTokenHash!);
+  if (computedHash.length !== storedHash.length || !timingSafeEqual(computedHash, storedHash)) {
     logger.warn("Password reset failed: code mismatch", { userId: user.id });
     throw new HttpError(400, "Invalid or expired reset code");
   }

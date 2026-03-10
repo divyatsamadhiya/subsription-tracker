@@ -54,7 +54,9 @@ const makeUser = (
       | "sessionVersion"
       | "deletedAt"
       | "deletedByAdminId"
-      | "deleteReason",
+      | "deleteReason"
+      | "failedLoginAttempts"
+      | "lockedUntil",
       unknown
     >
   >
@@ -75,6 +77,8 @@ const makeUser = (
     deletedAt: null,
     deletedByAdminId: null,
     deleteReason: null,
+    failedLoginAttempts: 0,
+    lockedUntil: null,
     createdAt: now,
     updatedAt: now,
     passwordResetTokenHash: null,
@@ -170,10 +174,48 @@ describe("authService", () => {
   it("fails login when password is invalid", async () => {
     vi.mocked(prisma.user.findUnique).mockResolvedValue(makeUser() as never);
     vi.mocked(comparePassword).mockResolvedValue(false);
+    vi.mocked(prisma.user.update).mockResolvedValue(makeUser() as never);
 
     await expect(
-      loginUser({ email: "john@example.com", password: "WrongPassword" })
+      loginUser({ email: "john@example.com", password: "WrongPass1" })
     ).rejects.toMatchObject({ status: 401, message: "Invalid email or password" });
+
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: "user_1" },
+      data: { failedLoginAttempts: 1, lockedUntil: null }
+    });
+  });
+
+  it("locks account after too many failed login attempts", async () => {
+    vi.mocked(prisma.user.findUnique).mockResolvedValue(
+      makeUser({ failedLoginAttempts: 4 }) as never
+    );
+    vi.mocked(comparePassword).mockResolvedValue(false);
+    vi.mocked(prisma.user.update).mockResolvedValue(makeUser() as never);
+
+    await expect(
+      loginUser({ email: "john@example.com", password: "WrongPass1" })
+    ).rejects.toMatchObject({ status: 423 });
+
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: "user_1" },
+      data: {
+        failedLoginAttempts: 5,
+        lockedUntil: expect.any(Date)
+      }
+    });
+  });
+
+  it("rejects login when account is locked", async () => {
+    vi.mocked(prisma.user.findUnique).mockResolvedValue(
+      makeUser({ lockedUntil: new Date(Date.now() + 60_000) }) as never
+    );
+
+    await expect(
+      loginUser({ email: "john@example.com", password: "Password123" })
+    ).rejects.toMatchObject({ status: 423 });
+
+    expect(comparePassword).not.toHaveBeenCalled();
   });
 
   it("returns the current user", async () => {
