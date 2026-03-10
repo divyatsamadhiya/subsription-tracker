@@ -42,9 +42,9 @@ cd frontend && npx vitest run src/App.test.tsx
 ### Backend (`backend/`)
 - **Runtime**: Node.js + Express, TypeScript (strict)
 - **Database**: PostgreSQL via Prisma ORM (`backend/prisma/schema.prisma`)
-- **Auth**: JWT in HTTP-only SameSite=lax cookies. Token signed with `jwtSecret + sessionSalt` (salt randomizes on server restart). 7-day expiry. Session invalidation via `sessionVersion` increment.
+- **Auth**: JWT in HTTP-only SameSite=lax cookies. Token signed with `jwtSecret + sessionSalt` (salt randomizes on server restart). 7-day expiry. Session invalidation via `sessionVersion` increment. Account lockout after 5 failed login attempts (15-min cooldown). Password reset uses 8-char hex tokens (32-bit entropy) with timing-safe comparison.
 - **Middleware**: `requireAuth`, `optionalAuth`, `requireAdmin` in `src/middleware/auth.ts`
-- **Config**: `src/config.ts` — env parsing with test-environment fallbacks
+- **Config**: `src/config.ts` — env parsing with test-environment fallbacks; JWT secret validation rejects weak/placeholder secrets at startup (min 32 chars)
 - **Services**: `authService` (register/login/password-reset), `adminService` (user management + audit logging)
 - **Routes**: `/api/v1/auth`, `/api/v1/subscriptions`, `/api/v1/settings`, `/api/v1/profile`, `/api/v1/backup`, `/api/v1/admin`
 - **Tests**: Vitest (node env), Prisma mocked via `src/test/mockPrisma.ts`
@@ -69,7 +69,7 @@ cd frontend && npx vitest run src/App.test.tsx
 
 ## Domain Models (Prisma)
 
-- **User**: UUID id, email (unique), passwordHash, role (user/admin), sessionVersion, profile fields, soft-delete support
+- **User**: UUID id, email (unique), passwordHash, role (user/admin), sessionVersion, profile fields, soft-delete support, failedLoginAttempts, lockedUntil (account lockout)
 - **Settings**: Per-user preferences (currency, week start, notifications, theme)
 - **Subscription**: Tracked subscriptions with amountMinor (cents), billingCycle, category, reminderDaysBefore
 - **AdminAuditLog**: Tracks admin actions with metadata
@@ -86,6 +86,14 @@ Triggers on push to `master`/`develop`/`codex/**` and PRs to `master`/`develop`.
 Steps: `npm ci` → `npm run test` → `npm run build`
 
 **Critical**: Vitest uses esbuild (no type-check), so TypeScript errors only surface during `npm run build` (which runs `tsc -b`). Always run both test and build before considering work done.
+
+## Security
+
+- **Rate Limiting**: Auth endpoints (8 req/15 min), admin writes (30/min), admin reads (60/min), backup endpoints (10 per 15 min)
+- **Helmet**: Explicit CSP (default-src 'self', no inline scripts, frame-ancestors 'none'), strict referrer-policy, HSTS in production (1 year, includeSubDomains, preload)
+- **Password Complexity**: Registration and password reset require uppercase + lowercase + digit
+- **Account Lockout**: 5 failed login attempts triggers 15-minute lockout
+- **JWT Secret Validation**: Rejects known placeholder secrets and secrets shorter than 32 characters at startup
 
 ## Key Conventions
 
