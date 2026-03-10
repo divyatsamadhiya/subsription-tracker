@@ -169,7 +169,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       {/* Footer */}
       <div className="flex items-center gap-2 px-3 py-3">
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-          {user?.profile.fullName?.[0]?.toUpperCase() ??
+          {user?.profile?.fullName?.[0]?.toUpperCase() ??
             user?.email[0]?.toUpperCase() ??
             "?"}
         </div>
@@ -183,7 +183,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             >
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium">
-                  {user?.profile.fullName ?? "User"}
+                  {user?.profile?.fullName ?? "User"}
                 </p>
                 <p className="truncate text-xs text-muted-foreground">
                   {user?.email}

@@ -90,7 +90,7 @@ export default function OverviewPage() {
       .sort((a, b) => b.amount - a.amount);
   }, [subscriptions]);
 
-  const firstName = user?.profile.fullName?.split(" ")[0] ?? "there";
+  const firstName = user?.profile?.fullName?.split(" ")[0] ?? "there";
 
   return (
     <motion.div variants={container} initial="hidden" animate="show">

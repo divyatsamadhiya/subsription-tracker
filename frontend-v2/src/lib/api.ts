@@ -22,7 +22,7 @@ async function request<T>(
 }
 
 export const api = {
-  me: () => request<AuthUser>("/auth/me"),
+  me: () => request<{ user: AuthUser }>("/auth/me").then((r) => r.user),
   logout: () => request<void>("/auth/logout", { method: "POST" }),
 
   getProfile: () => request<UserProfile>("/profile"),

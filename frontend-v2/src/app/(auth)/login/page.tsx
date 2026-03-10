@@ -34,7 +34,7 @@ export default function LoginPage() {
         throw new Error(data.error || "Invalid credentials");
       }
 
-      window.location.href = "/dashboard";
+      window.location.href = "/";
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {

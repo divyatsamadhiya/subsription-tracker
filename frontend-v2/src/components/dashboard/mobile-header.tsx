@@ -94,12 +94,12 @@ export function MobileHeader() {
           <div className="flex items-center justify-between p-3">
             <div className="flex items-center gap-2 min-w-0">
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-                {user?.profile.fullName?.[0]?.toUpperCase() ??
+                {user?.profile?.fullName?.[0]?.toUpperCase() ??
                   user?.email[0]?.toUpperCase() ??
                   "?"}
               </div>
               <p className="truncate text-sm font-medium">
-                {user?.profile.fullName ?? user?.email}
+                {user?.profile?.fullName ?? user?.email}
               </p>
             </div>
             <Button
