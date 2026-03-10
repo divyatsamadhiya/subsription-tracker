@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { authCookieMaxAgeMs, authCookieName, config, isProduction, sessionSalt } from "../config.js";
@@ -66,6 +67,28 @@ export const clearAuthCookieOptions = {
   sameSite: "lax" as const,
   secure: isProduction,
   path: "/"
+};
+
+export const googleOauthStateCookieName = "pulseboard_google_oauth_state";
+export const googleOauthStateCookieMaxAgeMs = 10 * 60 * 1000;
+
+export const googleOauthStateCookieOptions = {
+  httpOnly: true,
+  sameSite: "lax" as const,
+  secure: isProduction,
+  path: "/",
+  maxAge: googleOauthStateCookieMaxAgeMs
+};
+
+export const clearGoogleOauthStateCookieOptions = {
+  httpOnly: true,
+  sameSite: "lax" as const,
+  secure: isProduction,
+  path: "/"
+};
+
+export const createOauthState = (): string => {
+  return randomBytes(24).toString("hex");
 };
 
 export { authCookieName };

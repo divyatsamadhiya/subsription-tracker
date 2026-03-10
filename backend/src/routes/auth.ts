@@ -18,6 +18,8 @@ const authWriteLimiter = rateLimit({
 
 authRouter.post("/register", authWriteLimiter, asyncHandler(authController.register));
 authRouter.post("/login", authWriteLimiter, asyncHandler(authController.login));
+authRouter.get("/google/start", authWriteLimiter, asyncHandler(authController.googleStart));
+authRouter.get("/google/callback", authWriteLimiter, asyncHandler(authController.googleCallback));
 authRouter.post("/forgot-password", authWriteLimiter, asyncHandler(authController.forgotPassword));
 authRouter.post("/reset-password", authWriteLimiter, asyncHandler(authController.resetPassword));
 authRouter.post("/logout", optionalAuth, asyncHandler(authController.logout));

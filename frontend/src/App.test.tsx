@@ -73,6 +73,7 @@ const makeSubscription = (overrides?: Partial<Subscription>): Subscription => ({
 describe("App auth and profile flows", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.history.replaceState({}, "", "/");
   });
 
   it("shows required profile fields in register mode and submits them", async () => {
@@ -125,6 +126,30 @@ describe("App auth and profile flows", () => {
     const showButtons = screen.getAllByRole("button", { name: "Show password" });
     fireEvent.click(showButtons[showButtons.length - 1]);
     expect(recoveryPasswordInput).toHaveAttribute("type", "text");
+  });
+
+  it("starts Google sign-in from the auth screen", async () => {
+    mockedUseAppStore.mockReturnValue(makeStoreState() as never);
+
+    render(<App />);
+
+    expect(screen.getByRole("link", { name: "Continue with Google" })).toHaveAttribute(
+      "href",
+      "/api/v1/auth/google/start"
+    );
+  });
+
+  it("shows Google auth callback errors on the auth screen", async () => {
+    mockedUseAppStore.mockReturnValue(makeStoreState() as never);
+    window.history.replaceState({}, "", "/?authError=google_auth_failed");
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Google sign-in failed. Please try again.")
+      ).toBeInTheDocument();
+    });
   });
 
   it("shows soft prompt for legacy user and opens profile tab", async () => {

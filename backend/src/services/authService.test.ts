@@ -24,12 +24,17 @@ vi.mock("./passwordResetEmailService.js", () => ({
   sendPasswordResetEmail: vi.fn()
 }));
 
+import { config } from "../config.js";
 import { prisma } from "../prisma.js";
 import { comparePassword, hashPassword, signUserToken } from "../utils/auth.js";
 import { sendPasswordResetEmail } from "./passwordResetEmailService.js";
 import {
+  createGoogleOauthAuthorizationUrl,
   getCurrentUser,
+  getGoogleAuthFailureRedirectUrl,
+  getGoogleAuthSuccessRedirectUrl,
   loginUser,
+  loginWithGoogleAuthorizationCode,
   registerUser,
   requestPasswordReset,
   resetPassword
@@ -41,6 +46,7 @@ const makeUser = (
       | "id"
       | "email"
       | "passwordHash"
+      | "googleSubject"
       | "fullName"
       | "country"
       | "timeZone"
@@ -67,6 +73,7 @@ const makeUser = (
     id: "user_1",
     email: "john@example.com",
     passwordHash: "hashed",
+    googleSubject: null,
     fullName: "John Doe",
     country: "United States",
     timeZone: "America/New_York",
@@ -90,6 +97,7 @@ const makeUser = (
 describe("authService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubGlobal("fetch", vi.fn());
   });
 
   it("registers a new user successfully", async () => {
@@ -184,6 +192,18 @@ describe("authService", () => {
       where: { id: "user_1" },
       data: { failedLoginAttempts: 1, lockedUntil: null }
     });
+  });
+
+  it("fails local login for a Google-only account", async () => {
+    vi.mocked(prisma.user.findUnique).mockResolvedValue(
+      makeUser({ passwordHash: null, googleSubject: "google-subject" }) as never
+    );
+
+    await expect(
+      loginUser({ email: "john@example.com", password: "WrongPass1" })
+    ).rejects.toMatchObject({ status: 401, message: "Invalid email or password" });
+
+    expect(comparePassword).not.toHaveBeenCalled();
   });
 
   it("locks account after too many failed login attempts", async () => {
@@ -283,6 +303,20 @@ describe("authService", () => {
     expect(sendPasswordResetEmail).not.toHaveBeenCalled();
   });
 
+  it("returns a generic response when reset is requested for a Google-only account", async () => {
+    vi.mocked(prisma.user.findUnique).mockResolvedValue(
+      makeUser({ passwordHash: null, googleSubject: "google-subject" }) as never
+    );
+
+    const result = await requestPasswordReset({ email: "john@example.com" });
+
+    expect(result).toEqual({
+      message: "If this email exists, a reset code has been generated."
+    });
+    expect(prisma.user.update).not.toHaveBeenCalled();
+    expect(sendPasswordResetEmail).not.toHaveBeenCalled();
+  });
+
   it("fails reset code request when email delivery fails", async () => {
     const user = makeUser();
     vi.mocked(prisma.user.findUnique).mockResolvedValue(user as never);
@@ -367,5 +401,162 @@ describe("authService", () => {
         newPassword: "NewPassword123"
       })
     ).rejects.toMatchObject({ status: 400, message: "Invalid or expired reset code" });
+  });
+
+  it("builds the Google authorization URL", () => {
+    const url = new URL(createGoogleOauthAuthorizationUrl("state_123"));
+
+    expect(url.origin).toBe("https://accounts.google.com");
+    expect(url.searchParams.get("client_id")).toBe(config.googleOauth.clientId);
+    expect(url.searchParams.get("state")).toBe("state_123");
+  });
+
+  it("builds frontend redirect URLs for Google auth", () => {
+    expect(getGoogleAuthSuccessRedirectUrl()).toBe("http://localhost:5173/");
+    expect(getGoogleAuthFailureRedirectUrl("google_auth_failed")).toBe(
+      "http://localhost:5173/?authError=google_auth_failed"
+    );
+  });
+
+  it("signs in an existing Google-linked user", async () => {
+    vi.mocked(global.fetch).mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({
+        id_token:
+          "header." +
+          Buffer.from(
+            JSON.stringify({
+              iss: "https://accounts.google.com",
+              aud: config.googleOauth.clientId!,
+              exp: Math.floor(Date.now() / 1000) + 3600,
+              sub: "google-subject-1",
+              email: "john@example.com",
+              email_verified: true,
+              name: "John Doe"
+            })
+          ).toString("base64url") +
+          ".signature"
+      })
+    } as never);
+    vi.mocked(prisma.user.findUnique)
+      .mockResolvedValueOnce(makeUser({ googleSubject: "google-subject-1" }) as never);
+    vi.mocked(signUserToken).mockReturnValue("token_abc");
+
+    const result = await loginWithGoogleAuthorizationCode("google-code");
+
+    expect(result.token).toBe("token_abc");
+    expect(prisma.user.findUnique).toHaveBeenCalledWith({ where: { googleSubject: "google-subject-1" } });
+  });
+
+  it("auto-links an existing local account by verified Google email", async () => {
+    vi.mocked(global.fetch).mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({
+        id_token:
+          "header." +
+          Buffer.from(
+            JSON.stringify({
+              iss: "https://accounts.google.com",
+              aud: config.googleOauth.clientId!,
+              exp: Math.floor(Date.now() / 1000) + 3600,
+              sub: "google-subject-2",
+              email: "john@example.com",
+              email_verified: true,
+              name: "John Doe"
+            })
+          ).toString("base64url") +
+          ".signature"
+      })
+    } as never);
+    vi.mocked(prisma.user.findUnique)
+      .mockResolvedValueOnce(null as never)
+      .mockResolvedValueOnce(makeUser() as never);
+    vi.mocked(prisma.user.update).mockResolvedValue(
+      makeUser({ googleSubject: "google-subject-2" }) as never
+    );
+    vi.mocked(signUserToken).mockReturnValue("token_abc");
+
+    const result = await loginWithGoogleAuthorizationCode("google-code");
+
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: "user_1" },
+      data: { googleSubject: "google-subject-2" }
+    });
+    expect(result.user.email).toBe("john@example.com");
+  });
+
+  it("creates a new account for a first-time Google sign-in", async () => {
+    vi.mocked(global.fetch).mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({
+        id_token:
+          "header." +
+          Buffer.from(
+            JSON.stringify({
+              iss: "https://accounts.google.com",
+              aud: config.googleOauth.clientId!,
+              exp: Math.floor(Date.now() / 1000) + 3600,
+              sub: "google-subject-3",
+              email: "new@example.com",
+              email_verified: true,
+              name: "New User"
+            })
+          ).toString("base64url") +
+          ".signature"
+      })
+    } as never);
+    vi.mocked(prisma.user.findUnique)
+      .mockResolvedValueOnce(null as never)
+      .mockResolvedValueOnce(null as never);
+    vi.mocked(prisma.user.create).mockResolvedValue(
+      makeUser({
+        id: "user_2",
+        email: "new@example.com",
+        googleSubject: "google-subject-3",
+        fullName: "New User",
+        country: null,
+        timeZone: null
+      }) as never
+    );
+    vi.mocked(prisma.settings.create).mockResolvedValue({} as never);
+    vi.mocked(signUserToken).mockReturnValue("token_new");
+
+    const result = await loginWithGoogleAuthorizationCode("google-code");
+
+    expect(prisma.user.create).toHaveBeenCalledWith({
+      data: {
+        email: "new@example.com",
+        googleSubject: "google-subject-3",
+        fullName: "New User"
+      }
+    });
+    expect(prisma.settings.create).toHaveBeenCalled();
+    expect(result.user.profileComplete).toBe(false);
+  });
+
+  it("rejects Google sign-in for unverified email", async () => {
+    vi.mocked(global.fetch).mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({
+        id_token:
+          "header." +
+          Buffer.from(
+            JSON.stringify({
+              iss: "https://accounts.google.com",
+              aud: config.googleOauth.clientId!,
+              exp: Math.floor(Date.now() / 1000) + 3600,
+              sub: "google-subject-4",
+              email: "john@example.com",
+              email_verified: false
+            })
+          ).toString("base64url") +
+          ".signature"
+      })
+    } as never);
+
+    await expect(loginWithGoogleAuthorizationCode("google-code")).rejects.toMatchObject({
+      status: 401,
+      message: "Google email must be verified"
+    });
   });
 });

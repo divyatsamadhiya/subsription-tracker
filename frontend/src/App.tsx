@@ -95,6 +95,11 @@ const viewTabs: Array<{ id: AppView; label: string }> = [
   { id: "settings", label: "Settings & Backup" }
 ];
 
+const googleAuthNoticeByCode: Record<string, string> = {
+  invalid_google_state: "Google sign-in could not be completed. Please try again.",
+  google_auth_failed: "Google sign-in failed. Please try again."
+};
+
 const App = () => {
   const {
     hydrated,
@@ -162,6 +167,20 @@ const App = () => {
   }, [hydrate]);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const authError = params.get("authError");
+    if (!authError) {
+      return;
+    }
+
+    setAuthNotice(googleAuthNoticeByCode[authError] ?? "Google sign-in failed. Please try again.");
+    params.delete("authError");
+    const nextQuery = params.toString();
+    const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ""}${window.location.hash}`;
+    window.history.replaceState({}, "", nextUrl);
+  }, []);
+
+  useEffect(() => {
     if (error) {
       showFeedback(`Error: ${error}`, "error");
     }
@@ -197,7 +216,6 @@ const App = () => {
       setProfileTimeZone("");
       setProfilePhone("");
       setProfileBio("");
-      setAuthNotice("");
       setRecoveryNotice("");
       setShowRecoveryPanel(false);
       return;
@@ -763,6 +781,21 @@ const App = () => {
                   </Box>
 
                   {authNotice ? <Alert severity="info">{authNotice}</Alert> : null}
+
+                  <Stack spacing={1.5}>
+                    <Button
+                      component="a"
+                      href="/api/v1/auth/google/start"
+                      variant="outlined"
+                      size="large"
+                      fullWidth
+                    >
+                      Continue with Google
+                    </Button>
+                    <Typography variant="body2" color="text.secondary" textAlign="center">
+                      Or continue with your email and password.
+                    </Typography>
+                  </Stack>
 
                   <Stack component="form" spacing={1.5} onSubmit={handleAuthSubmit}>
                     {authMode === "register" ? (
