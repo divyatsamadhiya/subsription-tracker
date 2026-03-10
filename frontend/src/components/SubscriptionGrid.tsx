@@ -64,6 +64,11 @@ export const SubscriptionGrid = ({
     return statusFilter === "active" ? subscription.isActive : !subscription.isActive;
   };
 
+  const statusFilteredCount = useMemo(
+    () => subscriptions.filter((subscription) => matchesStatus(subscription)).length,
+    [statusFilter, subscriptions]
+  );
+
   const categoryCounts = useMemo(
     () =>
       CATEGORY_OPTIONS.map((category) => ({
@@ -144,7 +149,7 @@ export const SubscriptionGrid = ({
           clickable
           color={categoryFilter === "all" ? "primary" : "default"}
           variant={categoryFilter === "all" ? "filled" : "outlined"}
-          label={`All categories (${visibleSubscriptions.length})`}
+          label={`All categories (${statusFilteredCount})`}
           sx={filterChipSx}
           onClick={() => setCategoryFilter("all")}
         />
