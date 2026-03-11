@@ -28,6 +28,7 @@ import {
 import { useDashboard } from "@/lib/dashboard-context";
 import { formatCurrencyMinor } from "@/lib/format";
 import { calculateMonthlyTotalMinor } from "@/lib/date";
+import { RenewalAlertsBell } from "@/components/dashboard/top-bar";
 
 const NAV_ITEMS = [
   { href: "/", icon: LayoutDashboard, label: "Overview" },
@@ -60,33 +61,47 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       animate={{ width: collapsed ? 68 : 256 }}
       transition={{ duration: 0.2, ease: "easeInOut" }}
     >
-      {/* Logo */}
-      <div className="flex h-14 items-center gap-2.5 px-4">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary">
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="text-primary-foreground"
-          >
-            <path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" />
-          </svg>
+      {/* Logo + Bell */}
+      <div className="flex h-14 items-center justify-between px-4">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="text-primary-foreground"
+            >
+              <path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" />
+            </svg>
+          </div>
+          <AnimatePresence>
+            {!collapsed && (
+              <motion.span
+                initial={{ opacity: 0, width: 0 }}
+                animate={{ opacity: 1, width: "auto" }}
+                exit={{ opacity: 0, width: 0 }}
+                className="overflow-hidden whitespace-nowrap font-heading text-base font-semibold"
+              >
+                Pulseboard
+              </motion.span>
+            )}
+          </AnimatePresence>
         </div>
         <AnimatePresence>
           {!collapsed && (
-            <motion.span
-              initial={{ opacity: 0, width: 0 }}
-              animate={{ opacity: 1, width: "auto" }}
-              exit={{ opacity: 0, width: 0 }}
-              className="overflow-hidden whitespace-nowrap font-heading text-base font-semibold"
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ duration: 0.15 }}
             >
-              Pulseboard
-            </motion.span>
+              <RenewalAlertsBell />
+            </motion.div>
           )}
         </AnimatePresence>
       </div>

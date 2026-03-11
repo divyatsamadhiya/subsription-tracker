@@ -81,7 +81,7 @@ export default function SubscriptionsPage() {
   const editRequested = searchParams.get("action") === "edit";
   const editRequestedId = searchParams.get("id");
 
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
   const [categoryFilter, setCategoryFilter] = useState<SubscriptionCategory | "all">("all");
   const [search, setSearch] = useState("");
   const [sortOption, setSortOption] = useState<SubscriptionSortOption>("renewal_asc");
@@ -359,10 +359,6 @@ export default function SubscriptionsPage() {
           <h1 className="font-heading text-2xl font-semibold tracking-tight">
             Subscriptions
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {subscriptions.length} total &middot; {activeCount} active &middot;{" "}
-            {pausedCount} paused
-          </p>
         </div>
         <Button size="lg" className="h-9 gap-2" onClick={openCreate}>
           <Plus className="size-4" />

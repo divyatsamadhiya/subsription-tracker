@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Bell, CalendarClock, CreditCard, LayoutDashboard, BarChart3, User, Settings } from "lucide-react";
+import { Bell, CalendarClock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -16,25 +15,6 @@ import {
 import { useDashboard } from "@/lib/dashboard-context";
 import { formatRelativeDue, formatShortDate } from "@/lib/format";
 import { getUpcomingRenewals, nowIsoDate, daysUntil } from "@/lib/date";
-
-const NAV_ITEMS = [
-  { href: "/", icon: LayoutDashboard, label: "Overview" },
-  { href: "/subscriptions", icon: CreditCard, label: "Subscriptions" },
-  { href: "/analytics", icon: BarChart3, label: "Analytics" },
-  { href: "/profile", icon: User, label: "Profile" },
-  { href: "/settings", icon: Settings, label: "Settings" },
-] as const;
-
-function useCurrentPageLabel() {
-  const pathname = usePathname();
-
-  const isActive = (href: string) => {
-    if (href === "/") return pathname === "/";
-    return pathname.startsWith(href);
-  };
-
-  return NAV_ITEMS.find((item) => isActive(item.href))?.label ?? "Dashboard";
-}
 
 export function RenewalAlertsBell() {
   const { subscriptions } = useDashboard();
@@ -93,16 +73,5 @@ export function RenewalAlertsBell() {
         )}
       </DropdownMenuContent>
     </DropdownMenu>
-  );
-}
-
-export function DesktopTopBar() {
-  const currentPage = useCurrentPageLabel();
-
-  return (
-    <header className="sticky top-0 z-20 hidden h-14 items-center justify-between border-b border-border bg-background/80 px-8 backdrop-blur-sm md:flex">
-      <h1 className="font-heading text-base font-semibold">{currentPage}</h1>
-      <RenewalAlertsBell />
-    </header>
   );
 }

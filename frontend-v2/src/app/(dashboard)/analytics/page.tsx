@@ -359,28 +359,27 @@ export default function AnalyticsPage() {
                         dataKey="value"
                         strokeWidth={0}
                       >
-                        {pieData.map((entry, i) => (
-                          <Cell
-                            key={i}
-                            fill={entry.color}
-                            onClick={() =>
-                              setSelectedCategory((current) =>
-                                current === entry.category ? null : entry.category
-                              )
-                            }
-                            fillOpacity={
-                              selectedCategory === null || selectedCategory === entry.category
-                                ? 1
-                                : 0.28
-                            }
-                            stroke={
-                              selectedCategory === entry.category
-                                ? "var(--color-foreground)"
-                                : "transparent"
-                            }
-                            strokeWidth={selectedCategory === entry.category ? 1.5 : 0}
-                          />
-                        ))}
+                        {pieData.map((entry, i) => {
+                          const isSelected = selectedCategory === entry.category;
+                          return (
+                            <Cell
+                              key={i}
+                              fill={entry.color}
+                              onClick={() =>
+                                setSelectedCategory((current) =>
+                                  current === entry.category ? null : entry.category
+                                )
+                              }
+                              fillOpacity={
+                                selectedCategory === null || isSelected
+                                  ? 1
+                                  : 0.28
+                              }
+                              stroke={isSelected ? "var(--color-foreground)" : "none"}
+                              strokeWidth={isSelected ? 1.5 : 0}
+                            />
+                          );
+                        })}
                       </Pie>
                       <Tooltip
                         contentStyle={{
@@ -506,35 +505,37 @@ export default function AnalyticsPage() {
                           allowDecimals={false}
                           width={30}
                         />
-                        <Tooltip content={<RenewalBucketTooltip currency={currency} />} />
+                        <Tooltip
+                          content={<RenewalBucketTooltip currency={currency} />}
+                          cursor={false}
+                        />
                         <Bar
                           dataKey="count"
                           fill="var(--color-primary)"
                           radius={[6, 6, 0, 0]}
                           maxBarSize={56}
                         >
-                          {renewalChartData.map((bucket) => (
-                            <Cell
-                              key={bucket.bucketKey}
-                              fillOpacity={
-                                selectedRenewalBucketKey === null ||
-                                selectedRenewalBucketKey === bucket.bucketKey
-                                  ? 1
-                                  : 0.35
-                              }
-                              stroke={
-                                selectedRenewalBucketKey === bucket.bucketKey
-                                  ? "var(--color-foreground)"
-                                  : "transparent"
-                              }
-                              strokeWidth={selectedRenewalBucketKey === bucket.bucketKey ? 1.5 : 0}
-                              onClick={() =>
-                                setSelectedRenewalBucketKey((current) =>
-                                  current === bucket.bucketKey ? null : bucket.bucketKey
-                                )
-                              }
-                            />
-                          ))}
+                          {renewalChartData.map((bucket) => {
+                            const isSelected = selectedRenewalBucketKey === bucket.bucketKey;
+                            return (
+                              <Cell
+                                key={bucket.bucketKey}
+                                fill="var(--color-primary)"
+                                fillOpacity={
+                                  selectedRenewalBucketKey === null || isSelected
+                                    ? 1
+                                    : 0.35
+                                }
+                                stroke={isSelected ? "var(--color-foreground)" : "none"}
+                                strokeWidth={isSelected ? 1.5 : 0}
+                                onClick={() =>
+                                  setSelectedRenewalBucketKey((current) =>
+                                    current === bucket.bucketKey ? null : bucket.bucketKey
+                                  )
+                                }
+                              />
+                            );
+                          })}
                           <LabelList
                             dataKey="amountLabel"
                             position="top"

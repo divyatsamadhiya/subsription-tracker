@@ -327,11 +327,11 @@ export default function OverviewPage() {
           </div>
         </div>
         <Button
-          size="sm"
-          className="gap-1.5 shrink-0"
+          size="lg"
+          className="h-9 gap-2 shrink-0"
           onClick={() => router.push("/subscriptions?action=create")}
         >
-          <Plus className="size-3.5" />
+          <Plus className="size-4" />
           Add subscription
         </Button>
       </motion.div>
@@ -592,23 +592,28 @@ export default function OverviewPage() {
                           </div>
                           <div className="flex items-center gap-2">
                             {/* Quick actions — visible on hover */}
-                            <div className="hidden items-center gap-0.5 opacity-0 transition-opacity group-hover:flex group-hover:opacity-100">
+                            <div className="hidden items-center gap-1 opacity-0 transition-opacity group-hover:flex group-hover:opacity-100">
                               <button
                                 onClick={() => router.push(`/subscriptions?action=edit&id=${sub.id}`)}
-                                className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                                aria-label="Edit"
+                                className="flex h-6 items-center gap-1 rounded-md px-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                               >
                                 <Pencil className="size-3" />
+                                Edit
                               </button>
                               <button
                                 onClick={() => handleToggleActive(sub)}
-                                className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                                aria-label={sub.isActive ? "Pause" : "Activate"}
+                                className="flex h-6 items-center gap-1 rounded-md px-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                               >
                                 {sub.isActive ? (
-                                  <Pause className="size-3" />
+                                  <>
+                                    <Pause className="size-3" />
+                                    Pause
+                                  </>
                                 ) : (
-                                  <Play className="size-3" />
+                                  <>
+                                    <Play className="size-3" />
+                                    Resume
+                                  </>
                                 )}
                               </button>
                             </div>
