@@ -3,7 +3,12 @@
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-const GOOGLE_AUTH_URL = "/api/v1/auth/google/start";
+// Google OAuth requires a full browser redirect, not an API proxy call.
+// Point directly to the backend to ensure cookies and redirects work correctly.
+const GOOGLE_AUTH_URL =
+  process.env.NEXT_PUBLIC_API_URL
+    ? `${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/google/start`
+    : "http://localhost:4000/api/v1/auth/google/start";
 
 export function GoogleButton() {
   return (

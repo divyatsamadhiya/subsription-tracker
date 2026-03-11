@@ -120,7 +120,7 @@ export default function SubscriptionsPage() {
 
   async function handleFormSubmit(data: SubscriptionInput) {
     if (formMode === "create") {
-      await api.createSubscription({ ...data, currency });
+      await api.createSubscription(data);
     } else if (editTarget) {
       await api.updateSubscription(editTarget.id, data);
     }

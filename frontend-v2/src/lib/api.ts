@@ -1,4 +1,4 @@
-import type { AuthUser, Subscription, AppSettings, UserProfile } from "./types";
+import type { AuthUser, Subscription, SubscriptionInput, AppSettings, UserProfile } from "./types";
 
 const BASE = "/api/v1";
 const TIMEOUT_MS = 15_000;
@@ -60,7 +60,7 @@ export const api = {
 
   getSubscriptions: () =>
     request<{ subscriptions: Subscription[] }>("/subscriptions").then((r) => r.subscriptions),
-  createSubscription: (data: Omit<Subscription, "id" | "createdAt" | "updatedAt">) =>
+  createSubscription: (data: SubscriptionInput) =>
     request<{ subscription: Subscription }>("/subscriptions", {
       method: "POST",
       body: JSON.stringify(data),
