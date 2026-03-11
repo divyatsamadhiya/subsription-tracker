@@ -14,6 +14,17 @@ export function getBulkSelectionSummary(selectedCount: number): string | null {
   return `${selectedCount} selected`;
 }
 
+export function getAmountFilterSummary(
+  minMonthlyAmountMinor: number,
+  symbol: string
+): string {
+  if (minMonthlyAmountMinor <= 0) {
+    return "All amounts";
+  }
+
+  return `Above ${symbol}${Math.round(minMonthlyAmountMinor / 100)}/mo`;
+}
+
 export function getBulkSelectAllLabel(
   selectedVisibleCount: number,
   visibleCount: number

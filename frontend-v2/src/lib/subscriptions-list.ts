@@ -6,6 +6,11 @@ export type SubscriptionSortOption =
   | "amount_desc"
   | "alpha_asc";
 
+interface SubscriptionFilterOptions {
+  searchQuery?: string;
+  minMonthlyAmountMinor?: number;
+}
+
 const CSV_HEADERS = [
   "Name",
   "Status",
@@ -104,6 +109,49 @@ export function getRenewalDistance(
 ): string | null {
   const effectiveRenewalDate = getEffectiveRenewalDate(subscription, todayIsoDate);
   return formatRenewalDistance(daysUntil(effectiveRenewalDate, todayIsoDate));
+}
+
+export function matchesSubscriptionSearch(
+  subscription: Subscription,
+  searchQuery: string
+): boolean {
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  if (!normalizedQuery) return true;
+
+  const numericQuery = normalizedQuery.replace(/[^0-9.]/g, "");
+  const amountMinor = subscription.amountMinor / 100;
+  const monthlyMinor = monthlyEquivalentMinor(subscription) / 100;
+  const searchFields = [
+    subscription.name.toLowerCase(),
+    subscription.category.toLowerCase(),
+    String(Math.round(amountMinor)),
+    amountMinor.toFixed(2),
+    String(Math.round(monthlyMinor)),
+    monthlyMinor.toFixed(2),
+  ];
+
+  if (searchFields.some((field) => field.includes(normalizedQuery))) {
+    return true;
+  }
+
+  return numericQuery.length > 0
+    ? searchFields.some((field) => field.includes(numericQuery))
+    : false;
+}
+
+export function filterSubscriptions(
+  subscriptions: Subscription[],
+  options: SubscriptionFilterOptions = {}
+): Subscription[] {
+  const { searchQuery = "", minMonthlyAmountMinor = 0 } = options;
+
+  return subscriptions.filter((subscription) => {
+    if (!matchesSubscriptionSearch(subscription, searchQuery)) {
+      return false;
+    }
+
+    return monthlyEquivalentMinor(subscription) >= minMonthlyAmountMinor;
+  });
 }
 
 export function normalizePinnedSubscriptionOrder(

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  getAmountFilterSummary,
   getBulkSelectAllLabel,
   getBulkSelectionSummary,
   getSubscriptionRowControlsClass,
@@ -9,6 +10,11 @@ describe("subscription list UI helpers", () => {
   it("only returns a bulk selection summary when something is selected", () => {
     expect(getBulkSelectionSummary(0)).toBeNull();
     expect(getBulkSelectionSummary(3)).toBe("3 selected");
+  });
+
+  it("formats the compact amount filter summary", () => {
+    expect(getAmountFilterSummary(0, "₹")).toBe("All amounts");
+    expect(getAmountFilterSummary(500_00, "₹")).toBe("Above ₹500/mo");
   });
 
   it("keeps row controls hidden until hover or focus when not selected", () => {

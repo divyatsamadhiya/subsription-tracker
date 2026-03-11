@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   buildSubscriptionsCsv,
+  filterSubscriptions,
   formatRenewalDistance,
   getEffectiveRenewalDate,
   getRenewalDistance,
+  matchesSubscriptionSearch,
   monthlyEquivalentMinor,
   normalizePinnedSubscriptionOrder,
   reorderPinnedSubscriptions,
@@ -65,6 +67,55 @@ describe("getRenewalDistance", () => {
     expect(getRenewalDistance(subscription, "2026-03-11")).toBe(
       "Renews in 21 days"
     );
+  });
+});
+
+describe("subscription filtering", () => {
+  const subscriptions = [
+    buildSubscription({
+      id: "claude",
+      name: "Claude Pro",
+      category: "productivity",
+      amountMinor: 2150_00,
+      billingCycle: "monthly",
+    }),
+    buildSubscription({
+      id: "youtube",
+      name: "YouTube Premium",
+      category: "entertainment",
+      amountMinor: 299_00,
+      billingCycle: "monthly",
+    }),
+    buildSubscription({
+      id: "1password",
+      name: "1Password",
+      category: "productivity",
+      amountMinor: 5828_00,
+      billingCycle: "yearly",
+    }),
+  ];
+
+  it("matches search queries against name, category, and amount", () => {
+    expect(matchesSubscriptionSearch(subscriptions[0], "claude")).toBe(true);
+    expect(matchesSubscriptionSearch(subscriptions[0], "productivity")).toBe(true);
+    expect(matchesSubscriptionSearch(subscriptions[1], "299")).toBe(true);
+    expect(matchesSubscriptionSearch(subscriptions[2], "485.67")).toBe(true);
+    expect(matchesSubscriptionSearch(subscriptions[1], "health")).toBe(false);
+  });
+
+  it("filters subscriptions by search query and monthly amount threshold", () => {
+    expect(
+      filterSubscriptions(subscriptions, {
+        searchQuery: "productivity",
+        minMonthlyAmountMinor: 500_00,
+      }).map((subscription) => subscription.name)
+    ).toEqual(["Claude Pro"]);
+
+    expect(
+      filterSubscriptions(subscriptions, {
+        minMonthlyAmountMinor: 300_00,
+      }).map((subscription) => subscription.name)
+    ).toEqual(["Claude Pro", "1Password"]);
   });
 });
 

@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Download,
+  SlidersHorizontal,
   Plus,
   Pause,
   Search,
@@ -15,6 +16,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Popover,
+  PopoverContent,
+  PopoverDescription,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
@@ -24,7 +33,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useDashboard } from "@/lib/dashboard-context";
-import { categoryLabel, formatCurrencyMinor } from "@/lib/format";
+import { categoryLabel, currencySymbol, formatCurrencyMinor } from "@/lib/format";
 import { nowIsoDate } from "@/lib/date";
 import { CATEGORY_OPTIONS } from "@/lib/types";
 import type { Subscription, SubscriptionCategory, SubscriptionInput } from "@/lib/types";
@@ -33,11 +42,14 @@ import { SubscriptionFormSheet } from "@/components/dashboard/subscription-form-
 import { DeleteDialog } from "@/components/dashboard/delete-dialog";
 import { SubscriptionRow } from "@/components/dashboard/subscription-row";
 import {
+  getAmountFilterSummary,
   getBulkSelectAllLabel,
   getBulkSelectionSummary,
 } from "@/components/dashboard/subscription-list-ui";
 import {
   buildSubscriptionsCsv,
+  filterSubscriptions,
+  monthlyEquivalentMinor,
   normalizePinnedSubscriptionOrder,
   reorderPinnedSubscriptions,
   sortSubscriptions,
@@ -70,6 +82,7 @@ export default function SubscriptionsPage() {
   const [categoryFilter, setCategoryFilter] = useState<SubscriptionCategory | "all">("all");
   const [search, setSearch] = useState("");
   const [sortOption, setSortOption] = useState<SubscriptionSortOption>("renewal_asc");
+  const [minMonthlyAmountMinor, setMinMonthlyAmountMinor] = useState(0);
   const [rawSelectedIds, setRawSelectedIds] = useState<string[]>([]);
   const [storedPinnedIds, setStoredPinnedIds] = useState<string[]>(() => {
     if (typeof window === "undefined") return [];
@@ -130,6 +143,22 @@ export default function SubscriptionsPage() {
     const validIds = new Set(subscriptions.map((subscription) => subscription.id));
     return rawSelectedIds.filter((id) => validIds.has(id));
   }, [subscriptions, rawSelectedIds]);
+  const maxMonthlyAmountMinor = useMemo(() => {
+    return statusFiltered.reduce((max, subscription) => {
+      return Math.max(max, monthlyEquivalentMinor(subscription));
+    }, 0);
+  }, [statusFiltered]);
+  const sliderMaxMinor = Math.max(maxMonthlyAmountMinor, 1000_00);
+  const effectiveMinMonthlyAmountMinor = Math.min(
+    minMonthlyAmountMinor,
+    sliderMaxMinor
+  );
+  const sliderStepMinor = 100_00;
+  const currencyMark = currencySymbol(currency);
+  const amountFilterLabel = getAmountFilterSummary(
+    effectiveMinMonthlyAmountMinor,
+    currencyMark
+  );
 
   // Final visible list
   const visible = useMemo(() => {
@@ -139,17 +168,21 @@ export default function SubscriptionsPage() {
       list = list.filter((s) => s.category === categoryFilter);
     }
 
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter(
-        (s) =>
-          s.name.toLowerCase().includes(q) ||
-          s.category.includes(q)
-      );
-    }
+    list = filterSubscriptions(list, {
+      searchQuery: search,
+      minMonthlyAmountMinor: effectiveMinMonthlyAmountMinor,
+    });
 
     return sortSubscriptions(list, sortOption, today, pinnedIds);
-  }, [statusFiltered, categoryFilter, search, sortOption, today, pinnedIds]);
+  }, [
+    statusFiltered,
+    categoryFilter,
+    search,
+    effectiveMinMonthlyAmountMinor,
+    sortOption,
+    today,
+    pinnedIds,
+  ]);
 
   const totals = useMemo(
     () => summarizeSubscriptionTotals(subscriptions),
@@ -354,6 +387,63 @@ export default function SubscriptionsPage() {
             className="h-full pl-9"
           />
         </div>
+        <Popover>
+          <PopoverTrigger
+            render={
+              <Button
+                variant="outline"
+                size="lg"
+                className="h-10 w-full justify-between px-3 sm:w-[190px]"
+                aria-label="Filter by monthly amount"
+              />
+            }
+          >
+            <span className="flex items-center gap-2">
+              <SlidersHorizontal className="size-4" />
+              <span className="truncate">{amountFilterLabel}</span>
+            </span>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-[280px] gap-3 p-3">
+            <PopoverHeader>
+              <PopoverTitle>Amount range</PopoverTitle>
+              <PopoverDescription>
+                Filter by monthly-equivalent spend.
+              </PopoverDescription>
+            </PopoverHeader>
+            <div className="rounded-xl border border-border bg-muted/30 px-3 py-2">
+              <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
+                Current threshold
+              </p>
+              <p className="mt-1 text-lg font-semibold text-foreground">
+                {amountFilterLabel}
+              </p>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={sliderMaxMinor}
+              step={sliderStepMinor}
+              value={effectiveMinMonthlyAmountMinor}
+              onChange={(event) => setMinMonthlyAmountMinor(Number(event.target.value))}
+              className="h-2 w-full cursor-pointer appearance-none rounded-full bg-border accent-primary"
+              aria-label="Minimum monthly subscription amount"
+            />
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>{currencyMark}0</span>
+              <span>{currencyMark}{Math.round(sliderMaxMinor / 100)}/mo</span>
+            </div>
+            <div className="flex justify-end">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setMinMonthlyAmountMinor(0)}
+                disabled={effectiveMinMonthlyAmountMinor === 0}
+              >
+                Reset
+              </Button>
+            </div>
+          </PopoverContent>
+        </Popover>
         <div className="h-10 w-full sm:w-[220px]">
           <Select
             value={sortOption}
