@@ -7,6 +7,7 @@ import { ArrowLeft, Loader2, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/auth/password-input";
 
 type Step = "request" | "reset" | "done";
 
@@ -183,9 +184,8 @@ export default function ForgotPasswordPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="newPassword">New password</Label>
-                <Input
+                <PasswordInput
                   id="newPassword"
-                  type="password"
                   placeholder="Min 8 chars, upper + lower + digit"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}

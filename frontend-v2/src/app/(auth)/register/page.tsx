@@ -7,6 +7,7 @@ import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/auth/password-input";
 import { Separator } from "@/components/ui/separator";
 import { GoogleButton } from "@/components/auth/google-button";
 
@@ -158,9 +159,8 @@ export default function RegisterPage() {
 
         <motion.div variants={item} className="space-y-2">
           <Label htmlFor="password">Password</Label>
-          <Input
+          <PasswordInput
             id="password"
-            type="password"
             placeholder="Min 8 chars, upper + lower + digit"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
