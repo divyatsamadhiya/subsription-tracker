@@ -91,14 +91,22 @@ describe("api.createSubscription", () => {
 });
 
 describe("api.updateSubscription", () => {
-  it("patches with correct URL and body", async () => {
+  it("sends PUT with correct URL and body", async () => {
     const subscription = { id: "s1", name: "Netflix Updated" };
     globalThis.fetch = mockFetchResponse({ subscription });
 
-    await api.updateSubscription("s1", { name: "Netflix Updated" });
+    await api.updateSubscription("s1", {
+      name: "Netflix Updated",
+      amountMinor: 999,
+      billingCycle: "monthly",
+      nextBillingDate: "2026-04-01",
+      category: "entertainment",
+      reminderDaysBefore: [1],
+      isActive: true,
+    } as Parameters<typeof api.updateSubscription>[1]);
     expect(fetch).toHaveBeenCalledWith(
       "/api/v1/subscriptions/s1",
-      expect.objectContaining({ method: "PATCH" })
+      expect.objectContaining({ method: "PUT" })
     );
   });
 });

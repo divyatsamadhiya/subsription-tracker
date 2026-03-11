@@ -128,7 +128,17 @@ export default function SubscriptionsPage() {
   }
 
   async function handleToggleActive(sub: Subscription) {
-    await api.updateSubscription(sub.id, { isActive: !sub.isActive });
+    await api.updateSubscription(sub.id, {
+      name: sub.name,
+      amountMinor: sub.amountMinor,
+      billingCycle: sub.billingCycle,
+      customIntervalDays: sub.customIntervalDays,
+      nextBillingDate: sub.nextBillingDate,
+      category: sub.category,
+      reminderDaysBefore: sub.reminderDaysBefore,
+      isActive: !sub.isActive,
+      notes: sub.notes,
+    });
     await refresh();
   }
 

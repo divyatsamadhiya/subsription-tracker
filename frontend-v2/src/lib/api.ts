@@ -65,9 +65,9 @@ export const api = {
       method: "POST",
       body: JSON.stringify(data),
     }).then((r) => r.subscription),
-  updateSubscription: (id: string, data: Partial<Subscription>) =>
+  updateSubscription: (id: string, data: SubscriptionInput) =>
     request<{ subscription: Subscription }>(`/subscriptions/${id}`, {
-      method: "PATCH",
+      method: "PUT",
       body: JSON.stringify(data),
     }).then((r) => r.subscription),
   deleteSubscription: (id: string) =>
