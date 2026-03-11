@@ -109,7 +109,7 @@ export default function RegisterPage() {
           </motion.div>
         )}
 
-        <motion.div variants={item} className="grid grid-cols-2 gap-3">
+        <motion.div variants={item} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="fullName">Full name</Label>
             <Input

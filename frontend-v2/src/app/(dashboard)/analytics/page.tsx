@@ -227,8 +227,8 @@ export default function AnalyticsPage() {
               <CardTitle className="text-base">Spending by category</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center gap-6">
-                <div className="h-[200px] w-[200px] shrink-0">
+              <div className="flex flex-col items-center gap-6 sm:flex-row">
+                <div className="h-[180px] w-[180px] shrink-0 sm:h-[200px] sm:w-[200px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie

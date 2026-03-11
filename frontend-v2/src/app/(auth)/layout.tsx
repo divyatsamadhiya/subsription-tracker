@@ -11,7 +11,7 @@ export default function AuthLayout({
         <AuthShowcase />
       </div>
 
-      <div className="flex w-full items-center justify-center p-6 lg:w-1/2">
+      <div className="flex w-full items-center justify-center p-4 sm:p-6 lg:w-1/2">
         <div className="w-full max-w-[400px]">{children}</div>
       </div>
     </div>

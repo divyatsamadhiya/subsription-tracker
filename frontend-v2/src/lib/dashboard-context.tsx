@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { api } from "./api";
+import { useTheme } from "./theme-provider";
 import type { AuthUser, Subscription, AppSettings } from "./types";
 import { DEFAULT_SETTINGS } from "./types";
 
@@ -30,6 +31,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { setTheme } = useTheme();
 
   const refresh = useCallback(async () => {
     try {
@@ -46,13 +48,15 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         )
       );
       setSettings(prefs);
+      // Sync theme with user's saved preference
+      setTheme(prefs.themePreference);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load data");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [setTheme]);
 
   const logout = useCallback(async () => {
     await api.logout();

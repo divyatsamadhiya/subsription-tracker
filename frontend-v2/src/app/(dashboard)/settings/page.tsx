@@ -2,21 +2,22 @@
 
 import { useRef, useState } from "react";
 import { motion } from "motion/react";
-import { Download, Upload, Loader2 } from "lucide-react";
+import { Download, Upload, Loader2, Sun, Moon, Monitor } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useDashboard } from "@/lib/dashboard-context";
+import { useTheme } from "@/lib/theme-provider";
 import { api } from "@/lib/api";
 import type { AppSettings, ThemePreference } from "@/lib/types";
 
 const CURRENCIES = ["USD", "EUR", "GBP", "INR", "CAD"] as const;
-const THEMES: { value: ThemePreference; label: string }[] = [
-  { value: "system", label: "System" },
-  { value: "light", label: "Light" },
-  { value: "dark", label: "Dark" },
+const THEMES: { value: ThemePreference; label: string; icon: typeof Sun }[] = [
+  { value: "system", label: "System", icon: Monitor },
+  { value: "light", label: "Light", icon: Sun },
+  { value: "dark", label: "Dark", icon: Moon },
 ];
 
 const container = {
@@ -31,6 +32,7 @@ const item = {
 
 export default function SettingsPage() {
   const { settings, refresh } = useDashboard();
+  const { setTheme } = useTheme();
   const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -38,6 +40,10 @@ export default function SettingsPage() {
 
   async function updateSetting(patch: Partial<AppSettings>) {
     setSaving(true);
+    // Apply theme change immediately for instant feedback
+    if (patch.themePreference) {
+      setTheme(patch.themePreference);
+    }
     try {
       await api.updateSettings(patch);
       await refresh();
@@ -110,20 +116,24 @@ export default function SettingsPage() {
                   </p>
                 </div>
                 <div className="flex gap-1.5">
-                  {THEMES.map((t) => (
-                    <button
-                      key={t.value}
-                      onClick={() => updateSetting({ themePreference: t.value })}
-                      disabled={saving}
-                      className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-                        settings.themePreference === t.value
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-border text-muted-foreground hover:bg-accent"
-                      }`}
-                    >
-                      {t.label}
-                    </button>
-                  ))}
+                  {THEMES.map((t) => {
+                    const Icon = t.icon;
+                    return (
+                      <button
+                        key={t.value}
+                        onClick={() => updateSetting({ themePreference: t.value })}
+                        disabled={saving}
+                        className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                          settings.themePreference === t.value
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-border text-muted-foreground hover:bg-accent"
+                        }`}
+                      >
+                        <Icon className="size-3" />
+                        {t.label}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 

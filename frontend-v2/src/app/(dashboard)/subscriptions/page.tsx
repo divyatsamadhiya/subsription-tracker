@@ -186,7 +186,7 @@ export default function SubscriptionsPage() {
       </Tabs>
 
       {/* Category filter */}
-      <div className="mt-3 flex flex-wrap gap-1.5">
+      <div className="mt-3 flex gap-1.5 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-x-visible sm:pb-0">
         <button
           onClick={() => setCategoryFilter("all")}
           className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
