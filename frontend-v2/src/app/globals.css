@@ -148,6 +148,12 @@
   }
 }
 
+/* Disable browser focus outline on Recharts SVG internals */
+.recharts-wrapper *:focus,
+.recharts-wrapper *:focus-visible {
+  outline: none;
+}
+
 /* Smooth focus ring animation */
 @layer utilities {
   input:focus-visible,

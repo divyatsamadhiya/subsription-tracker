@@ -1,13 +1,14 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import {
-  AreaChart,
-  Area,
   BarChart,
   Bar,
+  LabelList,
+  ComposedChart,
+  Line,
   PieChart,
   Pie,
   Cell,
@@ -23,20 +24,31 @@ import {
   CreditCard,
   CalendarClock,
   BarChart3,
+  Layers3,
   Plus,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useDashboard } from "@/lib/dashboard-context";
-import { formatCurrencyMinor, categoryLabel, currencySymbol } from "@/lib/format";
+import {
+  formatCurrencyMinor,
+  categoryLabel,
+  currencySymbol,
+  formatShortDate,
+} from "@/lib/format";
 import { nowIsoDate } from "@/lib/date";
 import {
-  buildSpendTrend,
+  buildSpendComparisonTrend,
   buildCategorySpend,
   buildRenewalBuckets,
   buildAnalyticsSummary,
+  getCategoryChangeMeta,
+  getAnalyticsRangeMonths,
+  getSubscriptionsForCategoryPoint,
+  type AnalyticsRange,
 } from "@/lib/analytics";
 import type { SubscriptionCategory } from "@/lib/types";
+import { CATEGORY_HEX } from "@/lib/category-colors";
 
 const container = {
   hidden: { opacity: 0 },
@@ -48,31 +60,40 @@ const item = {
   show: { opacity: 1, y: 0, transition: { duration: 0.3 } },
 };
 
-const CATEGORY_HEX: Record<SubscriptionCategory, string> = {
-  entertainment: "#7C3AED",
-  productivity: "#10B981",
-  utilities: "#F59E0B",
-  health: "#EC4899",
-  other: "#3B82F6",
-};
+const RANGE_OPTIONS: Array<{ value: AnalyticsRange; label: string }> = [
+  { value: "3m", label: "3M" },
+  { value: "6m", label: "6M" },
+  { value: "1y", label: "1Y" },
+  { value: "all", label: "All" },
+];
 
 export default function AnalyticsPage() {
   const { subscriptions, settings } = useDashboard();
   const router = useRouter();
   const currency = settings.defaultCurrency;
   const today = nowIsoDate();
+  const [showComparison, setShowComparison] = useState(false);
+  const [range, setRange] = useState<AnalyticsRange>("1y");
+  const [selectedCategory, setSelectedCategory] = useState<SubscriptionCategory | null>(null);
+  const [selectedRenewalBucketKey, setSelectedRenewalBucketKey] = useState<
+    "0-7" | "8-14" | "15-21" | "22-30" | null
+  >(null);
 
+  const rangeMonths = useMemo(
+    () => getAnalyticsRangeMonths(subscriptions, today, range),
+    [subscriptions, today, range]
+  );
   const summary = useMemo(
     () => buildAnalyticsSummary(subscriptions, today),
     [subscriptions, today]
   );
   const spendTrend = useMemo(
-    () => buildSpendTrend(subscriptions, today, 6),
-    [subscriptions, today]
+    () => buildSpendComparisonTrend(subscriptions, today, rangeMonths),
+    [subscriptions, today, rangeMonths]
   );
   const categorySpend = useMemo(
-    () => buildCategorySpend(subscriptions),
-    [subscriptions]
+    () => buildCategorySpend(subscriptions, today),
+    [subscriptions, today]
   );
   const renewalBuckets = useMemo(
     () => buildRenewalBuckets(subscriptions, today),
@@ -134,15 +155,37 @@ export default function AnalyticsPage() {
   const trendData = spendTrend.map((p) => ({
     name: p.monthLabel,
     amount: p.amountMinor / 100,
+    cumulative: p.cumulativeAmountMinor / 100,
+    previousAmount: p.previousAmountMinor / 100,
+    previousMonthLabel: p.previousMonthLabel,
+    contributors: p.contributors,
   }));
 
   const pieData = categorySpend.map((p) => ({
     name: categoryLabel(p.category),
     value: p.amountMinor / 100,
     color: CATEGORY_HEX[p.category],
+    category: p.category,
+    momChangePercent: p.momChangePercent,
+    sourceCategories: p.sourceCategories,
   }));
+  const selectedCategoryPoint = categorySpend.find(
+    (entry) => entry.category === selectedCategory
+  ) ?? null;
+  const categorySubscriptions = getSubscriptionsForCategoryPoint(
+    subscriptions,
+    selectedCategoryPoint
+  );
 
   const totalMonthly = summary.monthlyBaselineMinor / 100;
+  const visibleRenewalBuckets = renewalBuckets.filter((bucket) => bucket.count > 0);
+  const hiddenRenewalBuckets = renewalBuckets.filter((bucket) => bucket.count === 0);
+  const selectedRenewalBucket =
+    renewalBuckets.find((bucket) => bucket.bucketKey === selectedRenewalBucketKey) ?? null;
+  const renewalChartData = visibleRenewalBuckets.map((bucket) => ({
+    ...bucket,
+    amountLabel: formatRenewalAmountLabel(bucket.amountMinor, currency),
+  }));
 
   return (
     <motion.div variants={container} initial="hidden" animate="show">
@@ -162,42 +205,84 @@ export default function AnalyticsPage() {
       >
         <KpiCard
           icon={DollarSign}
-          label="Monthly baseline"
-          value={formatCurrencyMinor(summary.monthlyBaselineMinor, currency)}
-        />
-        <KpiCard
-          icon={TrendingUp}
-          label="6-month projection"
-          value={formatCurrencyMinor(summary.projectedSixMonthMinor, currency)}
-        />
-        <KpiCard
-          icon={CreditCard}
-          label="Active subs"
-          value={String(summary.activeCount)}
+          label="Avg monthly spend"
+          value={formatCurrencyMinor(summary.averageMonthlySpendMinor, currency)}
+          subtitle="Across the next 12 months"
         />
         <KpiCard
           icon={CalendarClock}
-          label="Due in 30 days"
-          value={String(summary.renewalCount30Days)}
+          label="Highest spend month"
+          value={summary.highestSpendMonth?.monthLabel ?? "No data"}
+          subtitle={
+            summary.highestSpendMonth
+              ? formatCurrencyMinor(summary.highestSpendMonth.amountMinor, currency)
+              : "No upcoming charges yet"
+          }
+        />
+        <KpiCard
+          icon={CreditCard}
+          label="Most cancelled category"
+          value={
+            summary.mostCancelledCategory
+              ? categoryLabel(summary.mostCancelledCategory.category)
+              : "No cancellations"
+          }
+          subtitle={
+            summary.mostCancelledCategory
+              ? `${summary.mostCancelledCategory.count} inactive subscription${
+                  summary.mostCancelledCategory.count === 1 ? "" : "s"
+                }`
+              : "Nothing inactive to analyze"
+          }
+        />
+        <KpiCard
+          icon={TrendingUp}
+          label="YoY growth"
+          value={
+            summary.yoyGrowthPercent === null
+              ? "N/A"
+              : `${summary.yoyGrowthPercent >= 0 ? "+" : ""}${summary.yoyGrowthPercent.toFixed(0)}%`
+          }
+          subtitle="Vs previous 12 months"
         />
       </motion.div>
 
-      {/* Spend Trend - Area Chart */}
+      {/* Spend Trend - 12 month combo chart */}
       <motion.div variants={item} className="mb-6">
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Monthly spend trend</CardTitle>
+          <CardHeader className="flex flex-col gap-3 pb-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle className="text-base">Monthly spend trend</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Hover a month to inspect the exact amount and the subscriptions behind it.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {RANGE_OPTIONS.map((option) => (
+                <Button
+                  key={option.value}
+                  variant={range === option.value ? "secondary" : "outline"}
+                  size="sm"
+                  onClick={() => setRange(option.value)}
+                >
+                  {option.label}
+                </Button>
+              ))}
+              <Button
+                variant={showComparison ? "secondary" : "outline"}
+                size="sm"
+                className="gap-2"
+                onClick={() => setShowComparison((current) => !current)}
+              >
+                <Layers3 className="size-3.5" />
+                {showComparison ? "Hide previous period" : "Vs previous period"}
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="h-[280px]">
+            <div className="h-[320px]">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={trendData}>
-                  <defs>
-                    <linearGradient id="spendGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--color-primary)" stopOpacity={0.2} />
-                      <stop offset="95%" stopColor="var(--color-primary)" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
+                <ComposedChart data={trendData}>
                   <CartesianGrid
                     strokeDasharray="3 3"
                     stroke="var(--color-border)"
@@ -208,6 +293,8 @@ export default function AnalyticsPage() {
                     tick={{ fontSize: 12, fill: "var(--color-muted-foreground)" }}
                     axisLine={false}
                     tickLine={false}
+                    interval={1}
+                    tickFormatter={(value) => value.slice(0, 3)}
                   />
                   <YAxis
                     tick={{ fontSize: 12, fill: "var(--color-muted-foreground)" }}
@@ -217,22 +304,33 @@ export default function AnalyticsPage() {
                     width={60}
                   />
                   <Tooltip
-                    contentStyle={{
-                      backgroundColor: "var(--color-card)",
-                      border: "1px solid var(--color-border)",
-                      borderRadius: 8,
-                      fontSize: 13,
-                    }}
-                    formatter={(value) => [`${sym}${Number(value).toFixed(2)}`, "Spend"]}
+                    cursor={{ fill: "var(--color-accent)", fillOpacity: 0.22 }}
+                    content={<MonthlySpendTooltip currencySymbol={sym} />}
                   />
-                  <Area
-                    type="monotone"
+                  <Bar
                     dataKey="amount"
-                    stroke="var(--color-primary)"
-                    strokeWidth={2}
-                    fill="url(#spendGradient)"
+                    fill="var(--color-primary)"
+                    radius={[6, 6, 0, 0]}
+                    maxBarSize={28}
                   />
-                </AreaChart>
+                  {showComparison && (
+                    <Line
+                      type="monotone"
+                      dataKey="previousAmount"
+                      stroke="var(--color-muted-foreground)"
+                      strokeWidth={2}
+                      strokeDasharray="6 4"
+                      dot={false}
+                    />
+                  )}
+                  <Line
+                    type="monotone"
+                    dataKey="cumulative"
+                    stroke="#10B981"
+                    strokeWidth={2.5}
+                    dot={false}
+                  />
+                </ComposedChart>
               </ResponsiveContainer>
             </div>
           </CardContent>
@@ -261,9 +359,27 @@ export default function AnalyticsPage() {
                         dataKey="value"
                         strokeWidth={0}
                       >
-                        {pieData.map((entry, i) => (
-                          <Cell key={i} fill={entry.color} />
-                        ))}
+                        {pieData.map((entry, i) => {
+                          const isSelected = selectedCategory === entry.category;
+                          return (
+                            <Cell
+                              key={i}
+                              fill={entry.color}
+                              onClick={() =>
+                                setSelectedCategory((current) =>
+                                  current === entry.category ? null : entry.category
+                                )
+                              }
+                              fillOpacity={
+                                selectedCategory === null || isSelected
+                                  ? 1
+                                  : 0.28
+                              }
+                              stroke={isSelected ? "var(--color-foreground)" : "none"}
+                              strokeWidth={isSelected ? 1.5 : 0}
+                            />
+                          );
+                        })}
                       </Pie>
                       <Tooltip
                         contentStyle={{
@@ -281,7 +397,7 @@ export default function AnalyticsPage() {
                         dominantBaseline="central"
                         className="fill-foreground font-heading text-lg font-semibold"
                       >
-                        {sym}{totalMonthly.toFixed(0)}
+                        {sym}{Math.round(totalMonthly).toLocaleString()}
                       </text>
                       <text
                         x="50%"
@@ -295,28 +411,66 @@ export default function AnalyticsPage() {
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
-                <div className="space-y-3 flex-1">
+                <div className="flex-1 space-y-3">
                   {categorySpend.map((entry) => (
-                    <div key={entry.category} className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="h-2.5 w-2.5 rounded-sm"
-                          style={{ backgroundColor: CATEGORY_HEX[entry.category] }}
-                        />
-                        <span>{categoryLabel(entry.category)}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground">
-                          {Math.round(entry.share * 100)}%
-                        </span>
-                        <span className="font-medium">
-                          {formatCurrencyMinor(entry.amountMinor, currency)}
-                        </span>
-                      </div>
-                    </div>
+                    <CategoryLegendRow
+                      key={entry.category}
+                      category={entry.category}
+                      amountMinor={entry.amountMinor}
+                      share={entry.share}
+                      currency={currency}
+                      momChangePercent={entry.momChangePercent}
+                      color={CATEGORY_HEX[entry.category]}
+                      isSelected={selectedCategory === entry.category}
+                      onClick={() =>
+                        setSelectedCategory((current) =>
+                          current === entry.category ? null : entry.category
+                        )
+                      }
+                    />
                   ))}
                 </div>
               </div>
+              {selectedCategoryPoint && (
+                <div className="mt-6 border-t border-border pt-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">
+                        {categoryLabel(selectedCategoryPoint.category)} subscriptions
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Highlighting {categorySubscriptions.length} active subscription
+                        {categorySubscriptions.length === 1 ? "" : "s"} below
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedCategory(null)}
+                    >
+                      Clear
+                    </Button>
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    {categorySubscriptions.map((subscription) => (
+                      <div
+                        key={subscription.id}
+                        className="flex items-center justify-between rounded-xl border border-border/70 bg-background/40 px-3 py-2 text-sm"
+                      >
+                        <div>
+                          <p className="font-medium text-foreground">{subscription.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {categoryLabel(subscription.category)}
+                          </p>
+                        </div>
+                        <span className="font-medium text-foreground">
+                          {formatCurrencyMinor(subscription.amountMinor, currency)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </motion.div>
@@ -328,45 +482,124 @@ export default function AnalyticsPage() {
               <CardTitle className="text-base">Renewal distribution</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-[200px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={renewalBuckets}>
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="var(--color-border)"
-                      vertical={false}
-                    />
-                    <XAxis
-                      dataKey="bucketLabel"
-                      tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <YAxis
-                      tick={{ fontSize: 12, fill: "var(--color-muted-foreground)" }}
-                      axisLine={false}
-                      tickLine={false}
-                      allowDecimals={false}
-                      width={30}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "var(--color-card)",
-                        border: "1px solid var(--color-border)",
-                        borderRadius: 8,
-                        fontSize: 13,
-                      }}
-                      formatter={(value) => [String(value), "Renewals"]}
-                    />
-                    <Bar
-                      dataKey="count"
-                      fill="var(--color-primary)"
-                      radius={[6, 6, 0, 0]}
-                      maxBarSize={48}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+              {visibleRenewalBuckets.length > 0 ? (
+                <>
+                  <div className="h-[200px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={renewalChartData} barCategoryGap={24}>
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          stroke="var(--color-border)"
+                          vertical={false}
+                        />
+                        <XAxis
+                          dataKey="bucketLabel"
+                          tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
+                          axisLine={false}
+                          tickLine={false}
+                        />
+                        <YAxis
+                          tick={{ fontSize: 12, fill: "var(--color-muted-foreground)" }}
+                          axisLine={false}
+                          tickLine={false}
+                          allowDecimals={false}
+                          width={30}
+                        />
+                        <Tooltip
+                          content={<RenewalBucketTooltip currency={currency} />}
+                          cursor={false}
+                        />
+                        <Bar
+                          dataKey="count"
+                          fill="var(--color-primary)"
+                          radius={[6, 6, 0, 0]}
+                          maxBarSize={56}
+                        >
+                          {renewalChartData.map((bucket) => {
+                            const isSelected = selectedRenewalBucketKey === bucket.bucketKey;
+                            return (
+                              <Cell
+                                key={bucket.bucketKey}
+                                fill="var(--color-primary)"
+                                fillOpacity={
+                                  selectedRenewalBucketKey === null || isSelected
+                                    ? 1
+                                    : 0.35
+                                }
+                                stroke={isSelected ? "var(--color-foreground)" : "none"}
+                                strokeWidth={isSelected ? 1.5 : 0}
+                                onClick={() =>
+                                  setSelectedRenewalBucketKey((current) =>
+                                    current === bucket.bucketKey ? null : bucket.bucketKey
+                                  )
+                                }
+                              />
+                            );
+                          })}
+                          <LabelList
+                            dataKey="amountLabel"
+                            position="top"
+                            offset={10}
+                            className="fill-muted-foreground text-[11px]"
+                          />
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                  {hiddenRenewalBuckets.length > 0 && (
+                    <p className="mt-3 text-xs text-muted-foreground">
+                      No renewals in {hiddenRenewalBuckets.map((bucket) => bucket.bucketLabel).join(", ")}.
+                    </p>
+                  )}
+                  {selectedRenewalBucket && (
+                    <div className="mt-4 border-t border-border pt-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium text-foreground">
+                            {selectedRenewalBucket.bucketLabel} renewals
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {selectedRenewalBucket.count} subscription
+                            {selectedRenewalBucket.count === 1 ? "" : "s"} totaling{" "}
+                            {formatCurrencyMinor(selectedRenewalBucket.amountMinor, currency)}
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setSelectedRenewalBucketKey(null)}
+                        >
+                          Clear
+                        </Button>
+                      </div>
+                      <div className="mt-3 space-y-2">
+                        {selectedRenewalBucket.subscriptions.map((subscription) => (
+                          <div
+                            key={subscription.subscriptionId}
+                            className="flex items-center justify-between rounded-xl border border-border/70 bg-background/40 px-3 py-2 text-sm"
+                          >
+                            <div>
+                              <p className="font-medium text-foreground">{subscription.name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                Renews {formatShortDate(subscription.nextBillingDate)}
+                              </p>
+                            </div>
+                            <span className="font-medium text-foreground">
+                              {formatCurrencyMinor(subscription.amountMinor, currency)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="flex h-[200px] items-center justify-center rounded-xl border border-dashed border-border/70 bg-background/30 px-6 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    No renewals in this window.
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </motion.div>
@@ -379,10 +612,12 @@ function KpiCard({
   icon: Icon,
   label,
   value,
+  subtitle,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   value: string;
+  subtitle?: string;
 }) {
   return (
     <Card className="relative overflow-hidden">
@@ -394,7 +629,173 @@ function KpiCard({
         <p className="mt-1.5 font-heading text-xl font-semibold tracking-tight">
           {value}
         </p>
+        {subtitle && (
+          <p className="mt-1 text-xs text-muted-foreground">
+            {subtitle}
+          </p>
+        )}
       </CardContent>
     </Card>
   );
+}
+
+function CategoryLegendRow({
+  category,
+  amountMinor,
+  share,
+  currency,
+  momChangePercent,
+  color,
+  isSelected,
+  onClick,
+}: {
+  category: SubscriptionCategory;
+  amountMinor: number;
+  share: number;
+  currency: string;
+  momChangePercent: number | null;
+  color: string;
+  isSelected: boolean;
+  onClick: () => void;
+}) {
+  const change = getCategoryChangeMeta(momChangePercent);
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 rounded-xl px-3 py-2 text-left text-sm transition-colors ${
+        isSelected ? "bg-accent" : "hover:bg-accent/60"
+      }`}
+    >
+      <div className="min-w-0">
+        <div className="flex items-center gap-3">
+          <div
+            className="h-2.5 w-2.5 shrink-0 rounded-sm"
+            style={{ backgroundColor: color }}
+          />
+          <span className="truncate font-medium text-foreground">
+            {categoryLabel(category)}
+          </span>
+        </div>
+        <p
+          className={`mt-1 pl-5 text-[11px] uppercase tracking-[0.16em] ${
+            change.tone === "positive"
+              ? "text-emerald-400"
+              : change.tone === "negative"
+                ? "text-rose-400"
+                : "text-muted-foreground"
+          }`}
+        >
+          {change.label}
+        </p>
+      </div>
+      <span className="text-xs tabular-nums text-muted-foreground">
+        {Math.round(share * 100)}%
+      </span>
+      <span className="min-w-[112px] text-right font-medium tabular-nums text-foreground">
+        {formatCurrencyMinor(amountMinor, currency)}
+      </span>
+    </button>
+  );
+}
+
+function MonthlySpendTooltip({
+  active,
+  payload,
+  currencySymbol,
+}: {
+  active?: boolean;
+  payload?: Array<{
+    payload: {
+      name: string;
+      amount: number;
+      cumulative: number;
+      previousAmount: number;
+      previousMonthLabel: string;
+      contributors: Array<{
+        subscriptionId: string;
+        name: string;
+        amountMinor: number;
+      }>;
+    };
+  }>;
+  currencySymbol: string;
+}) {
+  if (!active || !payload?.[0]) return null;
+
+  const point = payload[0].payload;
+
+  return (
+    <div className="w-64 rounded-xl border border-border bg-card p-3 text-sm shadow-lg">
+      <p className="font-medium text-foreground">{point.name}</p>
+      <p className="mt-1 font-heading text-lg font-semibold text-foreground">
+        {currencySymbol}{Number(point.amount).toFixed(2)}
+      </p>
+      <p className="text-xs text-muted-foreground">
+        Exact monthly spend
+      </p>
+      {point.contributors.length > 0 && (
+        <div className="mt-3 border-t border-border pt-2">
+          <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+            Contributed by
+          </p>
+          <div className="mt-2 space-y-1.5">
+            {point.contributors.map((contributor) => (
+              <div
+                key={contributor.subscriptionId}
+                className="flex items-center justify-between gap-3 text-xs"
+              >
+                <span className="truncate text-foreground">{contributor.name}</span>
+                <span className="shrink-0 text-muted-foreground">
+                  {currencySymbol}{(contributor.amountMinor / 100).toFixed(2)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RenewalBucketTooltip({
+  active,
+  payload,
+  currency,
+}: {
+  active?: boolean;
+  payload?: Array<{
+    payload: {
+      bucketLabel: string;
+      count: number;
+      amountMinor: number;
+    };
+  }>;
+  currency: string;
+}) {
+  if (!active || !payload?.[0]) return null;
+
+  const point = payload[0].payload;
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-3 text-sm shadow-lg">
+      <p className="font-medium text-foreground">{point.bucketLabel}</p>
+      <p className="mt-1 text-xs text-muted-foreground">
+        {point.count} renewal{point.count === 1 ? "" : "s"}
+      </p>
+      <p className="mt-1 font-medium text-foreground">
+        {formatCurrencyMinor(point.amountMinor, currency)}
+      </p>
+    </div>
+  );
+}
+
+function formatRenewalAmountLabel(amountMinor: number, currency: string): string {
+  return new Intl.NumberFormat(undefined, {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 0,
+    minimumFractionDigits: 0,
+  }).format(amountMinor / 100);
 }

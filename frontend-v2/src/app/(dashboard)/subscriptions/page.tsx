@@ -4,44 +4,72 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import {
+  Download,
+  SlidersHorizontal,
   Plus,
-  Search,
-  MoreHorizontal,
-  Pencil,
   Pause,
-  Play,
-  Trash2,
+  Search,
   CreditCard,
+  Trash2,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Popover,
+  PopoverContent,
+  PopoverDescription,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useDashboard } from "@/lib/dashboard-context";
-import { formatCurrencyMinor, categoryLabel, billingCycleLabel, formatShortDate } from "@/lib/format";
-import { daysUntil, nowIsoDate } from "@/lib/date";
+import { categoryLabel, currencySymbol, formatCurrencyMinor } from "@/lib/format";
+import { nowIsoDate } from "@/lib/date";
 import { CATEGORY_OPTIONS } from "@/lib/types";
 import type { Subscription, SubscriptionCategory, SubscriptionInput } from "@/lib/types";
 import { api } from "@/lib/api";
 import { SubscriptionFormSheet } from "@/components/dashboard/subscription-form-sheet";
 import { DeleteDialog } from "@/components/dashboard/delete-dialog";
+import { SubscriptionRow } from "@/components/dashboard/subscription-row";
+import {
+  getAmountFilterSummary,
+  getBulkSelectAllLabel,
+  getBulkSelectionSummary,
+} from "@/components/dashboard/subscription-list-ui";
+import {
+  buildSubscriptionsCsv,
+  filterSubscriptions,
+  monthlyEquivalentMinor,
+  normalizePinnedSubscriptionOrder,
+  reorderPinnedSubscriptions,
+  sortSubscriptions,
+  summarizeSubscriptionTotals,
+  togglePinnedSubscription,
+  type SubscriptionSortOption,
+} from "@/lib/subscriptions-list";
+import { toSubscriptionInput } from "@/lib/subscription-utils";
 
 type StatusFilter = "all" | "active" | "paused";
+const PINNED_ORDER_STORAGE_KEY = "subscription-tracker:pinned-order:v1";
 
-const CATEGORY_COLORS: Record<SubscriptionCategory, string> = {
-  entertainment: "bg-chart-1",
-  productivity: "bg-chart-2",
-  utilities: "bg-chart-3",
-  health: "bg-chart-4",
-  other: "bg-chart-5",
-};
+const SORT_OPTIONS: Array<{
+  value: SubscriptionSortOption;
+  label: string;
+}> = [
+  { value: "renewal_asc", label: "Renewal date" },
+  { value: "amount_desc", label: "Amount" },
+  { value: "alpha_asc", label: "Alphabetical" },
+];
 
 export default function SubscriptionsPage() {
   const { subscriptions, settings, refresh } = useDashboard();
@@ -49,24 +77,41 @@ export default function SubscriptionsPage() {
   const today = nowIsoDate();
   const searchParams = useSearchParams();
   const router = useRouter();
+  const createRequested = searchParams.get("action") === "create";
+  const editRequested = searchParams.get("action") === "edit";
+  const editRequestedId = searchParams.get("id");
 
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
   const [categoryFilter, setCategoryFilter] = useState<SubscriptionCategory | "all">("all");
   const [search, setSearch] = useState("");
+  const [sortOption, setSortOption] = useState<SubscriptionSortOption>("renewal_asc");
+  const [minMonthlyAmountMinor, setMinMonthlyAmountMinor] = useState(0);
+  const [rawSelectedIds, setRawSelectedIds] = useState<string[]>([]);
+  const [storedPinnedIds, setStoredPinnedIds] = useState<string[]>(() => {
+    if (typeof window === "undefined") return [];
 
-  const [formOpen, setFormOpen] = useState(false);
+    try {
+      const rawPinnedIds = window.localStorage.getItem(PINNED_ORDER_STORAGE_KEY);
+      if (!rawPinnedIds) return [];
+      const parsed = JSON.parse(rawPinnedIds);
+      return Array.isArray(parsed)
+        ? parsed.filter((value): value is string => typeof value === "string")
+        : [];
+    } catch {
+      return [];
+    }
+  });
+  const [draggedPinnedId, setDraggedPinnedId] = useState<string | null>(null);
+  const [dragTargetId, setDragTargetId] = useState<string | null>(null);
+
+  const [formOpen, setFormOpen] = useState(createRequested);
   const [formMode, setFormMode] = useState<"create" | "edit">("create");
   const [editTarget, setEditTarget] = useState<Subscription | undefined>();
 
-  const [deleteTarget, setDeleteTarget] = useState<Subscription | null>(null);
-
-  // Auto-open create form when navigated with ?action=create
-  useEffect(() => {
-    if (searchParams.get("action") === "create") {
-      openCreate();
-      router.replace("/subscriptions", { scroll: false });
-    }
-  }, [searchParams]);
+  const [deleteRequest, setDeleteRequest] = useState<{
+    ids: string[];
+    label: string;
+  } | null>(null);
 
   // Counts for status filter (unaffected by category/search)
   const activeCount = useMemo(
@@ -93,6 +138,30 @@ export default function SubscriptionsPage() {
     }
     return counts;
   }, [statusFiltered]);
+  const pinnedIds = useMemo(
+    () => normalizePinnedSubscriptionOrder(subscriptions, storedPinnedIds),
+    [subscriptions, storedPinnedIds]
+  );
+  const selectedIds = useMemo(() => {
+    const validIds = new Set(subscriptions.map((subscription) => subscription.id));
+    return rawSelectedIds.filter((id) => validIds.has(id));
+  }, [subscriptions, rawSelectedIds]);
+  const maxMonthlyAmountMinor = useMemo(() => {
+    return statusFiltered.reduce((max, subscription) => {
+      return Math.max(max, monthlyEquivalentMinor(subscription));
+    }, 0);
+  }, [statusFiltered]);
+  const sliderMaxMinor = Math.max(maxMonthlyAmountMinor, 1000_00);
+  const effectiveMinMonthlyAmountMinor = Math.min(
+    minMonthlyAmountMinor,
+    sliderMaxMinor
+  );
+  const sliderStepMinor = 100_00;
+  const currencyMark = currencySymbol(currency);
+  const amountFilterLabel = getAmountFilterSummary(
+    effectiveMinMonthlyAmountMinor,
+    currencyMark
+  );
 
   // Final visible list
   const visible = useMemo(() => {
@@ -102,20 +171,43 @@ export default function SubscriptionsPage() {
       list = list.filter((s) => s.category === categoryFilter);
     }
 
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter(
-        (s) =>
-          s.name.toLowerCase().includes(q) ||
-          s.category.includes(q)
-      );
-    }
+    list = filterSubscriptions(list, {
+      searchQuery: search,
+      minMonthlyAmountMinor: effectiveMinMonthlyAmountMinor,
+    });
 
-    return list.sort((a, b) =>
-      a.nextBillingDate.localeCompare(b.nextBillingDate) ||
-      a.name.localeCompare(b.name)
-    );
-  }, [statusFiltered, categoryFilter, search]);
+    return sortSubscriptions(list, sortOption, today, pinnedIds);
+  }, [
+    statusFiltered,
+    categoryFilter,
+    search,
+    effectiveMinMonthlyAmountMinor,
+    sortOption,
+    today,
+    pinnedIds,
+  ]);
+
+  const totals = useMemo(
+    () => summarizeSubscriptionTotals(subscriptions),
+    [subscriptions]
+  );
+  const selectedSortLabel =
+    SORT_OPTIONS.find((option) => option.value === sortOption)?.label ?? "Renewal date";
+  const selectedSubscriptions = useMemo(
+    () => subscriptions.filter((subscription) => selectedIds.includes(subscription.id)),
+    [subscriptions, selectedIds]
+  );
+  const selectedVisibleCount = useMemo(
+    () =>
+      visible.filter((subscription) => selectedIds.includes(subscription.id)).length,
+    [visible, selectedIds]
+  );
+  const activeSelectedCount = useMemo(
+    () => selectedSubscriptions.filter((subscription) => subscription.isActive).length,
+    [selectedSubscriptions]
+  );
+  const bulkSelectionSummary = getBulkSelectionSummary(selectedIds.length);
+  const bulkSelectAllLabel = getBulkSelectAllLabel(selectedVisibleCount, visible.length);
 
   function openCreate() {
     setFormMode("create");
@@ -129,6 +221,23 @@ export default function SubscriptionsPage() {
     setFormOpen(true);
   }
 
+  // Auto-open create/edit form when navigated with ?action=create or ?action=edit&id=...
+  useEffect(() => {
+    if (createRequested) {
+      router.replace("/subscriptions", { scroll: false });
+    } else if (editRequested && editRequestedId) {
+      const target = subscriptions.find((s) => s.id === editRequestedId);
+      if (target) {
+        openEdit(target);
+      }
+      router.replace("/subscriptions", { scroll: false });
+    }
+  }, [createRequested, editRequested, editRequestedId, router, subscriptions]);
+
+  useEffect(() => {
+    window.localStorage.setItem(PINNED_ORDER_STORAGE_KEY, JSON.stringify(pinnedIds));
+  }, [pinnedIds]);
+
   async function handleFormSubmit(data: SubscriptionInput) {
     if (formMode === "create") {
       await api.createSubscription(data);
@@ -139,24 +248,103 @@ export default function SubscriptionsPage() {
   }
 
   async function handleToggleActive(sub: Subscription) {
-    await api.updateSubscription(sub.id, {
-      name: sub.name,
-      amountMinor: sub.amountMinor,
-      billingCycle: sub.billingCycle,
-      customIntervalDays: sub.customIntervalDays,
-      nextBillingDate: sub.nextBillingDate,
-      category: sub.category,
-      reminderDaysBefore: sub.reminderDaysBefore,
-      isActive: !sub.isActive,
-      notes: sub.notes,
-    });
+    await api.updateSubscription(sub.id, toSubscriptionInput(sub, { isActive: !sub.isActive }));
     await refresh();
   }
 
   async function handleDelete() {
-    if (!deleteTarget) return;
-    await api.deleteSubscription(deleteTarget.id);
+    if (!deleteRequest) return;
+    await Promise.all(deleteRequest.ids.map((id) => api.deleteSubscription(id)));
+    setRawSelectedIds((current) => current.filter((id) => !deleteRequest.ids.includes(id)));
     await refresh();
+  }
+
+  async function handleBulkPause() {
+    const activeSelectedSubscriptions = selectedSubscriptions.filter(
+      (subscription) => subscription.isActive
+    );
+    if (activeSelectedSubscriptions.length === 0) return;
+
+    await Promise.all(
+      activeSelectedSubscriptions.map((subscription) =>
+        api.updateSubscription(
+          subscription.id,
+          toSubscriptionInput(subscription, { isActive: false })
+        )
+      )
+    );
+
+    await refresh();
+  }
+
+  function handleToggleSelection(subscriptionId: string, checked: boolean) {
+    setRawSelectedIds((current) => {
+      if (checked) {
+        return current.includes(subscriptionId) ? current : [...current, subscriptionId];
+      }
+
+      return current.filter((id) => id !== subscriptionId);
+    });
+  }
+
+  function handleSelectAllVisible() {
+    setRawSelectedIds((current) =>
+      Array.from(new Set([...current, ...visible.map((subscription) => subscription.id)]))
+    );
+  }
+
+  function handleTogglePin(subscriptionId: string) {
+    setStoredPinnedIds((current) => togglePinnedSubscription(current, subscriptionId));
+  }
+
+  function handlePinnedDragStart(subscriptionId: string) {
+    if (!pinnedIds.includes(subscriptionId)) return;
+    setDraggedPinnedId(subscriptionId);
+    setDragTargetId(subscriptionId);
+  }
+
+  function handlePinnedDragEnter(subscriptionId: string) {
+    if (!draggedPinnedId || draggedPinnedId === subscriptionId) return;
+    if (!pinnedIds.includes(subscriptionId)) return;
+    setDragTargetId(subscriptionId);
+  }
+
+  function clearPinnedDragState() {
+    setDraggedPinnedId(null);
+    setDragTargetId(null);
+  }
+
+  function handlePinnedDrop(targetId: string) {
+    if (!draggedPinnedId || !pinnedIds.includes(targetId)) {
+      clearPinnedDragState();
+      return;
+    }
+
+    setStoredPinnedIds((current) =>
+      reorderPinnedSubscriptions(current, draggedPinnedId, targetId)
+    );
+    clearPinnedDragState();
+  }
+
+  function handleExportSelected() {
+    if (selectedSubscriptions.length === 0) return;
+
+    const ordered = sortSubscriptions(
+      selectedSubscriptions,
+      sortOption,
+      today,
+      pinnedIds
+    );
+    const csv = buildSubscriptionsCsv(ordered, today);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "subscriptions-export.csv";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
   }
 
   return (
@@ -171,10 +359,6 @@ export default function SubscriptionsPage() {
           <h1 className="font-heading text-2xl font-semibold tracking-tight">
             Subscriptions
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {subscriptions.length} total &middot; {activeCount} active &middot;{" "}
-            {pausedCount} paused
-          </p>
         </div>
         <Button size="lg" className="h-9 gap-2" onClick={openCreate}>
           <Plus className="size-4" />
@@ -182,15 +366,94 @@ export default function SubscriptionsPage() {
         </Button>
       </div>
 
-      {/* Search */}
-      <div className="relative mt-5">
-        <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Search subscriptions..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="h-10 pl-9"
-        />
+      {/* Search + sort */}
+      <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-stretch">
+        <div className="relative h-10 flex-1">
+          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search subscriptions..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-full pl-9"
+          />
+        </div>
+        <Popover>
+          <PopoverTrigger
+            render={
+              <Button
+                variant="outline"
+                size="lg"
+                className="h-10 w-full justify-between px-3 sm:w-[190px]"
+                aria-label="Filter by monthly amount"
+              />
+            }
+          >
+            <span className="flex items-center gap-2">
+              <SlidersHorizontal className="size-4" />
+              <span className="truncate">{amountFilterLabel}</span>
+            </span>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-[280px] gap-3 p-3">
+            <PopoverHeader>
+              <PopoverTitle>Amount range</PopoverTitle>
+              <PopoverDescription>
+                Filter by monthly-equivalent spend.
+              </PopoverDescription>
+            </PopoverHeader>
+            <div className="rounded-xl border border-border bg-muted/30 px-3 py-2">
+              <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
+                Current threshold
+              </p>
+              <p className="mt-1 text-lg font-semibold text-foreground">
+                {amountFilterLabel}
+              </p>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={sliderMaxMinor}
+              step={sliderStepMinor}
+              value={effectiveMinMonthlyAmountMinor}
+              onChange={(event) => setMinMonthlyAmountMinor(Number(event.target.value))}
+              className="h-2 w-full cursor-pointer appearance-none rounded-full bg-border accent-primary"
+              aria-label="Minimum monthly subscription amount"
+            />
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>{currencyMark}0</span>
+              <span>{currencyMark}{Math.round(sliderMaxMinor / 100)}/mo</span>
+            </div>
+            <div className="flex justify-end">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setMinMonthlyAmountMinor(0)}
+                disabled={effectiveMinMonthlyAmountMinor === 0}
+              >
+                Reset
+              </Button>
+            </div>
+          </PopoverContent>
+        </Popover>
+        <div className="h-10 w-full sm:w-[220px]">
+          <Select
+            value={sortOption}
+            onValueChange={(value) => setSortOption(value as SubscriptionSortOption)}
+          >
+            <SelectTrigger
+              className="h-full w-full rounded-lg px-2.5 py-1 text-base data-[size=default]:h-full md:text-sm dark:bg-input/30"
+              aria-label="Sort subscriptions"
+            >
+              <SelectValue>{selectedSortLabel}</SelectValue>
+            </SelectTrigger>
+            <SelectContent align="end">
+              {SORT_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Status filter */}
@@ -226,6 +489,72 @@ export default function SubscriptionsPage() {
           )
         )}
       </div>
+
+      {bulkSelectionSummary && (
+        <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-border bg-muted/25 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-medium text-foreground">
+              {bulkSelectionSummary}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Bulk actions apply to the subscriptions you checked.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {bulkSelectAllLabel && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSelectAllVisible}
+              >
+                {bulkSelectAllLabel}
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={handleBulkPause}
+              disabled={activeSelectedCount === 0}
+            >
+              <Pause className="size-3.5" />
+              Pause selected
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={handleExportSelected}
+            >
+              <Download className="size-3.5" />
+              Export selected
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              className="gap-2"
+              onClick={() =>
+                setDeleteRequest({
+                  ids: selectedIds,
+                  label: `${selectedIds.length} subscriptions`,
+                })
+              }
+            >
+              <Trash2 className="size-3.5" />
+              Delete selected
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-2"
+              onClick={() => setRawSelectedIds([])}
+            >
+              <X className="size-3.5" />
+              Clear
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Subscription list */}
       <div className="mt-5">
@@ -264,7 +593,6 @@ export default function SubscriptionsPage() {
             <div className="divide-y divide-border">
               <AnimatePresence initial={false}>
                 {visible.map((sub) => {
-                  const days = daysUntil(sub.nextBillingDate, today);
                   return (
                     <motion.div
                       key={sub.id}
@@ -275,100 +603,36 @@ export default function SubscriptionsPage() {
                       transition={{ duration: 0.2 }}
                       className="overflow-hidden"
                     >
-                      <div className="flex items-center gap-4 px-4 py-3 sm:px-5">
-                        {/* Category dot */}
-                        <div
-                          className={`h-2.5 w-2.5 shrink-0 rounded-full ${CATEGORY_COLORS[sub.category]}`}
-                        />
-
-                        {/* Name + meta */}
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <p className="truncate text-sm font-medium">
-                              {sub.name}
-                            </p>
-                            {!sub.isActive && (
-                              <Badge
-                                variant="outline"
-                                className="border-destructive/60 bg-destructive px-1.5 py-0 text-[10px] text-white"
-                              >
-                                Paused
-                              </Badge>
-                            )}
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            {categoryLabel(sub.category)} &middot;{" "}
-                            {formatShortDate(sub.nextBillingDate)}
-                            {days >= 0 && days <= 7 && (
-                              <span className={days <= 1 ? " text-destructive font-medium" : ""}>
-                                {" "}&middot; {days === 0 ? "Today" : days === 1 ? "Tomorrow" : `${days}d`}
-                              </span>
-                            )}
-                          </p>
-                        </div>
-
-                        {/* Amount + cycle */}
-                        <div className="hidden sm:block text-right">
-                          <p className="text-sm font-semibold">
-                            {formatCurrencyMinor(sub.amountMinor, sub.currency)}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {billingCycleLabel(sub.billingCycle)}
-                          </p>
-                        </div>
-
-                        {/* Mobile amount */}
-                        <p className="text-sm font-semibold sm:hidden">
-                          {formatCurrencyMinor(sub.amountMinor, sub.currency)}
-                        </p>
-
-                        {/* Actions */}
-                        <DropdownMenu>
-                          <DropdownMenuTrigger
-                            render={
-                              <Button
-                                variant="ghost"
-                                size="icon-sm"
-                                aria-label="Actions"
-                              />
-                            }
-                          >
-                            <MoreHorizontal className="size-4" />
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => openEdit(sub)}>
-                              <Pencil className="size-3.5 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleToggleActive(sub)}
-                            >
-                              {sub.isActive ? (
-                                <>
-                                  <Pause className="size-3.5 mr-2" />
-                                  Pause
-                                </>
-                              ) : (
-                                <>
-                                  <Play className="size-3.5 mr-2" />
-                                  Activate
-                                </>
-                              )}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-destructive focus:text-destructive"
-                              onClick={() => setDeleteTarget(sub)}
-                            >
-                              <Trash2 className="size-3.5 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
+                      <SubscriptionRow
+                        subscription={sub}
+                        todayIsoDate={today}
+                        isPinned={pinnedIds.includes(sub.id)}
+                        isSelected={selectedIds.includes(sub.id)}
+                        isDragTarget={dragTargetId === sub.id && draggedPinnedId !== sub.id}
+                        onEdit={openEdit}
+                        onSelectChange={handleToggleSelection}
+                        onTogglePin={handleTogglePin}
+                        onToggleActive={handleToggleActive}
+                        onDelete={(subscription) =>
+                          setDeleteRequest({
+                            ids: [subscription.id],
+                            label: subscription.name,
+                          })
+                        }
+                        onPinnedDragStart={handlePinnedDragStart}
+                        onPinnedDragEnter={handlePinnedDragEnter}
+                        onPinnedDrop={handlePinnedDrop}
+                        onPinnedDragEnd={clearPinnedDragState}
+                      />
                     </motion.div>
                   );
                 })}
               </AnimatePresence>
+            </div>
+            <div className="border-t border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground sm:px-5">
+              <span className="font-medium text-foreground">Total:</span>{" "}
+              {formatCurrencyMinor(totals.activeMinor, currency)}/mo active &middot;{" "}
+              {formatCurrencyMinor(totals.pausedMinor, currency)}/mo paused
             </div>
           </Card>
         )}
@@ -386,9 +650,9 @@ export default function SubscriptionsPage() {
 
       {/* Delete dialog */}
       <DeleteDialog
-        open={!!deleteTarget}
-        onOpenChange={(open) => !open && setDeleteTarget(null)}
-        name={deleteTarget?.name ?? ""}
+        open={!!deleteRequest}
+        onOpenChange={(open) => !open && setDeleteRequest(null)}
+        name={deleteRequest?.label ?? ""}
         onConfirm={handleDelete}
       />
     </motion.div>

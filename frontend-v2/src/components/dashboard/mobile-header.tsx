@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useDashboard } from "@/lib/dashboard-context";
+import { RenewalAlertsBell } from "@/components/dashboard/top-bar";
 
 const NAV_ITEMS = [
   { href: "/", icon: LayoutDashboard, label: "Overview" },
@@ -89,13 +90,22 @@ export function MobileHeader() {
                 <Link
                   href={href}
                   className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                    "group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                     isActive(href)
                       ? "bg-primary/10 text-primary"
                       : "text-muted-foreground hover:bg-accent hover:text-foreground"
                   )}
                 >
-                  <Icon className="size-4" />
+                  <span
+                    className={cn(
+                      "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-colors",
+                      isActive(href)
+                        ? "border-primary/20 bg-primary/12 text-primary"
+                        : "border-border/70 bg-background/60 text-muted-foreground group-hover:text-foreground"
+                    )}
+                  >
+                    <Icon className="size-4" />
+                  </span>
                   {label}
                 </Link>
               </motion.div>
@@ -160,10 +170,12 @@ export function MobileHeader() {
         initial={{ opacity: 0, x: -8 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.2 }}
-        className="font-heading text-base font-semibold"
+        className="min-w-0 flex-1 truncate font-heading text-base font-semibold"
       >
         {currentPage}
       </motion.h1>
+
+      <RenewalAlertsBell />
     </header>
   );
 }

@@ -1,4 +1,5 @@
 import { AuthShowcase } from "@/components/auth/auth-showcase";
+import { AuthThemeToggle } from "@/components/auth/theme-toggle";
 
 export default function AuthLayout({
   children,
@@ -7,6 +8,8 @@ export default function AuthLayout({
 }) {
   return (
     <div className="flex min-h-svh">
+      <AuthThemeToggle />
+
       <div className="hidden w-1/2 p-3 lg:block">
         <AuthShowcase />
       </div>

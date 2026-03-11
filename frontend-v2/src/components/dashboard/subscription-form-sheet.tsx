@@ -1,13 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Loader2, X } from "lucide-react";
+import { format, parse } from "date-fns";
+import { Loader2, X, CalendarIcon, Search, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import {
   Sheet,
   SheetContent,
@@ -53,6 +56,9 @@ export function SubscriptionFormSheet({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [nameFocused, setNameFocused] = useState(false);
+  const [nameSearch, setNameSearch] = useState("");
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const nameDropdownRef = useRef<HTMLDivElement>(null);
 
   // Reset form when opening
   useEffect(() => {
@@ -81,14 +87,15 @@ export function SubscriptionFormSheet({
     setError(null);
   }, [open, mode, initial]);
 
-  // Autocomplete suggestions
+  // Dropdown suggestions — show all when open, filter when searching
   const filteredSuggestions = useMemo(() => {
-    if (!nameFocused || name.length < 1) return [];
-    const q = name.toLowerCase();
+    if (!nameFocused) return [];
+    const q = nameSearch.toLowerCase();
+    if (!q) return SUBSCRIPTION_SUGGESTIONS;
     return SUBSCRIPTION_SUGGESTIONS.filter(
       (s) => s.name.toLowerCase().includes(q)
-    ).slice(0, 6);
-  }, [name, nameFocused]);
+    );
+  }, [nameSearch, nameFocused]);
 
   function toggleReminder(day: number) {
     setReminders((prev) =>
@@ -163,22 +170,24 @@ export function SubscriptionFormSheet({
             </motion.div>
           )}
 
-          {/* Name with autocomplete */}
-          <div className="relative space-y-2">
+          {/* Name with dropdown */}
+          <div className="relative space-y-2" ref={nameDropdownRef}>
             <Label htmlFor="sub-name">Name</Label>
-            <Input
-              id="sub-name"
-              placeholder="e.g. Netflix, Spotify"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              onFocus={() => setNameFocused(true)}
-              onBlur={() => setTimeout(() => setNameFocused(false), 150)}
-              required
-              className="h-10"
-              autoComplete="off"
-            />
+            <button
+              type="button"
+              onClick={() => {
+                setNameFocused(true);
+                setNameSearch("");
+              }}
+              className={`flex h-10 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm transition-colors hover:bg-accent/50 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 ${
+                name ? "text-foreground" : "text-muted-foreground"
+              }`}
+            >
+              <span className="truncate">{name || "Select a subscription..."}</span>
+              <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
+            </button>
             <AnimatePresence>
-              {filteredSuggestions.length > 0 && (
+              {nameFocused && (
                 <motion.div
                   initial={{ opacity: 0, y: -4, scale: 0.97 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -186,26 +195,63 @@ export function SubscriptionFormSheet({
                   transition={{ duration: 0.15 }}
                   className="absolute top-full left-0 z-50 mt-1 w-full rounded-lg border border-border bg-popover shadow-lg"
                 >
-                  {filteredSuggestions.map((s, i) => (
-                    <motion.button
-                      key={s.name}
+                  {/* Search input */}
+                  <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+                    <Search className="size-4 text-muted-foreground shrink-0" />
+                    <input
+                      autoFocus
+                      placeholder="Search..."
+                      value={nameSearch}
+                      onChange={(e) => setNameSearch(e.target.value)}
+                      onBlur={() => setTimeout(() => setNameFocused(false), 150)}
+                      className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                    />
+                  </div>
+                  {/* Option to type custom name */}
+                  {nameSearch.trim() && !filteredSuggestions.some(
+                    (s) => s.name.toLowerCase() === nameSearch.trim().toLowerCase()
+                  ) && (
+                    <button
                       type="button"
-                      initial={{ opacity: 0, x: -8 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: i * 0.03, duration: 0.15 }}
-                      className="flex w-full items-center justify-between px-3 py-2 text-sm hover:bg-accent transition-colors first:rounded-t-lg last:rounded-b-lg"
+                      className="flex w-full items-center gap-2 px-3 py-2 text-sm text-primary hover:bg-accent transition-colors"
                       onMouseDown={() => {
-                        setName(s.name);
-                        setCategory(s.category);
+                        setName(nameSearch.trim());
                         setNameFocused(false);
+                        setNameSearch("");
                       }}
                     >
-                      <span>{s.name}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {categoryLabel(s.category)}
-                      </span>
-                    </motion.button>
-                  ))}
+                      Use &ldquo;{nameSearch.trim()}&rdquo;
+                    </button>
+                  )}
+                  {/* Scrollable suggestions list */}
+                  <div className="max-h-56 overflow-y-auto">
+                    {filteredSuggestions.length === 0 ? (
+                      <p className="px-3 py-3 text-center text-xs text-muted-foreground">
+                        No matches found
+                      </p>
+                    ) : (
+                      filteredSuggestions.map((s) => (
+                        <button
+                          key={s.name}
+                          type="button"
+                          className={`flex w-full items-center justify-between px-3 py-2 text-sm transition-colors hover:bg-accent ${
+                            s.name === name ? "bg-accent/50 font-medium" : ""
+                          }`}
+                          onMouseDown={() => {
+                            setName(s.name);
+                            setCategory(s.category);
+                            setNameFocused(false);
+                            setNameSearch("");
+                          }}
+                        >
+                          <span>{s.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {categoryLabel(s.category)}
+                          </span>
+                        </button>
+                      ))
+                    )}
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -265,15 +311,42 @@ export function SubscriptionFormSheet({
 
           {/* Next billing date */}
           <div className="space-y-2">
-            <Label htmlFor="sub-date">Next billing date</Label>
-            <Input
-              id="sub-date"
-              type="date"
-              value={nextBillingDate}
-              onChange={(e) => setNextBillingDate(e.target.value)}
-              required
-              className="h-10"
-            />
+            <Label>Next billing date</Label>
+            <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+              <PopoverTrigger
+                className={`flex h-10 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm transition-colors hover:bg-accent/50 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 ${
+                  nextBillingDate ? "text-foreground" : "text-muted-foreground"
+                }`}
+              >
+                <span>
+                  {nextBillingDate
+                    ? format(parse(nextBillingDate, "yyyy-MM-dd", new Date()), "PPP")
+                    : "Pick a date"}
+                </span>
+                <CalendarIcon className="size-4 shrink-0 text-muted-foreground" />
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-auto p-0">
+                <Calendar
+                  mode="single"
+                  selected={
+                    nextBillingDate
+                      ? parse(nextBillingDate, "yyyy-MM-dd", new Date())
+                      : undefined
+                  }
+                  onSelect={(date) => {
+                    if (date) {
+                      setNextBillingDate(format(date, "yyyy-MM-dd"));
+                    }
+                    setCalendarOpen(false);
+                  }}
+                  defaultMonth={
+                    nextBillingDate
+                      ? parse(nextBillingDate, "yyyy-MM-dd", new Date())
+                      : undefined
+                  }
+                />
+              </PopoverContent>
+            </Popover>
           </div>
 
           {/* Category */}
