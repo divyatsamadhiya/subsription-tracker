@@ -48,6 +48,7 @@ import {
   type AnalyticsRange,
 } from "@/lib/analytics";
 import type { SubscriptionCategory } from "@/lib/types";
+import { CATEGORY_HEX } from "@/lib/category-colors";
 
 const container = {
   hidden: { opacity: 0 },
@@ -57,14 +58,6 @@ const container = {
 const item = {
   hidden: { opacity: 0, y: 8 },
   show: { opacity: 1, y: 0, transition: { duration: 0.3 } },
-};
-
-const CATEGORY_HEX: Record<SubscriptionCategory, string> = {
-  entertainment: "#7C3AED",
-  productivity: "#10B981",
-  utilities: "#F59E0B",
-  health: "#EC4899",
-  other: "#3B82F6",
 };
 
 const RANGE_OPTIONS: Array<{ value: AnalyticsRange; label: string }> = [

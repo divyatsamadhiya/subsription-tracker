@@ -9,6 +9,7 @@ import {
   TooltipContent,
 } from "@/components/ui/tooltip";
 import { formatCurrencyMinor } from "@/lib/format";
+import { buildCalendarGrid, buildRenewalMap, formatMonthLabel } from "@/lib/calendar-grid";
 
 interface RenewalCalendarProps {
   renewals: Subscription[];
@@ -18,40 +19,17 @@ interface RenewalCalendarProps {
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export function RenewalCalendar({ renewals, today }: RenewalCalendarProps) {
-  const { year, month, days, todayDay, renewalMap, monthLabel } = useMemo(() => {
+  const { days, todayDay, renewalMap, monthLabel } = useMemo(() => {
     const [y, m] = today.split("-").map(Number);
     const daysInMonth = new Date(y, m, 0).getDate();
     const firstDow = new Date(y, m - 1, 1).getDay();
     const todayD = Number(today.split("-")[2]);
 
-    const rMap = new Map<number, Subscription[]>();
-    for (const sub of renewals) {
-      const day = Number(sub.nextBillingDate.split("-")[2]);
-      const subMonth = Number(sub.nextBillingDate.split("-")[1]);
-      const subYear = Number(sub.nextBillingDate.split("-")[0]);
-      if (subYear === y && subMonth === m) {
-        const existing = rMap.get(day) ?? [];
-        existing.push(sub);
-        rMap.set(day, existing);
-      }
-    }
-
-    const label = new Date(y, m - 1).toLocaleString("default", {
-      month: "long",
-      year: "numeric",
-    });
-
-    const allDays: (number | null)[] = [];
-    for (let i = 0; i < firstDow; i++) allDays.push(null);
-    for (let d = 1; d <= daysInMonth; d++) allDays.push(d);
-
     return {
-      year: y,
-      month: m,
-      days: allDays,
+      days: buildCalendarGrid(daysInMonth, firstDow),
       todayDay: todayD,
-      renewalMap: rMap,
-      monthLabel: label,
+      renewalMap: buildRenewalMap(renewals, y, m),
+      monthLabel: formatMonthLabel(y, m),
     };
   }, [today, renewals]);
 

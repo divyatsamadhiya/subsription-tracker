@@ -57,6 +57,7 @@ import {
   togglePinnedSubscription,
   type SubscriptionSortOption,
 } from "@/lib/subscriptions-list";
+import { toSubscriptionInput } from "@/lib/subscription-utils";
 
 type StatusFilter = "all" | "active" | "paused";
 const PINNED_ORDER_STORAGE_KEY = "subscription-tracker:pinned-order:v1";
@@ -77,6 +78,8 @@ export default function SubscriptionsPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const createRequested = searchParams.get("action") === "create";
+  const editRequested = searchParams.get("action") === "edit";
+  const editRequestedId = searchParams.get("id");
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [categoryFilter, setCategoryFilter] = useState<SubscriptionCategory | "all">("all");
@@ -218,31 +221,22 @@ export default function SubscriptionsPage() {
     setFormOpen(true);
   }
 
-  // Auto-open create form when navigated with ?action=create
+  // Auto-open create/edit form when navigated with ?action=create or ?action=edit&id=...
   useEffect(() => {
     if (createRequested) {
       router.replace("/subscriptions", { scroll: false });
+    } else if (editRequested && editRequestedId) {
+      const target = subscriptions.find((s) => s.id === editRequestedId);
+      if (target) {
+        openEdit(target);
+      }
+      router.replace("/subscriptions", { scroll: false });
     }
-  }, [createRequested, router]);
+  }, [createRequested, editRequested, editRequestedId, router, subscriptions]);
 
   useEffect(() => {
     window.localStorage.setItem(PINNED_ORDER_STORAGE_KEY, JSON.stringify(pinnedIds));
   }, [pinnedIds]);
-
-  function toSubscriptionInput(subscription: Subscription, overrides?: Partial<SubscriptionInput>) {
-    return {
-      name: subscription.name,
-      amountMinor: subscription.amountMinor,
-      billingCycle: subscription.billingCycle,
-      customIntervalDays: subscription.customIntervalDays,
-      nextBillingDate: subscription.nextBillingDate,
-      category: subscription.category,
-      reminderDaysBefore: subscription.reminderDaysBefore,
-      isActive: subscription.isActive,
-      notes: subscription.notes,
-      ...overrides,
-    };
-  }
 
   async function handleFormSubmit(data: SubscriptionInput) {
     if (formMode === "create") {

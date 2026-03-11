@@ -54,12 +54,14 @@ import {
 } from "@/lib/date";
 import type { Subscription, SubscriptionCategory } from "@/lib/types";
 import { CATEGORY_OPTIONS } from "@/lib/types";
+import { CATEGORY_HEX } from "@/lib/category-colors";
+import { toSubscriptionInput } from "@/lib/subscription-utils";
 import { AnimatedNumber } from "@/components/dashboard/animated-number";
 import { Sparkline } from "@/components/dashboard/sparkline";
 import { RenewalCalendar } from "@/components/dashboard/renewal-calendar";
-import { getBrandColor } from "@/lib/brand-colors";
-import { getBrandIcon } from "@/lib/brand-icons";
+import { SubscriptionAvatar } from "@/components/dashboard/subscription-avatar";
 import { buildSpendSparkline } from "@/lib/overview-helpers";
+
 import { buildSpendTrend } from "@/lib/analytics";
 import {
   getGreetingRenewalTip,
@@ -83,14 +85,6 @@ const container = {
 const item = {
   hidden: { opacity: 0, y: 8 },
   show: { opacity: 1, y: 0, transition: { duration: 0.3 } },
-};
-
-const CATEGORY_HEX: Record<SubscriptionCategory, string> = {
-  entertainment: "#7C3AED",
-  productivity: "#10B981",
-  utilities: "#F59E0B",
-  health: "#EC4899",
-  other: "#3B82F6",
 };
 
 interface CostWatchPreference {
@@ -149,40 +143,6 @@ function urgencyClass(days: number) {
     return "border-destructive/60 bg-destructive text-white";
   }
   return "bg-muted text-muted-foreground border-border";
-}
-
-/** Brand-colored initial circle for a subscription */
-function SubIcon({ name, category }: { name: string; category: SubscriptionCategory }) {
-  const brandColor = getBrandColor(name);
-  const brandIcon = getBrandIcon(name);
-  const bgColor = brandColor ?? CATEGORY_HEX[category];
-  const initial = name[0]?.toUpperCase() ?? "?";
-  const iconColor = brandIcon?.hex === "000000" ? "currentColor" : `#${brandIcon?.hex}`;
-
-  return (
-    <div
-      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[11px] font-bold text-white"
-      style={{
-        backgroundColor: brandIcon ? `${bgColor}1A` : bgColor,
-        color: brandIcon ? iconColor : "#FFFFFF",
-      }}
-      aria-hidden="true"
-    >
-      {brandIcon ? (
-        <svg
-          viewBox="0 0 24 24"
-          className="size-4"
-          fill="currentColor"
-          role="img"
-          aria-label={brandIcon.title}
-        >
-          <path d={brandIcon.path} />
-        </svg>
-      ) : (
-        initial
-      )}
-    </div>
-  );
 }
 
 export default function OverviewPage() {
@@ -325,17 +285,7 @@ export default function OverviewPage() {
     .map((subscription) => subscription.name) ?? [];
 
   async function handleToggleActive(sub: Subscription) {
-    await api.updateSubscription(sub.id, {
-      name: sub.name,
-      amountMinor: sub.amountMinor,
-      billingCycle: sub.billingCycle,
-      customIntervalDays: sub.customIntervalDays,
-      nextBillingDate: sub.nextBillingDate,
-      category: sub.category,
-      reminderDaysBefore: sub.reminderDaysBefore,
-      isActive: !sub.isActive,
-      notes: sub.notes,
-    });
+    await api.updateSubscription(sub.id, toSubscriptionInput(sub, { isActive: !sub.isActive }));
     await refresh();
   }
 
@@ -630,7 +580,7 @@ export default function OverviewPage() {
                           className="group flex items-center justify-between px-6 py-3 transition-colors hover:bg-accent/50"
                         >
                           <div className="flex items-center gap-3 min-w-0">
-                            <SubIcon name={sub.name} category={sub.category} />
+                            <SubscriptionAvatar name={sub.name} category={sub.category} size="xs" />
                             <div className="min-w-0">
                               <p className="truncate text-sm font-medium">
                                 {sub.name}
@@ -644,7 +594,7 @@ export default function OverviewPage() {
                             {/* Quick actions — visible on hover */}
                             <div className="hidden items-center gap-0.5 opacity-0 transition-opacity group-hover:flex group-hover:opacity-100">
                               <button
-                                onClick={() => router.push(`/subscriptions?action=create`)}
+                                onClick={() => router.push(`/subscriptions?action=edit&id=${sub.id}`)}
                                 className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                                 aria-label="Edit"
                               >
@@ -1115,9 +1065,10 @@ function InsightSpotlightCard({
       <CardContent className="flex h-full min-h-[250px] flex-col justify-between gap-5">
         <div className="space-y-4">
           <div className="flex items-center gap-3">
-            <SubIcon
+            <SubscriptionAvatar
               name={mostExpensiveInsight.subscription.name}
               category={mostExpensiveInsight.subscription.category}
+              size="xs"
             />
             <div className="min-w-0">
               <p className="truncate font-medium">

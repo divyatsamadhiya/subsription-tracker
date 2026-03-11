@@ -2,15 +2,8 @@
 
 import { getBrandColor } from "@/lib/brand-colors";
 import { getBrandIcon } from "@/lib/brand-icons";
+import { CATEGORY_HEX } from "@/lib/category-colors";
 import type { SubscriptionCategory } from "@/lib/types";
-
-const CATEGORY_HEX: Record<SubscriptionCategory, string> = {
-  entertainment: "#7C3AED",
-  productivity: "#10B981",
-  utilities: "#F59E0B",
-  health: "#EC4899",
-  other: "#3B82F6",
-};
 
 export function SubscriptionAvatar({
   name,
@@ -19,15 +12,20 @@ export function SubscriptionAvatar({
 }: {
   name: string;
   category: SubscriptionCategory;
-  size?: "sm" | "md";
+  size?: "xs" | "sm" | "md";
 }) {
   const brandColor = getBrandColor(name);
   const brandIcon = getBrandIcon(name);
   const bgColor = brandColor ?? CATEGORY_HEX[category];
   const initial = name[0]?.toUpperCase() ?? "?";
   const iconColor = brandIcon?.hex === "000000" ? "currentColor" : `#${brandIcon?.hex}`;
-  const dimensions = size === "sm" ? "h-8 w-8 rounded-xl" : "h-10 w-10 rounded-2xl";
-  const glyphSize = size === "sm" ? "size-4" : "size-5";
+  const dimensions =
+    size === "xs"
+      ? "h-7 w-7 rounded-lg"
+      : size === "sm"
+        ? "h-8 w-8 rounded-xl"
+        : "h-10 w-10 rounded-2xl";
+  const glyphSize = size === "xs" ? "size-3.5" : size === "sm" ? "size-4" : "size-5";
 
   return (
     <div
@@ -36,6 +34,7 @@ export function SubscriptionAvatar({
         backgroundColor: brandIcon ? `${bgColor}1A` : bgColor,
         color: brandIcon ? iconColor : "#FFFFFF",
       }}
+      aria-hidden="true"
     >
       {brandIcon ? (
         <svg

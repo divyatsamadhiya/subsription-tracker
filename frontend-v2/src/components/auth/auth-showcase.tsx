@@ -10,11 +10,11 @@ interface CountUpProps {
   prefix?: string;
   suffix?: string;
   duration?: number;
+  decimals?: number;
 }
 
-function CountUp({ target, prefix = "", suffix = "", duration = 2000 }: CountUpProps) {
+function CountUp({ target, prefix = "", suffix = "", duration = 2000, decimals = 0 }: CountUpProps) {
   const [value, setValue] = useState(0);
-  const ref = useRef<HTMLSpanElement>(null);
   const started = useRef(false);
 
   useEffect(() => {
@@ -27,25 +27,26 @@ function CountUp({ target, prefix = "", suffix = "", duration = 2000 }: CountUpP
       const progress = Math.min(elapsed / duration, 1);
       // ease-out cubic
       const eased = 1 - Math.pow(1 - progress, 3);
-      setValue(Math.round(eased * target));
+      const factor = Math.pow(10, decimals);
+      setValue(Math.round(eased * target * factor) / factor);
       if (progress < 1) requestAnimationFrame(tick);
     }
     requestAnimationFrame(tick);
-  }, [target, duration]);
+  }, [target, duration, decimals]);
 
   return (
-    <span ref={ref}>
+    <span>
       {prefix}
-      {value.toLocaleString()}
+      {decimals > 0 ? value.toFixed(decimals) : value.toLocaleString()}
       {suffix}
     </span>
   );
 }
 
 const stats = [
-  { target: 3200, prefix: "", suffix: "+", label: "Subscriptions tracked" },
-  { target: 48, prefix: "$", suffix: "K", label: "Saved by users" },
-  { target: 99.9, prefix: "", suffix: "%", label: "Uptime", isDecimal: true },
+  { target: 3200, prefix: "", suffix: "+", label: "Subscriptions tracked", decimals: 0 },
+  { target: 48, prefix: "$", suffix: "K", label: "Saved by users", decimals: 0 },
+  { target: 99.9, prefix: "", suffix: "%", label: "Uptime", decimals: 1 },
 ];
 
 export function AuthShowcase() {
@@ -124,16 +125,13 @@ export function AuthShowcase() {
         {stats.map((stat) => (
           <div key={stat.label}>
             <p className="font-heading text-2xl font-semibold">
-              {stat.isDecimal ? (
-                <>{stat.prefix}99.9{stat.suffix}</>
-              ) : (
-                <CountUp
-                  target={stat.target}
-                  prefix={stat.prefix}
-                  suffix={stat.suffix}
-                  duration={2200}
-                />
-              )}
+              <CountUp
+                target={stat.target}
+                prefix={stat.prefix}
+                suffix={stat.suffix}
+                duration={2200}
+                decimals={stat.decimals}
+              />
             </p>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {stat.label}

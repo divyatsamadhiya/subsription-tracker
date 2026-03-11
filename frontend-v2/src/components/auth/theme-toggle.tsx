@@ -4,11 +4,6 @@ import { useEffect, useState } from "react";
 import { Sun, Moon } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
-function getSystemDark() {
-  if (typeof window === "undefined") return false;
-  return window.matchMedia("(prefers-color-scheme: dark)").matches;
-}
-
 export function AuthThemeToggle() {
   const [dark, setDark] = useState(false);
   const [mounted, setMounted] = useState(false);
