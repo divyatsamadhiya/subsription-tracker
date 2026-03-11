@@ -7,6 +7,12 @@ export interface SpendTrendPoint {
   amountMinor: number;
 }
 
+export interface SpendComparisonPoint extends SpendTrendPoint {
+  previousAmountMinor: number;
+  previousMonthLabel: string;
+  cumulativeAmountMinor: number;
+}
+
 export interface CategorySpendPoint {
   category: SubscriptionCategory;
   amountMinor: number;
@@ -23,6 +29,15 @@ export interface AnalyticsSummary {
   projectedSixMonthMinor: number;
   activeCount: number;
   renewalCount30Days: number;
+  averageMonthlySpendMinor: number;
+  highestSpendMonth: SpendTrendPoint | null;
+  mostCancelledCategory: {
+    category: SubscriptionCategory;
+    count: number;
+  } | null;
+  currentTwelveMonthMinor: number;
+  previousTwelveMonthMinor: number;
+  yoyGrowthPercent: number | null;
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -75,6 +90,25 @@ const nextChargeDate = (
   }
 };
 
+const previousChargeDate = (
+  isoDate: string,
+  billingCycle: BillingCycle,
+  customIntervalDays?: number
+): string => {
+  switch (billingCycle) {
+    case "weekly":
+      return addDays(isoDate, -7);
+    case "monthly":
+      return addMonths(isoDate, -1);
+    case "yearly":
+      return addMonths(isoDate, -12);
+    case "custom_days":
+      return addDays(isoDate, -(customIntervalDays ?? 30));
+    default:
+      return isoDate;
+  }
+};
+
 const monthlyEquivalent = (sub: Subscription): number => {
   switch (sub.billingCycle) {
     case "weekly":
@@ -111,7 +145,19 @@ export const buildSpendTrend = (
   for (const sub of active) {
     let date = sub.nextBillingDate;
     let guard = 0;
-    while (date < fromIsoDate && guard < 400) {
+
+    while (date > startMonthKey && guard < 400) {
+      const previous = previousChargeDate(
+        date,
+        sub.billingCycle,
+        sub.customIntervalDays
+      );
+      if (previous === date) break;
+      date = previous;
+      guard++;
+    }
+
+    while (date < startMonthKey && guard < 800) {
       date = nextChargeDate(date, sub.billingCycle, sub.customIntervalDays);
       guard++;
     }
@@ -124,6 +170,30 @@ export const buildSpendTrend = (
   }
 
   return result;
+};
+
+export const buildSpendComparisonTrend = (
+  subscriptions: Subscription[],
+  fromIsoDate: string,
+  monthsAhead = 12
+): SpendComparisonPoint[] => {
+  const count = Math.max(1, monthsAhead);
+  const currentStartIso = `${fromIsoDate.slice(0, 7)}-01`;
+  const previousStartIso = addMonths(currentStartIso, -count);
+  const current = buildSpendTrend(subscriptions, currentStartIso, count);
+  const previous = buildSpendTrend(subscriptions, previousStartIso, count);
+  let cumulativeAmountMinor = 0;
+
+  return current.map((point, index) => {
+    cumulativeAmountMinor += point.amountMinor;
+
+    return {
+      ...point,
+      previousAmountMinor: previous[index]?.amountMinor ?? 0,
+      previousMonthLabel: previous[index]?.monthLabel ?? "",
+      cumulativeAmountMinor,
+    };
+  });
 };
 
 export const buildCategorySpend = (
@@ -171,15 +241,61 @@ export const buildRenewalBuckets = (
   return buckets;
 };
 
+export const getMostCancelledCategory = (
+  subscriptions: Subscription[]
+): AnalyticsSummary["mostCancelledCategory"] => {
+  const counts = new Map<SubscriptionCategory, number>();
+
+  for (const sub of subscriptions.filter((subscription) => !subscription.isActive)) {
+    counts.set(sub.category, (counts.get(sub.category) ?? 0) + 1);
+  }
+
+  const [category, count] =
+    [...counts.entries()].sort((left, right) => right[1] - left[1])[0] ?? [];
+
+  if (!category || !count) return null;
+
+  return { category, count };
+};
+
 export const buildAnalyticsSummary = (
   subscriptions: Subscription[],
   todayIsoDate: string
-): AnalyticsSummary => ({
-  monthlyBaselineMinor: calculateMonthlyTotalMinor(subscriptions),
-  projectedSixMonthMinor: buildSpendTrend(subscriptions, todayIsoDate, 6).reduce(
-    (s, p) => s + p.amountMinor,
+): AnalyticsSummary => {
+  const sixMonthTrend = buildSpendTrend(subscriptions, todayIsoDate, 6);
+  const twelveMonthTrend = buildSpendComparisonTrend(subscriptions, todayIsoDate, 12);
+  const currentTwelveMonthMinor = twelveMonthTrend.reduce(
+    (sum, point) => sum + point.amountMinor,
     0
-  ),
-  activeCount: subscriptions.filter((s) => s.isActive).length,
-  renewalCount30Days: getUpcomingRenewals(subscriptions, todayIsoDate, 30).length,
-});
+  );
+  const previousTwelveMonthMinor = twelveMonthTrend.reduce(
+    (sum, point) => sum + point.previousAmountMinor,
+    0
+  );
+  const highestSpendMonth =
+    currentTwelveMonthMinor > 0
+      ? [...twelveMonthTrend].sort((left, right) => right.amountMinor - left.amountMinor)[0] ??
+        null
+      : null;
+  const yoyGrowthPercent =
+    previousTwelveMonthMinor > 0
+      ? ((currentTwelveMonthMinor - previousTwelveMonthMinor) /
+          previousTwelveMonthMinor) *
+        100
+      : currentTwelveMonthMinor > 0
+        ? 100
+        : null;
+
+  return {
+    monthlyBaselineMinor: calculateMonthlyTotalMinor(subscriptions),
+    projectedSixMonthMinor: sixMonthTrend.reduce((sum, point) => sum + point.amountMinor, 0),
+    activeCount: subscriptions.filter((s) => s.isActive).length,
+    renewalCount30Days: getUpcomingRenewals(subscriptions, todayIsoDate, 30).length,
+    averageMonthlySpendMinor: Math.round(currentTwelveMonthMinor / 12),
+    highestSpendMonth,
+    mostCancelledCategory: getMostCancelledCategory(subscriptions),
+    currentTwelveMonthMinor,
+    previousTwelveMonthMinor,
+    yoyGrowthPercent,
+  };
+};

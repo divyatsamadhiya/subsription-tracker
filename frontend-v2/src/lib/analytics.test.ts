@@ -1,9 +1,11 @@
 import { describe, it, expect } from "vitest";
 import {
   buildSpendTrend,
+  buildSpendComparisonTrend,
   buildCategorySpend,
   buildRenewalBuckets,
   buildAnalyticsSummary,
+  getMostCancelledCategory,
 } from "./analytics";
 import { buildSubscription } from "@/test/factories";
 
@@ -107,6 +109,19 @@ describe("buildSpendTrend", () => {
     expect(result[0].amountMinor).toBe(1000);
   });
 
+  it("rewinds future billing dates to fill historical windows", () => {
+    const subs = [
+      buildSubscription({
+        billingCycle: "monthly",
+        amountMinor: 1000,
+        nextBillingDate: "2026-03-15",
+        isActive: true,
+      }),
+    ];
+    const result = buildSpendTrend(subs, "2025-12-01", 3);
+    expect(result.map((point) => point.amountMinor)).toEqual([1000, 1000, 1000]);
+  });
+
   it("has monthLabel and monthKey for each point", () => {
     const result = buildSpendTrend([], "2026-03-01", 3);
     expect(result[0].monthKey).toBe("2026-03");
@@ -134,6 +149,26 @@ describe("buildSpendTrend", () => {
     ];
     const result = buildSpendTrend(subs, "2026-03-01", 1);
     expect(result[0].amountMinor).toBe(1500);
+  });
+});
+
+describe("buildSpendComparisonTrend", () => {
+  it("returns 12 months of current spend with previous-period overlays", () => {
+    const subs = [
+      buildSubscription({
+        billingCycle: "monthly",
+        amountMinor: 1000,
+        nextBillingDate: "2026-03-15",
+        isActive: true,
+      }),
+    ];
+
+    const result = buildSpendComparisonTrend(subs, "2026-03-11", 12);
+
+    expect(result).toHaveLength(12);
+    expect(result[0].amountMinor).toBe(1000);
+    expect(result[0].previousAmountMinor).toBe(1000);
+    expect(result[1].cumulativeAmountMinor).toBe(2000);
   });
 });
 
@@ -345,6 +380,12 @@ describe("buildAnalyticsSummary", () => {
     expect(result.projectedSixMonthMinor).toBe(0);
     expect(result.activeCount).toBe(0);
     expect(result.renewalCount30Days).toBe(0);
+    expect(result.averageMonthlySpendMinor).toBe(0);
+    expect(result.highestSpendMonth).toBeNull();
+    expect(result.mostCancelledCategory).toBeNull();
+    expect(result.currentTwelveMonthMinor).toBe(0);
+    expect(result.previousTwelveMonthMinor).toBe(0);
+    expect(result.yoyGrowthPercent).toBeNull();
   });
 
   it("counts active subscriptions", () => {
@@ -400,5 +441,41 @@ describe("buildAnalyticsSummary", () => {
     ];
     const result = buildAnalyticsSummary(subs, "2026-03-01");
     expect(result.projectedSixMonthMinor).toBe(6000);
+  });
+
+  it("derives average month, highest month, and growth from the 12 month view", () => {
+    const subs = [
+      buildSubscription({
+        billingCycle: "monthly",
+        amountMinor: 1000,
+        nextBillingDate: "2026-03-15",
+        isActive: true,
+      }),
+    ];
+    const result = buildAnalyticsSummary(subs, "2026-03-11");
+
+    expect(result.averageMonthlySpendMinor).toBe(1000);
+    expect(result.highestSpendMonth?.amountMinor).toBe(1000);
+    expect(result.currentTwelveMonthMinor).toBe(12000);
+    expect(result.previousTwelveMonthMinor).toBe(12000);
+    expect(result.yoyGrowthPercent).toBe(0);
+  });
+
+  it("finds the most cancelled category from inactive subscriptions", () => {
+    const subs = [
+      buildSubscription({ category: "utilities", isActive: false }),
+      buildSubscription({ category: "utilities", isActive: false }),
+      buildSubscription({ category: "health", isActive: false }),
+      buildSubscription({ category: "entertainment", isActive: true }),
+    ];
+
+    expect(getMostCancelledCategory(subs)).toEqual({
+      category: "utilities",
+      count: 2,
+    });
+    expect(buildAnalyticsSummary(subs, "2026-03-11").mostCancelledCategory).toEqual({
+      category: "utilities",
+      count: 2,
+    });
   });
 });

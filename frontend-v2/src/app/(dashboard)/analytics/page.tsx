@@ -1,13 +1,13 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import {
-  AreaChart,
-  Area,
   BarChart,
   Bar,
+  ComposedChart,
+  Line,
   PieChart,
   Pie,
   Cell,
@@ -23,6 +23,7 @@ import {
   CreditCard,
   CalendarClock,
   BarChart3,
+  Layers3,
   Plus,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,7 +32,7 @@ import { useDashboard } from "@/lib/dashboard-context";
 import { formatCurrencyMinor, categoryLabel, currencySymbol } from "@/lib/format";
 import { nowIsoDate } from "@/lib/date";
 import {
-  buildSpendTrend,
+  buildSpendComparisonTrend,
   buildCategorySpend,
   buildRenewalBuckets,
   buildAnalyticsSummary,
@@ -61,13 +62,14 @@ export default function AnalyticsPage() {
   const router = useRouter();
   const currency = settings.defaultCurrency;
   const today = nowIsoDate();
+  const [showComparison, setShowComparison] = useState(false);
 
   const summary = useMemo(
     () => buildAnalyticsSummary(subscriptions, today),
     [subscriptions, today]
   );
   const spendTrend = useMemo(
-    () => buildSpendTrend(subscriptions, today, 6),
+    () => buildSpendComparisonTrend(subscriptions, today, 12),
     [subscriptions, today]
   );
   const categorySpend = useMemo(
@@ -134,6 +136,9 @@ export default function AnalyticsPage() {
   const trendData = spendTrend.map((p) => ({
     name: p.monthLabel,
     amount: p.amountMinor / 100,
+    cumulative: p.cumulativeAmountMinor / 100,
+    previousAmount: p.previousAmountMinor / 100,
+    previousMonthLabel: p.previousMonthLabel,
   }));
 
   const pieData = categorySpend.map((p) => ({
@@ -162,42 +167,72 @@ export default function AnalyticsPage() {
       >
         <KpiCard
           icon={DollarSign}
-          label="Monthly baseline"
-          value={formatCurrencyMinor(summary.monthlyBaselineMinor, currency)}
-        />
-        <KpiCard
-          icon={TrendingUp}
-          label="6-month projection"
-          value={formatCurrencyMinor(summary.projectedSixMonthMinor, currency)}
-        />
-        <KpiCard
-          icon={CreditCard}
-          label="Active subs"
-          value={String(summary.activeCount)}
+          label="Avg monthly spend"
+          value={formatCurrencyMinor(summary.averageMonthlySpendMinor, currency)}
+          subtitle="Across the next 12 months"
         />
         <KpiCard
           icon={CalendarClock}
-          label="Due in 30 days"
-          value={String(summary.renewalCount30Days)}
+          label="Highest spend month"
+          value={summary.highestSpendMonth?.monthLabel ?? "No data"}
+          subtitle={
+            summary.highestSpendMonth
+              ? formatCurrencyMinor(summary.highestSpendMonth.amountMinor, currency)
+              : "No upcoming charges yet"
+          }
+        />
+        <KpiCard
+          icon={CreditCard}
+          label="Most cancelled category"
+          value={
+            summary.mostCancelledCategory
+              ? categoryLabel(summary.mostCancelledCategory.category)
+              : "No cancellations"
+          }
+          subtitle={
+            summary.mostCancelledCategory
+              ? `${summary.mostCancelledCategory.count} inactive subscription${
+                  summary.mostCancelledCategory.count === 1 ? "" : "s"
+                }`
+              : "Nothing inactive to analyze"
+          }
+        />
+        <KpiCard
+          icon={TrendingUp}
+          label="YoY growth"
+          value={
+            summary.yoyGrowthPercent === null
+              ? "N/A"
+              : `${summary.yoyGrowthPercent >= 0 ? "+" : ""}${summary.yoyGrowthPercent.toFixed(0)}%`
+          }
+          subtitle="Vs previous 12 months"
         />
       </motion.div>
 
-      {/* Spend Trend - Area Chart */}
+      {/* Spend Trend - 12 month combo chart */}
       <motion.div variants={item} className="mb-6">
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Monthly spend trend</CardTitle>
+          <CardHeader className="flex flex-col gap-3 pb-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle className="text-base">12-month spend outlook</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Bars track monthly spend. The line shows your running yearly total.
+              </p>
+            </div>
+            <Button
+              variant={showComparison ? "secondary" : "outline"}
+              size="sm"
+              className="gap-2 self-start"
+              onClick={() => setShowComparison((current) => !current)}
+            >
+              <Layers3 className="size-3.5" />
+              {showComparison ? "Hide previous period" : "Vs previous period"}
+            </Button>
           </CardHeader>
           <CardContent>
-            <div className="h-[280px]">
+            <div className="h-[320px]">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={trendData}>
-                  <defs>
-                    <linearGradient id="spendGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--color-primary)" stopOpacity={0.2} />
-                      <stop offset="95%" stopColor="var(--color-primary)" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
+                <ComposedChart data={trendData}>
                   <CartesianGrid
                     strokeDasharray="3 3"
                     stroke="var(--color-border)"
@@ -208,6 +243,8 @@ export default function AnalyticsPage() {
                     tick={{ fontSize: 12, fill: "var(--color-muted-foreground)" }}
                     axisLine={false}
                     tickLine={false}
+                    interval={1}
+                    tickFormatter={(value) => value.slice(0, 3)}
                   />
                   <YAxis
                     tick={{ fontSize: 12, fill: "var(--color-muted-foreground)" }}
@@ -223,16 +260,45 @@ export default function AnalyticsPage() {
                       borderRadius: 8,
                       fontSize: 13,
                     }}
-                    formatter={(value) => [`${sym}${Number(value).toFixed(2)}`, "Spend"]}
+                    formatter={(value, name, item) => {
+                      if (name === "previousAmount") {
+                        return [
+                          `${sym}${Number(value).toFixed(2)}`,
+                          `Previous (${item.payload.previousMonthLabel})`,
+                        ];
+                      }
+
+                      if (name === "cumulative") {
+                        return [`${sym}${Number(value).toFixed(2)}`, "Cumulative total"];
+                      }
+
+                      return [`${sym}${Number(value).toFixed(2)}`, "Monthly spend"];
+                    }}
                   />
-                  <Area
-                    type="monotone"
+                  <Bar
                     dataKey="amount"
-                    stroke="var(--color-primary)"
-                    strokeWidth={2}
-                    fill="url(#spendGradient)"
+                    fill="var(--color-primary)"
+                    radius={[6, 6, 0, 0]}
+                    maxBarSize={28}
                   />
-                </AreaChart>
+                  {showComparison && (
+                    <Line
+                      type="monotone"
+                      dataKey="previousAmount"
+                      stroke="var(--color-muted-foreground)"
+                      strokeWidth={2}
+                      strokeDasharray="6 4"
+                      dot={false}
+                    />
+                  )}
+                  <Line
+                    type="monotone"
+                    dataKey="cumulative"
+                    stroke="#10B981"
+                    strokeWidth={2.5}
+                    dot={false}
+                  />
+                </ComposedChart>
               </ResponsiveContainer>
             </div>
           </CardContent>
@@ -379,10 +445,12 @@ function KpiCard({
   icon: Icon,
   label,
   value,
+  subtitle,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   value: string;
+  subtitle?: string;
 }) {
   return (
     <Card className="relative overflow-hidden">
@@ -394,6 +462,11 @@ function KpiCard({
         <p className="mt-1.5 font-heading text-xl font-semibold tracking-tight">
           {value}
         </p>
+        {subtitle && (
+          <p className="mt-1 text-xs text-muted-foreground">
+            {subtitle}
+          </p>
+        )}
       </CardContent>
     </Card>
   );
