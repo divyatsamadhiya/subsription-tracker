@@ -197,21 +197,13 @@ export default function SubscriptionsPage() {
 
       {/* Category filter */}
       <div className="mt-3 flex gap-1.5 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-x-visible sm:pb-0">
-        <button
-          onClick={() => setCategoryFilter("all")}
-          className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-            categoryFilter === "all"
-              ? "border-primary bg-primary/10 text-primary"
-              : "border-border text-muted-foreground hover:bg-accent"
-          }`}
-        >
-          All ({statusFiltered.length})
-        </button>
         {CATEGORY_OPTIONS.filter((cat) => (categoryCounts.get(cat) ?? 0) > 0).map(
           (cat) => (
             <button
               key={cat}
-              onClick={() => setCategoryFilter(cat)}
+              onClick={() =>
+                setCategoryFilter((current) => (current === cat ? "all" : cat))
+              }
               className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
                 categoryFilter === cat
                   ? "border-primary bg-primary/10 text-primary"
@@ -287,7 +279,7 @@ export default function SubscriptionsPage() {
                             {!sub.isActive && (
                               <Badge
                                 variant="outline"
-                                className="text-[10px] px-1.5 py-0 border-warning/30 text-warning-foreground bg-warning/10"
+                                className="border-destructive/60 bg-destructive px-1.5 py-0 text-[10px] text-white"
                               >
                                 Paused
                               </Badge>

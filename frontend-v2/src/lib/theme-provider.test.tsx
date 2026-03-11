@@ -19,6 +19,25 @@ let mockMediaDark = false;
 const mediaListeners: Array<() => void> = [];
 
 beforeEach(() => {
+  const storage = new Map<string, string>();
+  Object.defineProperty(window, "localStorage", {
+    writable: true,
+    value: {
+      clear: () => storage.clear(),
+      getItem: (key: string) => storage.get(key) ?? null,
+      key: (index: number) => Array.from(storage.keys())[index] ?? null,
+      get length() {
+        return storage.size;
+      },
+      removeItem: (key: string) => {
+        storage.delete(key);
+      },
+      setItem: (key: string, value: string) => {
+        storage.set(key, String(value));
+      },
+    } satisfies Storage,
+  });
+
   localStorage.clear();
   document.documentElement.classList.remove("dark");
   lastSetTheme = null;
@@ -111,6 +130,20 @@ describe("ThemeProvider", () => {
     const { unmount } = renderProvider();
     expect(lastTheme).toBe("dark");
     expect(lastResolved).toBe("dark");
+    unmount();
+  });
+
+  it("ignores stored theme on auth routes", () => {
+    localStorage.setItem("pulseboard-theme", "dark");
+    Object.defineProperty(window, "location", {
+      writable: true,
+      value: { pathname: "/login" },
+    });
+
+    const { unmount } = renderProvider();
+    expect(lastTheme).toBe("system");
+    expect(lastResolved).toBe("light");
+    expect(document.documentElement.classList.contains("dark")).toBe(false);
     unmount();
   });
 

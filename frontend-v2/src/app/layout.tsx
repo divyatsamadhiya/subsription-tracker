@@ -41,7 +41,7 @@ export const viewport: Viewport = {
  * Inline script to apply dark class before React hydrates (prevents FOUC).
  * Reads from localStorage; falls back to system preference.
  */
-const themeScript = `(function(){try{var t=localStorage.getItem("pulseboard-theme");if(t==="dark"||(t!=="light"&&matchMedia("(prefers-color-scheme:dark)").matches))document.documentElement.classList.add("dark")}catch(e){}})()`;
+const themeScript = `(function(){try{var p=window.location.pathname;var isAuth=p==="/login"||p==="/register"||p==="/forgot-password";var t=isAuth?null:localStorage.getItem("pulseboard-theme");if(t==="dark"||(t!=="light"&&matchMedia("(prefers-color-scheme:dark)").matches))document.documentElement.classList.add("dark")}catch(e){}})()`;
 
 export default function RootLayout({
   children,

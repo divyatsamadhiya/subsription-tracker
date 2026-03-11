@@ -23,6 +23,7 @@ const ThemeContext = createContext<ThemeContextValue>({
 });
 
 const STORAGE_KEY = "pulseboard-theme";
+const AUTH_PATHS = new Set(["/login", "/register", "/forgot-password"]);
 
 function getSystemTheme(): "light" | "dark" {
   if (typeof window === "undefined") return "light";
@@ -31,22 +32,26 @@ function getSystemTheme(): "light" | "dark" {
     : "light";
 }
 
+function isAuthPath(pathname: string): boolean {
+  return AUTH_PATHS.has(pathname);
+}
+
 function resolve(pref: ThemePreference): "light" | "dark" {
   if (pref === "system") return getSystemTheme();
   return pref;
 }
 
-export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<ThemePreference>("system");
-  const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("light");
+function getInitialTheme(): ThemePreference {
+  if (typeof window === "undefined") return "system";
+  if (isAuthPath(window.location.pathname)) return "system";
+  return (localStorage.getItem(STORAGE_KEY) as ThemePreference | null) ?? "system";
+}
 
-  // Initialise from localStorage
-  useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY) as ThemePreference | null;
-    const initial = stored ?? "system";
-    setThemeState(initial);
-    setResolvedTheme(resolve(initial));
-  }, []);
+export function ThemeProvider({ children }: { children: ReactNode }) {
+  const [theme, setThemeState] = useState<ThemePreference>(() => getInitialTheme());
+  const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">(() =>
+    resolve(getInitialTheme())
+  );
 
   // Apply class to <html>
   useEffect(() => {

@@ -46,8 +46,12 @@ const CATEGORY_COLORS: Record<SubscriptionCategory, string> = {
 };
 
 function urgencyClass(days: number) {
-  if (days <= 0) return "bg-destructive/10 text-destructive border-destructive/20";
-  if (days <= 3) return "bg-warning/10 text-warning-foreground border-warning/20";
+  if (days <= 0) {
+    return "border-destructive/60 bg-destructive text-white";
+  }
+  if (days <= 3) {
+    return "border-destructive/60 bg-destructive text-white";
+  }
   return "bg-muted text-muted-foreground border-border";
 }
 

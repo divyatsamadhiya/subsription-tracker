@@ -412,9 +412,9 @@ describe("authService", () => {
   });
 
   it("builds frontend redirect URLs for Google auth", () => {
-    expect(getGoogleAuthSuccessRedirectUrl()).toBe("http://localhost:5173/");
+    expect(getGoogleAuthSuccessRedirectUrl()).toBe(`${config.frontendAppUrl}/`);
     expect(getGoogleAuthFailureRedirectUrl("google_auth_failed")).toBe(
-      "http://localhost:5173/?authError=google_auth_failed"
+      `${config.frontendAppUrl}/?authError=google_auth_failed`
     );
   });
 
