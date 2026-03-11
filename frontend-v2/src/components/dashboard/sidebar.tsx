@@ -13,7 +13,6 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import {
   Tooltip,
@@ -103,7 +102,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
               key={href}
               href={href}
               className={cn(
-                "relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                 active
                   ? "text-primary"
                   : "text-muted-foreground hover:bg-accent hover:text-foreground"
@@ -116,7 +115,16 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                   transition={{ type: "spring", stiffness: 350, damping: 30 }}
                 />
               )}
-              <Icon className="relative z-10 size-4 shrink-0" />
+              <span
+                className={cn(
+                  "relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-colors",
+                  active
+                    ? "border-primary/20 bg-primary/12 text-primary"
+                    : "border-border/70 bg-background/60 text-muted-foreground group-hover:border-accent-foreground/10 group-hover:text-foreground"
+                )}
+              >
+                <Icon className="size-4 shrink-0" />
+              </span>
               <AnimatePresence>
                 {!collapsed && (
                   <motion.span

@@ -1,13 +1,18 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import {
+  AreaChart,
+  Area,
   PieChart,
   Pie,
   Cell,
   ResponsiveContainer,
+  XAxis,
+  YAxis,
+  CartesianGrid,
   Tooltip as RechartsTooltip,
 } from "recharts";
 import {
@@ -22,8 +27,9 @@ import {
   Pencil,
   Pause,
   Play,
-  ExternalLink,
   ChevronRight,
+  Lightbulb,
+  ArrowUpRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,7 +37,14 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Link from "next/link";
 import { useDashboard } from "@/lib/dashboard-context";
-import { formatCurrencyMinor, categoryLabel, formatShortDate, formatRelativeDue, currencySymbol } from "@/lib/format";
+import {
+  formatCurrencyMinor,
+  categoryLabel,
+  formatShortDate,
+  formatRelativeDue,
+  currencySymbol,
+  billingCycleLabel,
+} from "@/lib/format";
 import {
   calculateMonthlyTotalMinor,
   calculateYearlyTotalMinor,
@@ -45,8 +58,19 @@ import { AnimatedNumber } from "@/components/dashboard/animated-number";
 import { Sparkline } from "@/components/dashboard/sparkline";
 import { RenewalCalendar } from "@/components/dashboard/renewal-calendar";
 import { getBrandColor } from "@/lib/brand-colors";
-import { buildSpendSparkline, buildCountSparkline, estimateTrend } from "@/lib/overview-helpers";
+import { getBrandIcon } from "@/lib/brand-icons";
+import { buildSpendSparkline } from "@/lib/overview-helpers";
+import { buildSpendTrend } from "@/lib/analytics";
+import {
+  getGreetingRenewalTip,
+  getMostExpensiveSubscription,
+  getMostExpensiveSubscriptionTip,
+  getPotentialSavingsInsight,
+  getSavingsFallbackAmountMinor,
+} from "@/lib/dashboard-insights";
 import { api } from "@/lib/api";
+
+const COST_WATCH_STORAGE_PREFIX = "pulseboard-cost-watch";
 
 const container = {
   hidden: { opacity: 0 },
@@ -61,14 +85,6 @@ const item = {
   show: { opacity: 1, y: 0, transition: { duration: 0.3 } },
 };
 
-const CATEGORY_COLORS: Record<SubscriptionCategory, string> = {
-  entertainment: "bg-chart-1",
-  productivity: "bg-chart-2",
-  utilities: "bg-chart-3",
-  health: "bg-chart-4",
-  other: "bg-chart-5",
-};
-
 const CATEGORY_HEX: Record<SubscriptionCategory, string> = {
   entertainment: "#7C3AED",
   productivity: "#10B981",
@@ -76,6 +92,57 @@ const CATEGORY_HEX: Record<SubscriptionCategory, string> = {
   health: "#EC4899",
   other: "#3B82F6",
 };
+
+interface CostWatchPreference {
+  dismissed: boolean;
+  snoozeUntil: string | null;
+}
+
+function getCostWatchStorageKey(subscriptionId: string): string {
+  return `${COST_WATCH_STORAGE_PREFIX}:${subscriptionId}`;
+}
+
+function loadCostWatchPreference(subscriptionId: string): CostWatchPreference {
+  try {
+    const raw = window.localStorage.getItem(getCostWatchStorageKey(subscriptionId));
+    if (!raw) {
+      return { dismissed: false, snoozeUntil: null };
+    }
+
+    const parsed = JSON.parse(raw) as Partial<CostWatchPreference>;
+    return {
+      dismissed: parsed.dismissed === true,
+      snoozeUntil:
+        typeof parsed.snoozeUntil === "string" ? parsed.snoozeUntil : null,
+    };
+  } catch {
+    return { dismissed: false, snoozeUntil: null };
+  }
+}
+
+function saveCostWatchPreference(
+  subscriptionId: string,
+  preference: CostWatchPreference
+) {
+  window.localStorage.setItem(
+    getCostWatchStorageKey(subscriptionId),
+    JSON.stringify(preference)
+  );
+}
+
+function addUtcDays(baseDate: Date, days: number): string {
+  const next = new Date(baseDate);
+  next.setUTCDate(next.getUTCDate() + days);
+  return next.toISOString().slice(0, 10);
+}
+
+function isCostWatchMuted(
+  preference: CostWatchPreference,
+  todayIsoDate: string
+): boolean {
+  if (preference.dismissed) return true;
+  return preference.snoozeUntil != null && preference.snoozeUntil >= todayIsoDate;
+}
 
 function urgencyClass(days: number) {
   if (days <= 3) {
@@ -87,15 +154,33 @@ function urgencyClass(days: number) {
 /** Brand-colored initial circle for a subscription */
 function SubIcon({ name, category }: { name: string; category: SubscriptionCategory }) {
   const brandColor = getBrandColor(name);
+  const brandIcon = getBrandIcon(name);
   const bgColor = brandColor ?? CATEGORY_HEX[category];
   const initial = name[0]?.toUpperCase() ?? "?";
+  const iconColor = brandIcon?.hex === "000000" ? "currentColor" : `#${brandIcon?.hex}`;
 
   return (
     <div
       className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[11px] font-bold text-white"
-      style={{ backgroundColor: bgColor }}
+      style={{
+        backgroundColor: brandIcon ? `${bgColor}1A` : bgColor,
+        color: brandIcon ? iconColor : "#FFFFFF",
+      }}
+      aria-hidden="true"
     >
-      {initial}
+      {brandIcon ? (
+        <svg
+          viewBox="0 0 24 24"
+          className="size-4"
+          fill="currentColor"
+          role="img"
+          aria-label={brandIcon.title}
+        >
+          <path d={brandIcon.path} />
+        </svg>
+      ) : (
+        initial
+      )}
     </div>
   );
 }
@@ -103,12 +188,22 @@ function SubIcon({ name, category }: { name: string; category: SubscriptionCateg
 export default function OverviewPage() {
   const { user, subscriptions, settings, refresh } = useDashboard();
   const router = useRouter();
+  const [currentTime, setCurrentTime] = useState(() => new Date());
+  const [costWatchPreferenceVersion, setCostWatchPreferenceVersion] = useState(0);
   const [renewalWindow, setRenewalWindow] = useState<"7" | "30">("7");
   const [renewalView, setRenewalView] = useState<"list" | "calendar">("list");
   const [expandedCategory, setExpandedCategory] = useState<SubscriptionCategory | null>(null);
   const currency = settings.defaultCurrency;
   const today = nowIsoDate();
   const sym = currencySymbol(currency);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setCurrentTime(new Date());
+    }, 30 * 60 * 1000);
+
+    return () => window.clearInterval(timer);
+  }, []);
 
   const monthlyTotal = useMemo(
     () => calculateMonthlyTotalMinor(subscriptions),
@@ -133,8 +228,57 @@ export default function OverviewPage() {
   );
 
   const spendSparkline = useMemo(() => buildSpendSparkline(subscriptions), [subscriptions]);
-  const countSparkline = useMemo(() => buildCountSparkline(subscriptions), [subscriptions]);
-  const trend = useMemo(() => estimateTrend(subscriptions), [subscriptions]);
+  const spendTrend = useMemo(
+    () => buildSpendTrend(subscriptions, today, 6),
+    [subscriptions, today]
+  );
+  const spendTrendData = useMemo(
+    () =>
+      spendTrend.map((point) => ({
+        name: point.monthLabel,
+        amount: point.amountMinor / 100,
+      })),
+    [spendTrend]
+  );
+  const greetingTip = useMemo(
+    () => getGreetingRenewalTip(subscriptions, today),
+    [subscriptions, today]
+  );
+  const savingsInsight = useMemo(
+    () => getPotentialSavingsInsight(subscriptions),
+    [subscriptions]
+  );
+  const mostExpensiveInsight = useMemo(
+    () => getMostExpensiveSubscription(subscriptions),
+    [subscriptions]
+  );
+  const costWatchPreference = useMemo(() => {
+    void costWatchPreferenceVersion;
+    if (!mostExpensiveInsight || typeof window === "undefined") {
+      return { dismissed: false, snoozeUntil: null };
+    }
+    return loadCostWatchPreference(mostExpensiveInsight.subscription.id);
+  }, [mostExpensiveInsight, costWatchPreferenceVersion]);
+  const costWatchMuted = useMemo(
+    () => isCostWatchMuted(costWatchPreference, today),
+    [costWatchPreference, today]
+  );
+  const spotlightTip = useMemo(
+    () =>
+      getMostExpensiveSubscriptionTip(
+        subscriptions,
+        today,
+        currentTime.getHours(),
+        currency,
+        costWatchMuted ? ["Cost watch"] : []
+      ),
+    [subscriptions, today, currentTime, currency, costWatchMuted]
+  );
+  const fallbackSavingsMinor = useMemo(
+    () => getSavingsFallbackAmountMinor(subscriptions),
+    [subscriptions]
+  );
+  const potentialSavingsMinor = savingsInsight?.amountMinor ?? fallbackSavingsMinor;
 
   const categorySpend = useMemo(() => {
     const totals = new Map<SubscriptionCategory, number>();
@@ -176,6 +320,9 @@ export default function OverviewPage() {
   const firstName = user?.profile?.fullName?.split(" ")[0] ?? "there";
   const dueNames = renewals.slice(0, 3).map((s) => s.name);
   const dueExtra = renewals.length > 3 ? renewals.length - 3 : 0;
+  const savingsNames = savingsInsight?.candidates
+    .slice(0, 2)
+    .map((subscription) => subscription.name) ?? [];
 
   async function handleToggleActive(sub: Subscription) {
     await api.updateSubscription(sub.id, {
@@ -192,17 +339,42 @@ export default function OverviewPage() {
     await refresh();
   }
 
+  function handleDismissCostWatch() {
+    if (!mostExpensiveInsight) return;
+    const nextPreference = { dismissed: true, snoozeUntil: null };
+    saveCostWatchPreference(mostExpensiveInsight.subscription.id, nextPreference);
+    setCostWatchPreferenceVersion((version) => version + 1);
+  }
+
+  function handleSnoozeCostWatch() {
+    if (!mostExpensiveInsight) return;
+    const nextPreference = {
+      dismissed: false,
+      snoozeUntil: addUtcDays(currentTime, 30),
+    };
+    saveCostWatchPreference(mostExpensiveInsight.subscription.id, nextPreference);
+    setCostWatchPreferenceVersion((version) => version + 1);
+  }
+
   return (
     <motion.div variants={container} initial="hidden" animate="show">
       {/* Greeting */}
       <motion.div variants={item} className="mb-6 flex items-start justify-between gap-4">
         <div>
           <h1 className="font-heading text-2xl font-semibold tracking-tight">
-            Good {getGreeting()}, {firstName}
+            Good {getGreeting(currentTime)}, {firstName}
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Here&apos;s your spending overview
-          </p>
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+            <span>Here&apos;s your spending overview</span>
+            {greetingTip && (
+              <Badge
+                variant="secondary"
+                className="rounded-full px-2.5 py-0.5 text-[11px] font-medium"
+              >
+                Tip: {greetingTip}
+              </Badge>
+            )}
+          </div>
         </div>
         <Button
           size="sm"
@@ -217,14 +389,13 @@ export default function OverviewPage() {
       {/* KPI Cards */}
       <motion.div
         variants={item}
-        className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4"
+        className="mb-6 grid grid-cols-2 gap-3 xl:grid-cols-5"
       >
         <KpiCard
           icon={DollarSign}
           label="Monthly spend"
           numericValue={monthlyTotal / 100}
           formatFn={(n) => formatCurrencyMinor(Math.round(n * 100), currency)}
-          trend={trend}
           sparklineData={spendSparkline}
           sparklineColor="var(--color-primary)"
         />
@@ -241,8 +412,6 @@ export default function OverviewPage() {
           label="Active subs"
           numericValue={activeCount}
           formatFn={(n) => String(Math.round(n))}
-          sparklineData={countSparkline}
-          sparklineColor="var(--color-chart-4)"
         />
         <DueCard
           renewalWindow={renewalWindow}
@@ -250,7 +419,113 @@ export default function OverviewPage() {
           dueNames={dueNames}
           dueExtra={dueExtra}
         />
+        <SavingsCard
+          currency={currency}
+          savingsMinor={potentialSavingsMinor}
+          savingsInsight={savingsInsight}
+          savingsNames={savingsNames}
+          onFixOverlap={() => router.push("/subscriptions")}
+        />
       </motion.div>
+
+      <div className="mb-6 grid gap-6 lg:grid-cols-5">
+        <motion.div variants={item} className="lg:col-span-3">
+          <Card className="h-full">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">6-month spend trend</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {activeCount === 0 ? (
+                <div className="flex min-h-[250px] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border bg-muted/30 p-6 text-center">
+                  <p className="font-medium">No spend trend yet</p>
+                  <p className="max-w-sm text-sm text-muted-foreground">
+                    Add a few subscriptions to see how your monthly spend is trending over
+                    the next six months.
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={() => router.push("/subscriptions?action=create")}
+                  >
+                    <Plus className="size-3.5" />
+                    Add subscription
+                  </Button>
+                </div>
+              ) : (
+                <div className="h-[250px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={spendTrendData}>
+                      <defs>
+                        <linearGradient id="dashboardSpendGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop
+                            offset="5%"
+                            stopColor="var(--color-primary)"
+                            stopOpacity={0.24}
+                          />
+                          <stop
+                            offset="95%"
+                            stopColor="var(--color-primary)"
+                            stopOpacity={0}
+                          />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        stroke="var(--color-border)"
+                        vertical={false}
+                      />
+                      <XAxis
+                        dataKey="name"
+                        tick={{ fontSize: 12, fill: "var(--color-muted-foreground)" }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        tick={{ fontSize: 12, fill: "var(--color-muted-foreground)" }}
+                        axisLine={false}
+                        tickLine={false}
+                        tickFormatter={(value) => `${sym}${value}`}
+                        width={56}
+                      />
+                      <RechartsTooltip
+                        contentStyle={{
+                          backgroundColor: "var(--color-card)",
+                          border: "1px solid var(--color-border)",
+                          borderRadius: 8,
+                          fontSize: 13,
+                        }}
+                        formatter={(value) => [
+                          formatCurrencyMinor(Math.round(Number(value) * 100), currency),
+                          "Projected spend",
+                        ]}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="amount"
+                        stroke="var(--color-primary)"
+                        strokeWidth={2}
+                        fill="url(#dashboardSpendGradient)"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        <motion.div variants={item} className="lg:col-span-2">
+          <InsightSpotlightCard
+            mostExpensiveInsight={mostExpensiveInsight}
+            monthlyTotal={monthlyTotal}
+            currency={currency}
+            spotlightTip={spotlightTip}
+            onDismissCostWatch={handleDismissCostWatch}
+            onSnoozeCostWatch={handleSnoozeCostWatch}
+          />
+        </motion.div>
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-5">
         {/* Upcoming Renewals */}
@@ -617,7 +892,7 @@ function KpiCard({
   sparklineColor?: string;
 }) {
   return (
-    <Card className="group relative overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:shadow-primary/5">
+    <Card className="group relative min-h-[152px] overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:shadow-primary/5">
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-muted-foreground">
@@ -657,7 +932,7 @@ function DueCard({
   dueExtra: number;
 }) {
   return (
-    <Card className="group relative overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:shadow-primary/5">
+    <Card className="group relative min-h-[152px] overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:shadow-primary/5">
       <CardContent className="p-4">
         <div className="flex items-center gap-2 text-muted-foreground">
           <CalendarClock className="size-3.5" />
@@ -680,8 +955,252 @@ function DueCard({
   );
 }
 
-function getGreeting() {
-  const h = new Date().getHours();
+function SavingsCard({
+  currency,
+  savingsMinor,
+  savingsInsight,
+  savingsNames,
+  onFixOverlap,
+}: {
+  currency: string;
+  savingsMinor: number;
+  savingsInsight: ReturnType<typeof getPotentialSavingsInsight>;
+  savingsNames: string[];
+  onFixOverlap: () => void;
+}) {
+  const [flipped, setFlipped] = useState(false);
+  const summary = savingsInsight
+    ? `Overlap in ${categoryLabel(savingsInsight.category).toLowerCase()}.`
+    : "Estimated review target.";
+  const detail = savingsInsight
+    ? `Compare ${savingsNames.join(", ")} and pause one if it is redundant.`
+    : "No obvious duplicate category shows up yet. Review one low-value plan to free this amount.";
+
+  return (
+    <Card className="group relative min-h-[152px] overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:shadow-primary/5">
+      <div className="relative h-full [perspective:1200px]">
+        <div
+          className="relative h-full transition-transform duration-500"
+          style={{
+            transformStyle: "preserve-3d",
+            transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)",
+          }}
+        >
+          <CardContent
+            className="absolute inset-0 flex h-full flex-col p-4"
+            style={{ backfaceVisibility: "hidden" }}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Lightbulb className="size-3.5" />
+                <span className="text-xs font-medium">You could save</span>
+              </div>
+              <Badge variant="outline" className="text-[10px] uppercase tracking-[0.18em]">
+                {savingsInsight ? "Overlap" : "Estimate"}
+              </Badge>
+            </div>
+            <p className="mt-1.5 font-heading text-xl font-semibold tracking-tight">
+              <AnimatedNumber
+                value={savingsMinor / 100}
+                formatFn={(value) =>
+                  formatCurrencyMinor(Math.round(value * 100), currency)
+                }
+              />
+            </p>
+            <p className="mt-1 text-[11px] text-muted-foreground">{summary}</p>
+            <button
+              type="button"
+              onClick={() => setFlipped(true)}
+              aria-label="Show savings details"
+              className="mt-auto inline-flex items-center gap-1 text-[11px] font-medium text-primary transition-colors hover:text-primary/80"
+            >
+              How it works
+              <ChevronRight className="size-3" />
+            </button>
+          </CardContent>
+
+          <CardContent
+            className="absolute inset-0 flex h-full flex-col justify-between bg-card p-4"
+            style={{
+              backfaceVisibility: "hidden",
+              transform: "rotateY(180deg)",
+            }}
+          >
+            <div>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Savings tip
+                </p>
+                <Badge variant="outline" className="text-[10px] uppercase tracking-[0.18em]">
+                  {savingsInsight ? "Overlap" : "Estimate"}
+                </Badge>
+              </div>
+              <p className="mt-2 text-sm leading-5 text-foreground">
+                {detail}
+              </p>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => setFlipped(false)}
+                aria-label="Hide savings details"
+                className="inline-flex items-center gap-1 text-[11px] font-medium text-primary transition-colors hover:text-primary/80"
+              >
+                <ChevronRight className="size-3 rotate-180" />
+                Back
+              </button>
+              <Button size="sm" className="gap-1.5" onClick={onFixOverlap}>
+                {savingsInsight ? "Fix overlap" : "Review spend"}
+                <ChevronRight className="size-3.5" />
+              </Button>
+            </div>
+          </CardContent>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function InsightSpotlightCard({
+  mostExpensiveInsight,
+  monthlyTotal,
+  currency,
+  spotlightTip,
+  onDismissCostWatch,
+  onSnoozeCostWatch,
+}: {
+  mostExpensiveInsight: ReturnType<typeof getMostExpensiveSubscription>;
+  monthlyTotal: number;
+  currency: string;
+  spotlightTip: ReturnType<typeof getMostExpensiveSubscriptionTip>;
+  onDismissCostWatch: () => void;
+  onSnoozeCostWatch: () => void;
+}) {
+  if (!mostExpensiveInsight) {
+    return (
+      <Card className="h-full">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Savings tip</CardTitle>
+        </CardHeader>
+        <CardContent className="flex h-full min-h-[250px] flex-col justify-between gap-4">
+          <div className="space-y-2">
+            <p className="text-lg font-semibold tracking-tight">
+              Start by adding your most-used services.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Once subscriptions are tracked here, this panel will highlight your most
+              expensive plan and the easiest savings opportunities.
+            </p>
+          </div>
+          <div className="rounded-2xl border border-dashed border-border bg-muted/30 p-4">
+            <p className="text-sm font-medium">{spotlightTip.label}</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {spotlightTip.message}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const share = monthlyTotal > 0
+    ? Math.round((mostExpensiveInsight.monthlyEquivalentMinor / monthlyTotal) * 100)
+    : 0;
+
+  return (
+    <Card className="h-full overflow-hidden">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">Most expensive sub</CardTitle>
+      </CardHeader>
+      <CardContent className="flex h-full min-h-[250px] flex-col justify-between gap-5">
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <SubIcon
+              name={mostExpensiveInsight.subscription.name}
+              category={mostExpensiveInsight.subscription.category}
+            />
+            <div className="min-w-0">
+              <p className="truncate font-medium">
+                {mostExpensiveInsight.subscription.name}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {formatCurrencyMinor(
+                  mostExpensiveInsight.monthlyEquivalentMinor,
+                  currency
+                )}
+                {" "}per month
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-2xl bg-muted/40 p-3">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                Share of spend
+              </p>
+              <p className="mt-1 text-lg font-semibold">{share}%</p>
+            </div>
+            <div className="rounded-2xl bg-muted/40 p-3">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                Billing
+              </p>
+              <p className="mt-1 text-sm font-medium">
+                {formatCurrencyMinor(
+                  mostExpensiveInsight.subscription.amountMinor,
+                  mostExpensiveInsight.subscription.currency
+                )}
+                {" "}· {billingCycleLabel(mostExpensiveInsight.subscription.billingCycle)}
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-border bg-gradient-to-br from-primary/10 via-transparent to-primary/5 p-4">
+            <p className="text-sm font-medium">
+              Next renewal: {formatShortDate(mostExpensiveInsight.subscription.nextBillingDate)}
+            </p>
+            <p className="mt-3 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+              {spotlightTip.label}
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {spotlightTip.message}
+            </p>
+            {spotlightTip.label === "Cost watch" && (
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8"
+                  onClick={onDismissCostWatch}
+                >
+                  Dismiss
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8"
+                  onClick={onSnoozeCostWatch}
+                >
+                  Snooze 30 days
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <Link
+          href="/subscriptions"
+          className="inline-flex items-center gap-1 text-sm font-medium text-primary transition-colors hover:text-primary/80"
+        >
+          Review subscriptions
+          <ArrowUpRight className="size-3.5" />
+        </Link>
+      </CardContent>
+    </Card>
+  );
+}
+
+function getGreeting(date: Date) {
+  const h = date.getHours();
   if (h < 12) return "morning";
   if (h < 17) return "afternoon";
   return "evening";

@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { DashboardProvider, useDashboard } from "@/lib/dashboard-context";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { MobileHeader } from "@/components/dashboard/mobile-header";
+import { DesktopTopBar } from "@/components/dashboard/top-bar";
 import { Loader2 } from "lucide-react";
 
 function DashboardShell({ children }: { children: React.ReactNode }) {
@@ -63,6 +64,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       <main className="transition-[margin] duration-200 ease-in-out max-md:!ml-0 md:ml-64"
         style={{ marginLeft: collapsed ? 68 : undefined }}
       >
+        <DesktopTopBar />
         <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-8">
           <AnimatePresence mode="wait">
             <motion.div
