@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import {
   AreaChart,
@@ -22,8 +23,10 @@ import {
   CreditCard,
   CalendarClock,
   BarChart3,
+  Plus,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { useDashboard } from "@/lib/dashboard-context";
 import { formatCurrencyMinor, categoryLabel, currencySymbol } from "@/lib/format";
 import { nowIsoDate } from "@/lib/date";
@@ -55,6 +58,7 @@ const CATEGORY_HEX: Record<SubscriptionCategory, string> = {
 
 export default function AnalyticsPage() {
   const { subscriptions, settings } = useDashboard();
+  const router = useRouter();
   const currency = settings.defaultCurrency;
   const today = nowIsoDate();
 
@@ -107,6 +111,20 @@ export default function AnalyticsPage() {
         >
           Add some active subscriptions to see spending insights
         </motion.p>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.35 }}
+        >
+          <Button
+            size="sm"
+            className="mt-4 gap-1.5"
+            onClick={() => router.push("/subscriptions?action=create")}
+          >
+            <Plus className="size-3.5" />
+            Add subscription
+          </Button>
+        </motion.div>
       </motion.div>
     );
   }

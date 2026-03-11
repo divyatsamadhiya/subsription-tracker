@@ -10,7 +10,6 @@ import {
   User,
   LogOut,
   ChevronLeft,
-  ChevronRight,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/lib/utils";
@@ -21,6 +20,12 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useDashboard } from "@/lib/dashboard-context";
 import { formatCurrencyMinor } from "@/lib/format";
 import { calculateMonthlyTotalMinor } from "@/lib/date";
@@ -29,8 +34,6 @@ const NAV_ITEMS = [
   { href: "/", icon: LayoutDashboard, label: "Overview" },
   { href: "/subscriptions", icon: CreditCard, label: "Subscriptions" },
   { href: "/analytics", icon: BarChart3, label: "Analytics" },
-  { href: "/settings", icon: Settings, label: "Settings" },
-  { href: "/profile", icon: User, label: "Profile" },
 ] as const;
 
 interface SidebarProps {
@@ -49,6 +52,8 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     if (href === "/") return pathname === "/";
     return pathname.startsWith(href);
   };
+
+  const isAccountPage = pathname === "/profile" || pathname === "/settings";
 
   return (
     <motion.aside
@@ -166,41 +171,66 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
       <Separator />
 
-      {/* Footer */}
-      <div className="flex items-center gap-2 px-3 py-3">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-          {user?.profile?.fullName?.[0]?.toUpperCase() ??
-            user?.email[0]?.toUpperCase() ??
-            "?"}
-        </div>
-        <AnimatePresence>
-          {!collapsed && (
-            <motion.div
-              initial={{ opacity: 0, width: 0 }}
-              animate={{ opacity: 1, width: "auto" }}
-              exit={{ opacity: 0, width: 0 }}
-              className="flex flex-1 items-center justify-between overflow-hidden"
-            >
-              <div className="min-w-0">
+      {/* User footer with dropdown */}
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <button
+              className={cn(
+                "flex w-full items-center gap-2 px-3 py-3 text-left transition-colors hover:bg-accent",
+                isAccountPage && "bg-accent/60"
+              )}
+            />
+          }
+        >
+          <div className={cn(
+            "flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary",
+            isAccountPage && "ring-2 ring-primary/30"
+          )}>
+            {user?.profile?.fullName?.[0]?.toUpperCase() ??
+              user?.email[0]?.toUpperCase() ??
+              "?"}
+          </div>
+          <AnimatePresence>
+            {!collapsed && (
+              <motion.div
+                initial={{ opacity: 0, width: 0 }}
+                animate={{ opacity: 1, width: "auto" }}
+                exit={{ opacity: 0, width: 0 }}
+                className="min-w-0 flex-1 overflow-hidden"
+              >
                 <p className="truncate text-sm font-medium">
                   {user?.profile?.fullName ?? "User"}
                 </p>
                 <p className="truncate text-xs text-muted-foreground">
                   {user?.email}
                 </p>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={logout}
-                aria-label="Sign out"
-              >
-                <LogOut className="size-3.5" />
-              </Button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          side={collapsed ? "right" : "top"}
+          align={collapsed ? "start" : "start"}
+          className="w-48"
+        >
+          <DropdownMenuItem render={<Link href="/profile" />}>
+            <User className="size-3.5 mr-2" />
+            Profile
+          </DropdownMenuItem>
+          <DropdownMenuItem render={<Link href="/settings" />}>
+            <Settings className="size-3.5 mr-2" />
+            Settings
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className="text-destructive focus:text-destructive"
+            onClick={logout}
+          >
+            <LogOut className="size-3.5 mr-2" />
+            Sign out
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
 
       {/* Collapse toggle */}
       <motion.button

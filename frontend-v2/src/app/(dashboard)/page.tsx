@@ -1,13 +1,16 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import {
   DollarSign,
   TrendingUp,
   CreditCard,
   CalendarClock,
+  Plus,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -57,6 +60,7 @@ function urgencyClass(days: number) {
 
 export default function OverviewPage() {
   const { user, subscriptions, settings } = useDashboard();
+  const router = useRouter();
   const [renewalWindow, setRenewalWindow] = useState<"7" | "30">("7");
   const currency = settings.defaultCurrency;
   const today = nowIsoDate();
@@ -100,13 +104,23 @@ export default function OverviewPage() {
   return (
     <motion.div variants={container} initial="hidden" animate="show">
       {/* Greeting */}
-      <motion.div variants={item} className="mb-6">
-        <h1 className="font-heading text-2xl font-semibold tracking-tight">
-          Good {getGreeting()}, {firstName}
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Here&apos;s your spending overview
-        </p>
+      <motion.div variants={item} className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="font-heading text-2xl font-semibold tracking-tight">
+            Good {getGreeting()}, {firstName}
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Here&apos;s your spending overview
+          </p>
+        </div>
+        <Button
+          size="sm"
+          className="gap-1.5 shrink-0"
+          onClick={() => router.push("/subscriptions?action=create")}
+        >
+          <Plus className="size-3.5" />
+          Add subscription
+        </Button>
       </motion.div>
 
       {/* KPI Cards */}
@@ -166,9 +180,20 @@ export default function OverviewPage() {
             </CardHeader>
             <CardContent className="p-0">
               {renewals.length === 0 ? (
-                <p className="px-6 pb-6 text-sm text-muted-foreground">
-                  No renewals in the next {renewalWindow} days
-                </p>
+                <div className="flex flex-col items-center gap-3 px-6 pb-6 pt-2">
+                  <p className="text-sm text-muted-foreground">
+                    No renewals in the next {renewalWindow} days
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={() => router.push("/subscriptions?action=create")}
+                  >
+                    <Plus className="size-3.5" />
+                    Track a new service
+                  </Button>
+                </div>
               ) : (
                 <div className="divide-y divide-border">
                   {renewals.map((sub, i) => {
@@ -222,9 +247,20 @@ export default function OverviewPage() {
             </CardHeader>
             <CardContent>
               {categorySpend.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No active subscriptions yet
-                </p>
+                <div className="flex flex-col items-center gap-3 py-4">
+                  <p className="text-sm text-muted-foreground">
+                    No active subscriptions yet
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={() => router.push("/subscriptions?action=create")}
+                  >
+                    <Plus className="size-3.5" />
+                    Add your first
+                  </Button>
+                </div>
               ) : (
                 <div className="space-y-4">
                   {categorySpend.map((entry) => (

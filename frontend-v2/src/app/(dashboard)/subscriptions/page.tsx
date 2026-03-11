@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Plus,
@@ -46,6 +47,8 @@ export default function SubscriptionsPage() {
   const { subscriptions, settings, refresh } = useDashboard();
   const currency = settings.defaultCurrency;
   const today = nowIsoDate();
+  const searchParams = useSearchParams();
+  const router = useRouter();
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [categoryFilter, setCategoryFilter] = useState<SubscriptionCategory | "all">("all");
@@ -56,6 +59,14 @@ export default function SubscriptionsPage() {
   const [editTarget, setEditTarget] = useState<Subscription | undefined>();
 
   const [deleteTarget, setDeleteTarget] = useState<Subscription | null>(null);
+
+  // Auto-open create form when navigated with ?action=create
+  useEffect(() => {
+    if (searchParams.get("action") === "create") {
+      openCreate();
+      router.replace("/subscriptions", { scroll: false });
+    }
+  }, [searchParams]);
 
   // Counts for status filter (unaffected by category/search)
   const activeCount = useMemo(

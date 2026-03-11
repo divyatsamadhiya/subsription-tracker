@@ -27,8 +27,6 @@ const NAV_ITEMS = [
   { href: "/", icon: LayoutDashboard, label: "Overview" },
   { href: "/subscriptions", icon: CreditCard, label: "Subscriptions" },
   { href: "/analytics", icon: BarChart3, label: "Analytics" },
-  { href: "/settings", icon: Settings, label: "Settings" },
-  { href: "/profile", icon: User, label: "Profile" },
 ] as const;
 
 export function MobileHeader() {
@@ -40,8 +38,14 @@ export function MobileHeader() {
     return pathname.startsWith(href);
   };
 
+  const allPages = [
+    ...NAV_ITEMS,
+    { href: "/profile", icon: User, label: "Profile" },
+    { href: "/settings", icon: Settings, label: "Settings" },
+  ] as const;
+
   const currentPage =
-    NAV_ITEMS.find((item) => isActive(item.href))?.label ?? "Dashboard";
+    allPages.find((item) => isActive(item.href))?.label ?? "Dashboard";
 
   return (
     <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-border bg-background/80 px-4 backdrop-blur-sm md:hidden">
@@ -97,6 +101,36 @@ export function MobileHeader() {
               </motion.div>
             ))}
           </nav>
+          <Separator />
+
+          {/* User section with profile/settings links */}
+          <div className="p-2 space-y-1">
+            <Link
+              href="/profile"
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                isActive("/profile")
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
+              )}
+            >
+              <User className="size-4" />
+              Profile
+            </Link>
+            <Link
+              href="/settings"
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                isActive("/settings")
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
+              )}
+            >
+              <Settings className="size-4" />
+              Settings
+            </Link>
+          </div>
+
           <Separator />
           <div className="flex items-center justify-between p-3">
             <div className="flex items-center gap-2 min-w-0">
