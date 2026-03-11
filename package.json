@@ -13,7 +13,7 @@
     "dev:legacy": "npm run dev -w backend & npm run dev -w frontend & npm run dev -w admin-frontend",
     "build": "npm run build -w backend && npm run build -w frontend-v2 && npm run build -w admin-frontend",
     "build:legacy": "npm run build -w backend && npm run build -w frontend && npm run build -w admin-frontend",
-    "test": "npm run test -w backend && npm run test -w frontend && npm run test -w admin-frontend"
+    "test": "npm run test -w backend && npm run test -w frontend && npm run test -w frontend-v2 && npm run test -w admin-frontend"
   },
   "overrides": {
     "serialize-javascript": "^7.0.3",

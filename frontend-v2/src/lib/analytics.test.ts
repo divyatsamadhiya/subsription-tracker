@@ -1,0 +1,404 @@
+import { describe, it, expect } from "vitest";
+import {
+  buildSpendTrend,
+  buildCategorySpend,
+  buildRenewalBuckets,
+  buildAnalyticsSummary,
+} from "./analytics";
+import { buildSubscription } from "@/test/factories";
+
+describe("buildSpendTrend", () => {
+  it("returns correct number of month points", () => {
+    const result = buildSpendTrend([], "2026-03-11", 6);
+    expect(result).toHaveLength(6);
+  });
+
+  it("returns at least 1 point when monthsAhead is 0", () => {
+    const result = buildSpendTrend([], "2026-03-11", 0);
+    expect(result).toHaveLength(1);
+  });
+
+  it("fills in spend for monthly subscription", () => {
+    const subs = [
+      buildSubscription({
+        billingCycle: "monthly",
+        amountMinor: 1000,
+        nextBillingDate: "2026-03-15",
+        isActive: true,
+      }),
+    ];
+    const result = buildSpendTrend(subs, "2026-03-01", 3);
+    // Should charge once in March, once in April, once in May
+    expect(result[0].amountMinor).toBe(1000); // Mar
+    expect(result[1].amountMinor).toBe(1000); // Apr
+    expect(result[2].amountMinor).toBe(1000); // May
+  });
+
+  it("excludes inactive subscriptions", () => {
+    const subs = [
+      buildSubscription({
+        billingCycle: "monthly",
+        amountMinor: 1000,
+        nextBillingDate: "2026-03-15",
+        isActive: false,
+      }),
+    ];
+    const result = buildSpendTrend(subs, "2026-03-01", 3);
+    expect(result.every((p) => p.amountMinor === 0)).toBe(true);
+  });
+
+  it("handles weekly subscriptions (multiple charges per month)", () => {
+    const subs = [
+      buildSubscription({
+        billingCycle: "weekly",
+        amountMinor: 100,
+        nextBillingDate: "2026-03-01",
+        isActive: true,
+      }),
+    ];
+    const result = buildSpendTrend(subs, "2026-03-01", 1);
+    // March has ~4-5 weekly charges starting from Mar 1
+    expect(result[0].amountMinor).toBeGreaterThanOrEqual(400);
+    expect(result[0].amountMinor).toBeLessThanOrEqual(500);
+  });
+
+  it("handles yearly subscriptions", () => {
+    const subs = [
+      buildSubscription({
+        billingCycle: "yearly",
+        amountMinor: 12000,
+        nextBillingDate: "2026-06-01",
+        isActive: true,
+      }),
+    ];
+    const result = buildSpendTrend(subs, "2026-03-01", 6);
+    // Only charges in June (index 3)
+    const chargedMonths = result.filter((p) => p.amountMinor > 0);
+    expect(chargedMonths).toHaveLength(1);
+    expect(chargedMonths[0].monthKey).toBe("2026-06");
+  });
+
+  it("handles custom_days subscriptions", () => {
+    const subs = [
+      buildSubscription({
+        billingCycle: "custom_days",
+        customIntervalDays: 14,
+        amountMinor: 500,
+        nextBillingDate: "2026-03-01",
+        isActive: true,
+      }),
+    ];
+    const result = buildSpendTrend(subs, "2026-03-01", 1);
+    // Mar 1 + Mar 15 + Mar 29 = 3 charges
+    expect(result[0].amountMinor).toBe(1500);
+  });
+
+  it("advances past billing dates before the start", () => {
+    const subs = [
+      buildSubscription({
+        billingCycle: "monthly",
+        amountMinor: 1000,
+        nextBillingDate: "2025-01-15",
+        isActive: true,
+      }),
+    ];
+    const result = buildSpendTrend(subs, "2026-03-01", 1);
+    // Should have advanced from Jan 2025 to Mar 2026
+    expect(result[0].amountMinor).toBe(1000);
+  });
+
+  it("has monthLabel and monthKey for each point", () => {
+    const result = buildSpendTrend([], "2026-03-01", 3);
+    expect(result[0].monthKey).toBe("2026-03");
+    expect(result[1].monthKey).toBe("2026-04");
+    expect(result[2].monthKey).toBe("2026-05");
+    result.forEach((p) => {
+      expect(p.monthLabel).toBeTruthy();
+    });
+  });
+
+  it("sums multiple subscriptions charging in the same month", () => {
+    const subs = [
+      buildSubscription({
+        billingCycle: "monthly",
+        amountMinor: 1000,
+        nextBillingDate: "2026-03-01",
+        isActive: true,
+      }),
+      buildSubscription({
+        billingCycle: "monthly",
+        amountMinor: 500,
+        nextBillingDate: "2026-03-15",
+        isActive: true,
+      }),
+    ];
+    const result = buildSpendTrend(subs, "2026-03-01", 1);
+    expect(result[0].amountMinor).toBe(1500);
+  });
+});
+
+describe("buildCategorySpend", () => {
+  it("returns empty array for no subscriptions", () => {
+    expect(buildCategorySpend([])).toEqual([]);
+  });
+
+  it("returns empty array for only inactive subscriptions", () => {
+    const subs = [
+      buildSubscription({ isActive: false, category: "entertainment" }),
+    ];
+    expect(buildCategorySpend(subs)).toEqual([]);
+  });
+
+  it("groups by category with monthly equivalents", () => {
+    const subs = [
+      buildSubscription({
+        category: "entertainment",
+        billingCycle: "monthly",
+        amountMinor: 1000,
+        isActive: true,
+      }),
+      buildSubscription({
+        category: "entertainment",
+        billingCycle: "monthly",
+        amountMinor: 500,
+        isActive: true,
+      }),
+      buildSubscription({
+        category: "productivity",
+        billingCycle: "monthly",
+        amountMinor: 2000,
+        isActive: true,
+      }),
+    ];
+    const result = buildCategorySpend(subs);
+    expect(result).toHaveLength(2);
+    // Sorted by amount descending
+    expect(result[0].category).toBe("productivity");
+    expect(result[0].amountMinor).toBe(2000);
+    expect(result[1].category).toBe("entertainment");
+    expect(result[1].amountMinor).toBe(1500);
+  });
+
+  it("calculates share as fraction of total", () => {
+    const subs = [
+      buildSubscription({
+        category: "entertainment",
+        billingCycle: "monthly",
+        amountMinor: 3000,
+        isActive: true,
+      }),
+      buildSubscription({
+        category: "productivity",
+        billingCycle: "monthly",
+        amountMinor: 1000,
+        isActive: true,
+      }),
+    ];
+    const result = buildCategorySpend(subs);
+    expect(result[0].share).toBeCloseTo(0.75, 2);
+    expect(result[1].share).toBeCloseTo(0.25, 2);
+  });
+
+  it("sorts by amount descending", () => {
+    const subs = [
+      buildSubscription({
+        category: "health",
+        billingCycle: "monthly",
+        amountMinor: 100,
+        isActive: true,
+      }),
+      buildSubscription({
+        category: "utilities",
+        billingCycle: "monthly",
+        amountMinor: 5000,
+        isActive: true,
+      }),
+      buildSubscription({
+        category: "other",
+        billingCycle: "monthly",
+        amountMinor: 2000,
+        isActive: true,
+      }),
+    ];
+    const result = buildCategorySpend(subs);
+    expect(result[0].category).toBe("utilities");
+    expect(result[1].category).toBe("other");
+    expect(result[2].category).toBe("health");
+  });
+
+  it("handles yearly billing cycle conversion", () => {
+    const subs = [
+      buildSubscription({
+        category: "entertainment",
+        billingCycle: "yearly",
+        amountMinor: 12000,
+        isActive: true,
+      }),
+    ];
+    const result = buildCategorySpend(subs);
+    expect(result).toHaveLength(1);
+    expect(result[0].amountMinor).toBe(1000); // 12000 / 12
+  });
+});
+
+describe("buildRenewalBuckets", () => {
+  it("returns 4 buckets", () => {
+    const result = buildRenewalBuckets([], "2026-03-11");
+    expect(result).toHaveLength(4);
+    expect(result[0].bucketLabel).toBe("0-7 days");
+    expect(result[1].bucketLabel).toBe("8-14 days");
+    expect(result[2].bucketLabel).toBe("15-21 days");
+    expect(result[3].bucketLabel).toBe("22-30 days");
+  });
+
+  it("all counts are 0 for empty subscriptions", () => {
+    const result = buildRenewalBuckets([], "2026-03-11");
+    expect(result.every((b) => b.count === 0)).toBe(true);
+  });
+
+  it("puts subscription due in 3 days in 0-7 bucket", () => {
+    const subs = [
+      buildSubscription({ nextBillingDate: "2026-03-14", isActive: true }),
+    ];
+    const result = buildRenewalBuckets(subs, "2026-03-11");
+    expect(result[0].count).toBe(1);
+    expect(result[1].count).toBe(0);
+  });
+
+  it("puts subscription due in 10 days in 8-14 bucket", () => {
+    const subs = [
+      buildSubscription({ nextBillingDate: "2026-03-21", isActive: true }),
+    ];
+    const result = buildRenewalBuckets(subs, "2026-03-11");
+    expect(result[1].count).toBe(1);
+  });
+
+  it("puts subscription due in 18 days in 15-21 bucket", () => {
+    const subs = [
+      buildSubscription({ nextBillingDate: "2026-03-29", isActive: true }),
+    ];
+    const result = buildRenewalBuckets(subs, "2026-03-11");
+    expect(result[2].count).toBe(1);
+  });
+
+  it("puts subscription due in 25 days in 22-30 bucket", () => {
+    const subs = [
+      buildSubscription({ nextBillingDate: "2026-04-05", isActive: true }),
+    ];
+    const result = buildRenewalBuckets(subs, "2026-03-11");
+    expect(result[3].count).toBe(1);
+  });
+
+  it("excludes subscriptions past due (negative delta)", () => {
+    const subs = [
+      buildSubscription({ nextBillingDate: "2026-03-01", isActive: true }),
+    ];
+    const result = buildRenewalBuckets(subs, "2026-03-11");
+    expect(result.every((b) => b.count === 0)).toBe(true);
+  });
+
+  it("excludes subscriptions beyond 30 days", () => {
+    const subs = [
+      buildSubscription({ nextBillingDate: "2026-05-01", isActive: true }),
+    ];
+    const result = buildRenewalBuckets(subs, "2026-03-11");
+    expect(result.every((b) => b.count === 0)).toBe(true);
+  });
+
+  it("excludes inactive subscriptions", () => {
+    const subs = [
+      buildSubscription({ nextBillingDate: "2026-03-14", isActive: false }),
+    ];
+    const result = buildRenewalBuckets(subs, "2026-03-11");
+    expect(result.every((b) => b.count === 0)).toBe(true);
+  });
+
+  it("includes subscription due today in 0-7 bucket", () => {
+    const subs = [
+      buildSubscription({ nextBillingDate: "2026-03-11", isActive: true }),
+    ];
+    const result = buildRenewalBuckets(subs, "2026-03-11");
+    expect(result[0].count).toBe(1);
+  });
+
+  it("includes subscription at boundary day 7 in 0-7 bucket", () => {
+    const subs = [
+      buildSubscription({ nextBillingDate: "2026-03-18", isActive: true }),
+    ];
+    const result = buildRenewalBuckets(subs, "2026-03-11");
+    expect(result[0].count).toBe(1);
+  });
+
+  it("puts day 8 in 8-14 bucket", () => {
+    const subs = [
+      buildSubscription({ nextBillingDate: "2026-03-19", isActive: true }),
+    ];
+    const result = buildRenewalBuckets(subs, "2026-03-11");
+    expect(result[1].count).toBe(1);
+  });
+});
+
+describe("buildAnalyticsSummary", () => {
+  it("returns zero summary for empty subscriptions", () => {
+    const result = buildAnalyticsSummary([], "2026-03-11");
+    expect(result.monthlyBaselineMinor).toBe(0);
+    expect(result.projectedSixMonthMinor).toBe(0);
+    expect(result.activeCount).toBe(0);
+    expect(result.renewalCount30Days).toBe(0);
+  });
+
+  it("counts active subscriptions", () => {
+    const subs = [
+      buildSubscription({ isActive: true }),
+      buildSubscription({ isActive: true }),
+      buildSubscription({ isActive: false }),
+    ];
+    const result = buildAnalyticsSummary(subs, "2026-03-11");
+    expect(result.activeCount).toBe(2);
+  });
+
+  it("computes monthly baseline from active subs", () => {
+    const subs = [
+      buildSubscription({
+        billingCycle: "monthly",
+        amountMinor: 1000,
+        isActive: true,
+      }),
+      buildSubscription({
+        billingCycle: "monthly",
+        amountMinor: 500,
+        isActive: true,
+      }),
+    ];
+    const result = buildAnalyticsSummary(subs, "2026-03-11");
+    expect(result.monthlyBaselineMinor).toBe(1500);
+  });
+
+  it("counts renewals within 30 days", () => {
+    const subs = [
+      buildSubscription({
+        nextBillingDate: "2026-03-15",
+        isActive: true,
+      }),
+      buildSubscription({
+        nextBillingDate: "2026-05-01",
+        isActive: true,
+      }),
+    ];
+    const result = buildAnalyticsSummary(subs, "2026-03-11");
+    expect(result.renewalCount30Days).toBe(1);
+  });
+
+  it("projected six month is sum of spend trend", () => {
+    const subs = [
+      buildSubscription({
+        billingCycle: "monthly",
+        amountMinor: 1000,
+        nextBillingDate: "2026-03-15",
+        isActive: true,
+      }),
+    ];
+    const result = buildAnalyticsSummary(subs, "2026-03-01");
+    expect(result.projectedSixMonthMinor).toBe(6000);
+  });
+});
