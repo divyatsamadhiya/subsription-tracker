@@ -22,6 +22,7 @@ import {
   hashPassword,
   signUserToken
 } from "../utils/auth.js";
+import { currencyForCountry } from "../utils/countryCurrency.js";
 import { HttpError } from "../utils/http.js";
 import { toAuthUser } from "../utils/serializers.js";
 import { logger } from "../logger/logger.js";
@@ -253,10 +254,13 @@ export const registerUser = async (input: unknown): Promise<AuthWithToken> => {
     }
   });
 
+  const defaultCurrency = currencyForCountry(payload.country);
+
   await prisma.settings.create({
     data: {
       userId: user.id,
-      ...DEFAULT_SETTINGS
+      ...DEFAULT_SETTINGS,
+      defaultCurrency
     }
   });
 

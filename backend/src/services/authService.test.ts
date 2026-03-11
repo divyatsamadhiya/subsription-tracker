@@ -116,7 +116,11 @@ describe("authService", () => {
 
     expect(prisma.user.findUnique).toHaveBeenCalledWith({ where: { email: "john@example.com" } });
     expect(hashPassword).toHaveBeenCalledWith("Password123");
-    expect(prisma.settings.create).toHaveBeenCalled();
+    expect(prisma.settings.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ defaultCurrency: "INR" })
+      })
+    );
     expect(signUserToken).toHaveBeenCalledWith({ userId: "user_1", sessionVersion: 1 });
     expect(result.token).toBe("token_abc");
     expect(result.user.email).toBe("john@example.com");
@@ -412,9 +416,9 @@ describe("authService", () => {
   });
 
   it("builds frontend redirect URLs for Google auth", () => {
-    expect(getGoogleAuthSuccessRedirectUrl()).toBe("http://localhost:5173/");
+    expect(getGoogleAuthSuccessRedirectUrl()).toBe(`${config.frontendAppUrl}/`);
     expect(getGoogleAuthFailureRedirectUrl("google_auth_failed")).toBe(
-      "http://localhost:5173/?authError=google_auth_failed"
+      `${config.frontendAppUrl}/?authError=google_auth_failed`
     );
   });
 
