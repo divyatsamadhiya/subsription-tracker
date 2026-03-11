@@ -1,10 +1,6 @@
-const CACHE_NAME = "pulseboard-v1";
-const STATIC_ASSETS = ["/", "/login", "/register"];
+const CACHE_NAME = "pulseboard-v2";
 
-self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
-  );
+self.addEventListener("install", () => {
   self.skipWaiting();
 });
 
@@ -22,19 +18,32 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const { request } = event;
 
-  // Skip non-GET and API requests
-  if (request.method !== "GET" || request.url.includes("/api/")) return;
+  // Skip non-GET, API, and chrome-extension requests
+  if (
+    request.method !== "GET" ||
+    request.url.includes("/api/") ||
+    !request.url.startsWith("http")
+  ) {
+    return;
+  }
 
   event.respondWith(
     fetch(request)
       .then((response) => {
-        // Cache successful HTML/JS/CSS responses
-        if (response.ok && response.type === "basic") {
+        // Only cache successful same-origin responses (skip errors)
+        if (
+          response.ok &&
+          response.type === "basic" &&
+          response.status !== 404
+        ) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
         }
         return response;
       })
-      .catch(() => caches.match(request))
+      .catch(() =>
+        // Offline fallback — serve from cache if available
+        caches.match(request).then((cached) => cached || new Response("Offline", { status: 503 }))
+      )
   );
 });

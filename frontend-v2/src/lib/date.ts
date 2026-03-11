@@ -2,16 +2,24 @@ import type { Subscription } from "./types";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * Parse an ISO date string (YYYY-MM-DD) to UTC midnight.
+ * Using Date.UTC avoids local-timezone shifts.
+ */
 const toUtcMidnight = (isoDate: string): number => {
   const [year, month, day] = isoDate.split("-").map(Number);
   return Date.UTC(year, month - 1, day);
 };
 
+/**
+ * Return today's date as ISO string using UTC to stay consistent
+ * with toUtcMidnight — prevents off-by-one errors in non-UTC timezones.
+ */
 export const nowIsoDate = (): string => {
   const d = new Date();
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
+  const year = d.getUTCFullYear();
+  const month = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 };
 

@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/sheet";
 import type { Subscription, SubscriptionInput, BillingCycle, SubscriptionCategory } from "@/lib/types";
 import { CATEGORY_OPTIONS } from "@/lib/types";
-import { categoryLabel, billingCycleLabel } from "@/lib/format";
+import { categoryLabel, billingCycleLabel, currencySymbol } from "@/lib/format";
 import { nowIsoDate } from "@/lib/date";
 import { SUBSCRIPTION_SUGGESTIONS } from "@/lib/suggestions";
 
@@ -127,12 +127,7 @@ export function SubscriptionFormSheet({
     }
   }
 
-  const currencySymbol = new Intl.NumberFormat(undefined, {
-    style: "currency",
-    currency,
-  })
-    .formatToParts(0)
-    .find((p) => p.type === "currency")?.value ?? "$";
+  const sym = currencySymbol(currency);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -219,7 +214,7 @@ export function SubscriptionFormSheet({
           {/* Amount + Billing Cycle */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="sub-amount">Amount ({currencySymbol})</Label>
+              <Label htmlFor="sub-amount">Amount ({sym})</Label>
               <Input
                 id="sub-amount"
                 type="number"

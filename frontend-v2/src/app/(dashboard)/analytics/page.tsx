@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useDashboard } from "@/lib/dashboard-context";
-import { formatCurrencyMinor, categoryLabel } from "@/lib/format";
+import { formatCurrencyMinor, categoryLabel, currencySymbol } from "@/lib/format";
 import { nowIsoDate } from "@/lib/date";
 import {
   buildSpendTrend,
@@ -111,6 +111,8 @@ export default function AnalyticsPage() {
     );
   }
 
+  const sym = currencySymbol(currency);
+
   const trendData = spendTrend.map((p) => ({
     name: p.monthLabel,
     amount: p.amountMinor / 100,
@@ -193,7 +195,7 @@ export default function AnalyticsPage() {
                     tick={{ fontSize: 12, fill: "var(--color-muted-foreground)" }}
                     axisLine={false}
                     tickLine={false}
-                    tickFormatter={(v) => `$${v}`}
+                    tickFormatter={(v) => `${sym}${v}`}
                     width={60}
                   />
                   <Tooltip
@@ -203,7 +205,7 @@ export default function AnalyticsPage() {
                       borderRadius: 8,
                       fontSize: 13,
                     }}
-                    formatter={(value) => [`$${Number(value).toFixed(2)}`, "Spend"]}
+                    formatter={(value) => [`${sym}${Number(value).toFixed(2)}`, "Spend"]}
                   />
                   <Area
                     type="monotone"
@@ -252,7 +254,7 @@ export default function AnalyticsPage() {
                           borderRadius: 8,
                           fontSize: 13,
                         }}
-                        formatter={(value) => [`$${Number(value).toFixed(2)}`, ""]}
+                        formatter={(value) => [`${sym}${Number(value).toFixed(2)}`, ""]}
                       />
                       <text
                         x="50%"
@@ -261,7 +263,7 @@ export default function AnalyticsPage() {
                         dominantBaseline="central"
                         className="fill-foreground font-heading text-lg font-semibold"
                       >
-                        ${totalMonthly.toFixed(0)}
+                        {sym}{totalMonthly.toFixed(0)}
                       </text>
                       <text
                         x="50%"

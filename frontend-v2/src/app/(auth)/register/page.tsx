@@ -51,8 +51,12 @@ export default function RegisterPage() {
       });
 
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Registration failed");
+        let message = "Registration failed";
+        try {
+          const data = await res.json();
+          if (data.error) message = data.error;
+        } catch { /* non-JSON response */ }
+        throw new Error(message);
       }
 
       window.location.href = "/";

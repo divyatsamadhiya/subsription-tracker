@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -32,6 +33,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { setTheme } = useTheme();
+  const mountedRef = useRef(true);
 
   const refresh = useCallback(async () => {
     try {
@@ -40,6 +42,8 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         api.getSubscriptions(),
         api.getSettings(),
       ]);
+      // Guard against state updates after unmount
+      if (!mountedRef.current) return;
       setUser(me);
       setSubscriptions(
         subs.sort((a, b) =>
@@ -48,23 +52,31 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         )
       );
       setSettings(prefs);
-      // Sync theme with user's saved preference
       setTheme(prefs.themePreference);
       setError(null);
     } catch (err) {
+      if (!mountedRef.current) return;
       setError(err instanceof Error ? err.message : "Failed to load data");
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   }, [setTheme]);
 
   const logout = useCallback(async () => {
-    await api.logout();
+    try {
+      await api.logout();
+    } catch {
+      // Ignore logout errors — redirect anyway
+    }
     window.location.href = "/login";
   }, []);
 
   useEffect(() => {
+    mountedRef.current = true;
     refresh();
+    return () => {
+      mountedRef.current = false;
+    };
   }, [refresh]);
 
   return (

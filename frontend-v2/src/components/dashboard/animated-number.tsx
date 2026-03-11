@@ -10,16 +10,23 @@ interface AnimatedNumberProps {
   className?: string;
 }
 
+const defaultFormat = (n: number) => String(Math.round(n));
+
 export function AnimatedNumber({
   value,
   duration = 0.8,
-  formatFn = (n) => String(Math.round(n)),
+  formatFn = defaultFormat,
   className,
 }: AnimatedNumberProps) {
-  const motionValue = useMotionValue(0);
-  const rounded = useTransform(motionValue, (v) => formatFn(v));
-  const [display, setDisplay] = useState(formatFn(0));
-  const prevValue = useRef(0);
+  const motionValue = useRef(useMotionValue(0)).current;
+  const formatRef = useRef(formatFn);
+  formatRef.current = formatFn;
+
+  const rounded = useRef(
+    useTransform(motionValue, (v) => formatRef.current(v))
+  ).current;
+
+  const [display, setDisplay] = useState(() => formatFn(0));
 
   useEffect(() => {
     const controls = animate(motionValue, value, {
@@ -28,7 +35,6 @@ export function AnimatedNumber({
     });
 
     const unsubscribe = rounded.on("change", (v) => setDisplay(v));
-    prevValue.current = value;
 
     return () => {
       controls.stop();
@@ -36,9 +42,5 @@ export function AnimatedNumber({
     };
   }, [value, duration, motionValue, rounded]);
 
-  return (
-    <motion.span className={className}>
-      {display}
-    </motion.span>
-  );
+  return <motion.span className={className}>{display}</motion.span>;
 }

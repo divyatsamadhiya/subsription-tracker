@@ -30,8 +30,12 @@ export default function LoginPage() {
       });
 
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Invalid credentials");
+        let message = "Invalid credentials";
+        try {
+          const data = await res.json();
+          if (data.error) message = data.error;
+        } catch { /* non-JSON response */ }
+        throw new Error(message);
       }
 
       window.location.href = "/";

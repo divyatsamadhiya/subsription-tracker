@@ -31,8 +31,12 @@ export default function ForgotPasswordPage() {
       });
 
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to send reset code");
+        let message = "Failed to send reset code";
+        try {
+          const data = await res.json();
+          if (data.error) message = data.error;
+        } catch { /* non-JSON response */ }
+        throw new Error(message);
       }
 
       setStep("reset");
@@ -62,8 +66,12 @@ export default function ForgotPasswordPage() {
       });
 
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to reset password");
+        let message = "Failed to reset password";
+        try {
+          const data = await res.json();
+          if (data.error) message = data.error;
+        } catch { /* non-JSON response */ }
+        throw new Error(message);
       }
 
       setStep("done");
