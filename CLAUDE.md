@@ -4,13 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Pulseboard — a subscription tracker with user-facing frontend, admin console, and Express backend. Monorepo with three packages: `frontend/`, `admin-frontend/`, `backend/`.
+Pulseboard — a subscription tracker with user-facing frontend, admin console, and Express backend. Monorepo with four packages: `frontend-v2/` (primary), `frontend/` (legacy), `admin-frontend/`, `backend/`.
 
 ## Commands
 
 ### Root (monorepo)
 ```bash
-npm run dev          # Run all three packages in watch mode
+npm run dev          # Run all packages in watch mode
 npm run test         # Run all tests (backend → frontend → admin-frontend)
 npm run build        # Build all (includes tsc -b full type-check)
 ```
@@ -24,17 +24,25 @@ npm run db:generate -w backend      # Prisma generate
 npm run db:studio -w backend        # Prisma Studio GUI
 ```
 
-### Frontend
+### Frontend (legacy)
 ```bash
 npm run dev -w frontend             # Vite dev server (localhost:5173)
 npm run test -w frontend            # Run frontend tests
 npm run test:watch -w frontend      # Vitest watch mode
 ```
 
+### Frontend v2
+```bash
+npm run dev -w frontend-v2          # Next.js dev server (localhost:3000)
+npm run build -w frontend-v2        # Next.js production build (includes tsc)
+npm run test -w frontend-v2         # Run frontend-v2 tests (Vitest)
+```
+
 ### Running a single test file
 ```bash
 cd backend && npx vitest run src/services/authService.test.ts
 cd frontend && npx vitest run src/App.test.tsx
+cd frontend-v2 && npx vitest run src/lib/calendar-grid.test.ts
 ```
 
 ## Architecture
@@ -49,7 +57,21 @@ cd frontend && npx vitest run src/App.test.tsx
 - **Routes**: `/api/v1/auth`, `/api/v1/subscriptions`, `/api/v1/settings`, `/api/v1/profile`, `/api/v1/backup`, `/api/v1/admin`
 - **Tests**: Vitest (node env), Prisma mocked via `src/test/mockPrisma.ts`
 
-### Frontend (`frontend/`)
+### Frontend v2 (`frontend-v2/`) — Primary
+- **Stack**: Next.js 16, React 19, Tailwind CSS, shadcn/ui (Base UI primitives), TypeScript (strict)
+- **Charts**: Recharts v3 — BarChart, PieChart with custom cells and tooltips
+- **Calendar**: react-day-picker v9 with Tailwind-compatible classNames
+- **Animations**: motion/react (Framer Motion) for page transitions, staggered lists, interactive elements
+- **State**: React context (`DashboardProvider`) wrapping all dashboard pages
+- **API client**: `src/lib/api.ts` — typed fetch wrapper, `credentials: "include"` for cookies
+- **UI components**: `src/components/ui/` — shadcn/ui components (Button, Card, Sheet, Popover, Calendar, Select, Tabs, etc.)
+- **Layout**: Collapsible sidebar (`sidebar.tsx`) with nav, stats card, user menu; renewal alerts bell in sidebar header; mobile drawer header
+- **Subscription form**: Searchable dropdown for names (70+ suggestions in `lib/suggestions.ts`), calendar date picker via Popover + Calendar
+- **Shared utilities**: `lib/category-colors.ts` (CATEGORY_HEX), `lib/subscription-utils.ts` (toSubscriptionInput), `lib/sparkline-paths.ts`, `lib/calendar-grid.ts`
+- **Tests**: Vitest with tests for pure logic (sparkline paths, calendar grid, brand colors, overview helpers)
+- **Fonts**: System fonts (SF Pro / Helvetica Neue stack) for headings and body via CSS variables
+
+### Frontend (`frontend/`) — Legacy
 - **Stack**: React 18, MUI v7 (Material Design 3 theme), Vite, TypeScript (strict)
 - **Charts**: `@mui/x-charts` v8 — API differs from v6/v7 (e.g., hide legend with `slots={{ legend: () => null }}`, not `slotProps.legend.hidden`)
 - **State**: Zustand (`useAppStore`)
@@ -60,10 +82,11 @@ cd frontend && npx vitest run src/App.test.tsx
 - **PWA**: vite-plugin-pwa with workbox service worker
 
 ### Admin Frontend (`admin-frontend/`)
-- Same stack as frontend, runs on localhost:5174
+- Same stack as legacy frontend, runs on localhost:5174
 
 ### Dev Servers
-- Frontend: `http://localhost:5173` (proxies `/api` → backend)
+- Frontend v2: `http://localhost:3000` (Next.js)
+- Legacy Frontend: `http://localhost:5173` (Vite, proxies `/api` → backend)
 - Admin: `http://localhost:5174`
 - Backend: `http://localhost:4000`
 
@@ -100,6 +123,8 @@ Steps: `npm ci` → `npm run test` → `npm run build`
 - Amounts stored in minor units (cents) — use `formatCurrencyMinor` for display
 - Dates are ISO strings — use `formatIsoDate` for display
 - When changing UI copy/headings, grep test files for old strings and update them
-- Theme `shape.borderRadius` is 14 (single source of truth — no per-component overrides)
-- Fonts: Space Grotesk (headings), Plus Jakarta Sans (body)
+- Frontend v2 uses Tailwind CSS with CSS variables for theming (oklch color space)
+- Legacy frontend uses MUI theme with `shape.borderRadius` of 14
+- Fonts: System font stack (SF Pro / Helvetica Neue) for frontend-v2; Space Grotesk + Plus Jakarta Sans for legacy frontend
 - CORS: `FRONTEND_ORIGIN` must be explicit origins, no wildcards (credentials mode)
+- Shared constants (CATEGORY_HEX, toSubscriptionInput) live in `lib/` — do not duplicate across pages
