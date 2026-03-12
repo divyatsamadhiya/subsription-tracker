@@ -1,5 +1,7 @@
 import { calculateMonthlyTotalMinor, daysUntil, getUpcomingRenewals } from "./date";
 import type { BillingCycle, Subscription, SubscriptionCategory } from "./types";
+import type { UsageRating } from "./roi-ratings";
+import { getRoiVerdict, type RoiVerdict } from "./roi-ratings";
 
 export interface SpendTrendPoint {
   monthLabel: string;
@@ -26,6 +28,16 @@ export interface CategorySpendPoint {
   share: number;
   momChangePercent: number | null;
   sourceCategories: SubscriptionCategory[];
+}
+
+export interface CategoryTrendPoint {
+  monthLabel: string;
+  monthKey: string;
+  entertainment: number;
+  productivity: number;
+  utilities: number;
+  health: number;
+  other: number;
 }
 
 export interface RenewalBucketPoint {
@@ -342,9 +354,7 @@ export const buildCategorySpend = (
       const momChangePercent =
         previousMinor > 0
           ? ((amountMinor - previousMinor) / previousMinor) * 100
-          : amountMinor > 0
-            ? 100
-            : null;
+          : null;
 
       return {
         category,
@@ -383,9 +393,7 @@ export const buildCategorySpend = (
         ? (((otherAmountMinor + (explicitOther?.amountMinor ?? 0)) - previousOtherMinor) /
             previousOtherMinor) *
           100
-        : otherAmountMinor > 0
-          ? 100
-          : null,
+        : null,
     sourceCategories: Array.from(
       new Set(rolled.flatMap((point) => point.sourceCategories).concat(explicitOther?.sourceCategories ?? []))
     ),
@@ -410,6 +418,58 @@ function mergedCategoriesTotal(
     );
   }, 0);
 }
+
+export const buildCategoryTrend = (
+  subscriptions: Subscription[],
+  fromIsoDate: string,
+  monthsAhead = 12
+): CategoryTrendPoint[] => {
+  const count = Math.max(1, monthsAhead);
+  const startMonthIso = `${fromIsoDate.slice(0, 7)}-01`;
+
+  const ALL_CATEGORIES: SubscriptionCategory[] = [
+    "entertainment",
+    "productivity",
+    "utilities",
+    "health",
+    "other",
+  ];
+
+  return Array.from({ length: count }, (_, i) => {
+    const monthStartIso = addMonths(startMonthIso, i);
+    const monthKey = toMonthKey(monthStartIso);
+
+    const totals: Record<SubscriptionCategory, number> = {
+      entertainment: 0,
+      productivity: 0,
+      utilities: 0,
+      health: 0,
+      other: 0,
+    };
+
+    for (const sub of subscriptions) {
+      if (isActiveDuringMonth(sub, monthStartIso)) {
+        totals[sub.category] += monthlyEquivalent(sub);
+      }
+    }
+
+    const point: CategoryTrendPoint = {
+      monthLabel: toMonthLabel(monthKey),
+      monthKey,
+      entertainment: 0,
+      productivity: 0,
+      utilities: 0,
+      health: 0,
+      other: 0,
+    };
+
+    for (const cat of ALL_CATEGORIES) {
+      point[cat] = Math.round(totals[cat]) / 100;
+    }
+
+    return point;
+  });
+};
 
 export const buildRenewalBuckets = (
   subscriptions: Subscription[],
@@ -575,4 +635,60 @@ export const buildAnalyticsSummary = (
     previousTwelveMonthMinor,
     yoyGrowthPercent,
   };
+};
+
+export interface RoiItem {
+  subscriptionId: string;
+  name: string;
+  category: SubscriptionCategory;
+  monthlyMinor: number;
+  rating: UsageRating | null;
+  verdict: RoiVerdict | null;
+}
+
+export interface RoiSummary {
+  items: RoiItem[];
+  ratedCount: number;
+  totalCount: number;
+  underusedMonthlyMinor: number;
+}
+
+export const buildRoiData = (
+  subscriptions: Subscription[],
+  ratings: Record<string, UsageRating>
+): RoiSummary => {
+  const active = subscriptions.filter((s) => s.isActive);
+
+  let underusedMonthlyMinor = 0;
+  let ratedCount = 0;
+
+  const items: RoiItem[] = active.map((sub) => {
+    const monthly = Math.round(monthlyEquivalent(sub));
+    const rating = ratings[sub.id] ?? null;
+    const verdict = rating !== null ? getRoiVerdict(rating) : null;
+
+    if (rating !== null) ratedCount++;
+    if (verdict === "poor" || verdict === "fair") {
+      underusedMonthlyMinor += monthly;
+    }
+
+    return {
+      subscriptionId: sub.id,
+      name: sub.name,
+      category: sub.category,
+      monthlyMinor: monthly,
+      rating,
+      verdict,
+    };
+  });
+
+  items.sort((a, b) => {
+    const verdictOrder = (v: RoiVerdict | null) =>
+      v === "poor" ? 0 : v === "fair" ? 1 : v === "good" ? 2 : 3;
+    const orderDiff = verdictOrder(a.verdict) - verdictOrder(b.verdict);
+    if (orderDiff !== 0) return orderDiff;
+    return b.monthlyMinor - a.monthlyMinor;
+  });
+
+  return { items, ratedCount, totalCount: active.length, underusedMonthlyMinor };
 };
