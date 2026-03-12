@@ -1,9 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import {
+  AreaChart,
+  Area,
   BarChart,
   Bar,
   LabelList,
@@ -26,8 +28,11 @@ import {
   BarChart3,
   Layers3,
   Plus,
+  Star,
+  Gauge,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useDashboard } from "@/lib/dashboard-context";
 import {
@@ -40,15 +45,25 @@ import { nowIsoDate } from "@/lib/date";
 import {
   buildSpendComparisonTrend,
   buildCategorySpend,
+  buildCategoryTrend,
   buildRenewalBuckets,
   buildAnalyticsSummary,
+  buildRoiData,
   getCategoryChangeMeta,
   getAnalyticsRangeMonths,
   getSubscriptionsForCategoryPoint,
   type AnalyticsRange,
+  type RoiItem,
 } from "@/lib/analytics";
 import type { SubscriptionCategory } from "@/lib/types";
 import { CATEGORY_HEX } from "@/lib/category-colors";
+import {
+  getRoiRatings,
+  setRoiRating,
+  USAGE_LABELS,
+  type UsageRating,
+  type RoiVerdict,
+} from "@/lib/roi-ratings";
 
 const container = {
   hidden: { opacity: 0 },
@@ -74,10 +89,20 @@ export default function AnalyticsPage() {
   const today = nowIsoDate();
   const [showComparison, setShowComparison] = useState(false);
   const [range, setRange] = useState<AnalyticsRange>("1y");
+  const [categoryTrendRange, setCategoryTrendRange] = useState<AnalyticsRange>("1y");
   const [selectedCategory, setSelectedCategory] = useState<SubscriptionCategory | null>(null);
   const [selectedRenewalBucketKey, setSelectedRenewalBucketKey] = useState<
     "0-7" | "8-14" | "15-21" | "22-30" | null
   >(null);
+  const [roiRatings, setRoiRatings] = useState(getRoiRatings);
+
+  const handleRoiRate = useCallback(
+    (subscriptionId: string, rating: UsageRating) => {
+      setRoiRating(subscriptionId, rating);
+      setRoiRatings(getRoiRatings());
+    },
+    []
+  );
 
   const rangeMonths = useMemo(
     () => getAnalyticsRangeMonths(subscriptions, today, range),
@@ -95,9 +120,21 @@ export default function AnalyticsPage() {
     () => buildCategorySpend(subscriptions, today),
     [subscriptions, today]
   );
+  const categoryTrendMonths = useMemo(
+    () => getAnalyticsRangeMonths(subscriptions, today, categoryTrendRange),
+    [subscriptions, today, categoryTrendRange]
+  );
+  const categoryTrend = useMemo(
+    () => buildCategoryTrend(subscriptions, today, categoryTrendMonths),
+    [subscriptions, today, categoryTrendMonths]
+  );
   const renewalBuckets = useMemo(
     () => buildRenewalBuckets(subscriptions, today),
     [subscriptions, today]
+  );
+  const roiData = useMemo(
+    () => buildRoiData(subscriptions, roiRatings),
+    [subscriptions, roiRatings]
   );
 
   const hasData = subscriptions.some((s) => s.isActive);
@@ -332,6 +369,114 @@ export default function AnalyticsPage() {
                   />
                 </ComposedChart>
               </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* Category Trend - Stacked Area Chart */}
+      <motion.div variants={item} className="mb-6">
+        <Card>
+          <CardHeader className="flex flex-col gap-3 pb-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle className="text-base">Category trend over time</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">
+                How spending per category has shifted month by month
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {RANGE_OPTIONS.map((option) => (
+                <Button
+                  key={option.value}
+                  variant={categoryTrendRange === option.value ? "secondary" : "outline"}
+                  size="sm"
+                  onClick={() => setCategoryTrendRange(option.value)}
+                >
+                  {option.label}
+                </Button>
+              ))}
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[320px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={categoryTrend}>
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="var(--color-border)"
+                    vertical={false}
+                  />
+                  <XAxis
+                    dataKey="monthLabel"
+                    tick={{ fontSize: 12, fill: "var(--color-muted-foreground)" }}
+                    axisLine={false}
+                    tickLine={false}
+                    interval={1}
+                    tickFormatter={(value) => value.slice(0, 3)}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 12, fill: "var(--color-muted-foreground)" }}
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={(v) => `${sym}${v}`}
+                    width={60}
+                  />
+                  <Tooltip content={<CategoryTrendTooltip sym={sym} />} />
+                  <Area
+                    type="monotone"
+                    dataKey="entertainment"
+                    stackId="1"
+                    stroke={CATEGORY_HEX.entertainment}
+                    fill={CATEGORY_HEX.entertainment}
+                    fillOpacity={0.6}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="productivity"
+                    stackId="1"
+                    stroke={CATEGORY_HEX.productivity}
+                    fill={CATEGORY_HEX.productivity}
+                    fillOpacity={0.6}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="utilities"
+                    stackId="1"
+                    stroke={CATEGORY_HEX.utilities}
+                    fill={CATEGORY_HEX.utilities}
+                    fillOpacity={0.6}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="health"
+                    stackId="1"
+                    stroke={CATEGORY_HEX.health}
+                    fill={CATEGORY_HEX.health}
+                    fillOpacity={0.6}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="other"
+                    stackId="1"
+                    stroke={CATEGORY_HEX.other}
+                    fill={CATEGORY_HEX.other}
+                    fillOpacity={0.6}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="mt-3 flex flex-wrap justify-center gap-x-4 gap-y-1">
+              {(["entertainment", "productivity", "utilities", "health", "other"] as const).map(
+                (cat) => (
+                  <span key={cat} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <span
+                      className="inline-block size-2.5 rounded-sm"
+                      style={{ backgroundColor: CATEGORY_HEX[cat] }}
+                    />
+                    {categoryLabel(cat)}
+                  </span>
+                )
+              )}
             </div>
           </CardContent>
         </Card>
@@ -604,6 +749,60 @@ export default function AnalyticsPage() {
           </Card>
         </motion.div>
       </div>
+
+      {/* Subscription ROI Tracker */}
+      <motion.div variants={item} className="mt-6">
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <Gauge className="size-4 text-muted-foreground" />
+              <CardTitle className="text-base">Subscription ROI</CardTitle>
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Are you using what you pay for? Rate each subscription to find savings.
+            </p>
+          </CardHeader>
+          <CardContent>
+            {roiData.ratedCount > 0 && roiData.underusedMonthlyMinor > 0 && (
+              <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3">
+                <p className="text-sm font-medium text-foreground">
+                  {formatCurrencyMinor(roiData.underusedMonthlyMinor, currency)}/mo on
+                  underused subscriptions
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Consider cancelling or downgrading subscriptions rated Poor or Fair
+                </p>
+              </div>
+            )}
+            <div className="flex items-center justify-between gap-3 pb-3 text-xs text-muted-foreground">
+              <span>
+                {roiData.ratedCount} of {roiData.totalCount} rated
+              </span>
+              <div className="flex items-center gap-3">
+                <span className="flex items-center gap-1">
+                  <span className="inline-block size-2 rounded-full bg-emerald-500" /> Good
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="inline-block size-2 rounded-full bg-amber-500" /> Fair
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="inline-block size-2 rounded-full bg-rose-500" /> Poor
+                </span>
+              </div>
+            </div>
+            <div className="space-y-1">
+              {roiData.items.map((roiItem) => (
+                <RoiRow
+                  key={roiItem.subscriptionId}
+                  item={roiItem}
+                  currency={currency}
+                  onRate={handleRoiRate}
+                />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
     </motion.div>
   );
 }
@@ -664,22 +863,20 @@ function CategoryLegendRow({
     <button
       type="button"
       onClick={onClick}
-      className={`grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 rounded-xl px-3 py-2 text-left text-sm transition-colors ${
+      className={`w-full rounded-xl px-3 py-2 text-left text-sm transition-colors ${
         isSelected ? "bg-accent" : "hover:bg-accent/60"
       }`}
     >
-      <div className="min-w-0">
-        <div className="flex items-center gap-3">
-          <div
-            className="h-2.5 w-2.5 shrink-0 rounded-sm"
-            style={{ backgroundColor: color }}
-          />
-          <span className="truncate font-medium text-foreground">
-            {categoryLabel(category)}
-          </span>
-        </div>
-        <p
-          className={`mt-1 pl-5 text-[11px] uppercase tracking-[0.16em] ${
+      <div className="flex items-center gap-2">
+        <div
+          className="h-2.5 w-2.5 shrink-0 rounded-sm"
+          style={{ backgroundColor: color }}
+        />
+        <span className="font-medium text-foreground">
+          {categoryLabel(category)}
+        </span>
+        <span
+          className={`text-[11px] uppercase tracking-[0.12em] ${
             change.tone === "positive"
               ? "text-emerald-400"
               : change.tone === "negative"
@@ -688,14 +885,16 @@ function CategoryLegendRow({
           }`}
         >
           {change.label}
-        </p>
+        </span>
       </div>
-      <span className="text-xs tabular-nums text-muted-foreground">
-        {Math.round(share * 100)}%
-      </span>
-      <span className="min-w-[112px] text-right font-medium tabular-nums text-foreground">
-        {formatCurrencyMinor(amountMinor, currency)}
-      </span>
+      <div className="mt-0.5 flex items-center gap-2 pl-[18px] text-xs">
+        <span className="font-medium tabular-nums text-foreground">
+          {formatCurrencyMinor(amountMinor, currency)}
+        </span>
+        <span className="tabular-nums text-muted-foreground">
+          {Math.round(share * 100)}%
+        </span>
+      </div>
     </button>
   );
 }
@@ -787,6 +986,141 @@ function RenewalBucketTooltip({
       <p className="mt-1 font-medium text-foreground">
         {formatCurrencyMinor(point.amountMinor, currency)}
       </p>
+    </div>
+  );
+}
+
+const CATEGORY_TREND_KEYS = [
+  "entertainment",
+  "productivity",
+  "utilities",
+  "health",
+  "other",
+] as const;
+
+function CategoryTrendTooltip({
+  active,
+  payload,
+  sym,
+}: {
+  active?: boolean;
+  payload?: Array<{
+    dataKey: string;
+    value: number;
+    color: string;
+  }>;
+  sym: string;
+}) {
+  if (!active || !payload?.length) return null;
+
+  const label = (payload[0] as unknown as { payload: { monthLabel: string } }).payload.monthLabel;
+  const total = payload.reduce((sum, entry) => sum + entry.value, 0);
+  const sorted = [...payload]
+    .filter((entry) => entry.value > 0)
+    .sort((a, b) => b.value - a.value);
+
+  return (
+    <div className="w-56 rounded-xl border border-border bg-card p-3 text-sm shadow-lg">
+      <p className="font-medium text-foreground">{label}</p>
+      <p className="mt-1 font-heading text-lg font-semibold text-foreground">
+        {sym}{total.toFixed(2)}
+      </p>
+      {sorted.length > 0 && (
+        <div className="mt-2 space-y-1.5">
+          {sorted.map((entry) => (
+            <div
+              key={entry.dataKey}
+              className="flex items-center justify-between gap-3 text-xs"
+            >
+              <span className="flex items-center gap-1.5 text-foreground">
+                <span
+                  className="inline-block size-2 rounded-sm"
+                  style={{ backgroundColor: entry.color }}
+                />
+                {categoryLabel(entry.dataKey as SubscriptionCategory)}
+              </span>
+              <span className="shrink-0 tabular-nums text-muted-foreground">
+                {sym}{entry.value.toFixed(2)}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const VERDICT_COLORS: Record<RoiVerdict, string> = {
+  poor: "bg-rose-500",
+  fair: "bg-amber-500",
+  good: "bg-emerald-500",
+};
+
+const CATEGORY_PILL_CLASSES = {
+  entertainment: "border-chart-1/25 bg-chart-1/12 text-chart-1",
+  productivity: "border-chart-2/25 bg-chart-2/12 text-chart-2",
+  utilities: "border-chart-3/25 bg-chart-3/12 text-chart-3",
+  health: "border-chart-4/25 bg-chart-4/12 text-chart-4",
+  other: "border-chart-5/25 bg-chart-5/12 text-chart-5",
+} as const;
+
+function RoiRow({
+  item,
+  currency,
+  onRate,
+}: {
+  item: RoiItem;
+  currency: string;
+  onRate: (id: string, rating: UsageRating) => void;
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-border/70 bg-background/40 px-3 py-2.5">
+      {item.verdict ? (
+        <span
+          className={`size-2 shrink-0 rounded-full ${VERDICT_COLORS[item.verdict]}`}
+          title={item.verdict}
+        />
+      ) : (
+        <span className="size-2 shrink-0 rounded-full bg-border" />
+      )}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <p className="truncate text-sm font-medium text-foreground">
+            {item.name}
+          </p>
+          <Badge
+            variant="outline"
+            className={`px-2 py-0 text-[10px] font-medium ${CATEGORY_PILL_CLASSES[item.category]}`}
+          >
+            {categoryLabel(item.category)}
+          </Badge>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {formatCurrencyMinor(item.monthlyMinor, currency)}/mo
+          {item.rating !== null && (
+            <> &middot; {USAGE_LABELS[item.rating]}</>
+          )}
+        </p>
+      </div>
+      <div className="flex items-center gap-0.5">
+        {([1, 2, 3, 4, 5] as UsageRating[]).map((star) => (
+          <button
+            key={star}
+            type="button"
+            onClick={() => onRate(item.subscriptionId, star)}
+            className="rounded p-0.5 transition-colors hover:bg-accent"
+            title={USAGE_LABELS[star]}
+          >
+            <Star
+              className={`size-3.5 ${
+                item.rating !== null && star <= item.rating
+                  ? "fill-amber-400 text-amber-400"
+                  : "text-muted-foreground/40"
+              }`}
+            />
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

@@ -3,13 +3,16 @@ import {
   buildSpendTrend,
   buildSpendComparisonTrend,
   buildCategorySpend,
+  buildCategoryTrend,
   buildRenewalBuckets,
   buildAnalyticsSummary,
+  buildRoiData,
   getCategoryChangeMeta,
   getAnalyticsRangeMonths,
   getSubscriptionsForCategoryPoint,
   getMostCancelledCategory,
 } from "./analytics";
+import { getRoiVerdict } from "./roi-ratings";
 import { buildSubscription } from "@/test/factories";
 
 describe("buildSpendTrend", () => {
@@ -360,6 +363,77 @@ describe("buildCategorySpend", () => {
     expect(otherPoint).toBeTruthy();
     expect(otherPoint?.sourceCategories).toEqual(expect.arrayContaining(["health", "other"]));
     expect(otherPoint?.amountMinor).toBe(350);
+  });
+});
+
+describe("buildCategoryTrend", () => {
+  it("returns correct number of month points", () => {
+    const result = buildCategoryTrend([], "2026-03-11", 6);
+    expect(result).toHaveLength(6);
+    expect(result[0].monthKey).toBe("2026-03");
+    expect(result[5].monthKey).toBe("2026-08");
+  });
+
+  it("returns all category keys with zero values for no subscriptions", () => {
+    const result = buildCategoryTrend([], "2026-03-11", 1);
+    expect(result[0].entertainment).toBe(0);
+    expect(result[0].productivity).toBe(0);
+    expect(result[0].utilities).toBe(0);
+    expect(result[0].health).toBe(0);
+    expect(result[0].other).toBe(0);
+  });
+
+  it("breaks down monthly spend by category", () => {
+    const subs = [
+      buildSubscription({
+        category: "entertainment",
+        billingCycle: "monthly",
+        amountMinor: 1000,
+        isActive: true,
+      }),
+      buildSubscription({
+        category: "productivity",
+        billingCycle: "monthly",
+        amountMinor: 2000,
+        isActive: true,
+      }),
+    ];
+    const result = buildCategoryTrend(subs, "2026-03-11", 1);
+    expect(result[0].entertainment).toBe(10); // 1000 minor / 100
+    expect(result[0].productivity).toBe(20); // 2000 minor / 100
+    expect(result[0].health).toBe(0);
+  });
+
+  it("excludes subscriptions not yet created", () => {
+    const subs = [
+      buildSubscription({
+        category: "health",
+        billingCycle: "monthly",
+        amountMinor: 500,
+        isActive: true,
+        createdAt: "2026-06-01T00:00:00Z",
+      }),
+    ];
+    const result = buildCategoryTrend(subs, "2026-03-11", 6);
+    // Not yet created in March through May
+    expect(result[0].health).toBe(0);
+    expect(result[1].health).toBe(0);
+    expect(result[2].health).toBe(0);
+    // Active from June onward
+    expect(result[3].health).toBe(5);
+  });
+
+  it("converts yearly billing to monthly equivalent", () => {
+    const subs = [
+      buildSubscription({
+        category: "utilities",
+        billingCycle: "yearly",
+        amountMinor: 12000,
+        isActive: true,
+      }),
+    ];
+    const result = buildCategoryTrend(subs, "2026-03-11", 1);
+    expect(result[0].utilities).toBe(10); // 12000 / 12 = 1000 minor → 10 display
   });
 });
 
@@ -715,5 +789,111 @@ describe("buildAnalyticsSummary", () => {
       category: "utilities",
       count: 2,
     });
+  });
+});
+
+describe("getRoiVerdict", () => {
+  it("returns poor for low ratings (1-2)", () => {
+    expect(getRoiVerdict(1)).toBe("poor");
+    expect(getRoiVerdict(2)).toBe("poor");
+  });
+
+  it("returns fair for medium rating (3)", () => {
+    expect(getRoiVerdict(3)).toBe("fair");
+  });
+
+  it("returns good for high ratings (4-5)", () => {
+    expect(getRoiVerdict(4)).toBe("good");
+    expect(getRoiVerdict(5)).toBe("good");
+  });
+});
+
+describe("buildRoiData", () => {
+  it("returns empty for no active subscriptions", () => {
+    const subs = [buildSubscription({ isActive: false })];
+    const result = buildRoiData(subs, {});
+    expect(result.items).toHaveLength(0);
+    expect(result.totalCount).toBe(0);
+    expect(result.ratedCount).toBe(0);
+  });
+
+  it("lists active subscriptions with null verdict when unrated", () => {
+    const subs = [
+      buildSubscription({ id: "a", name: "Netflix", amountMinor: 1500, isActive: true }),
+    ];
+    const result = buildRoiData(subs, {});
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].rating).toBeNull();
+    expect(result.items[0].verdict).toBeNull();
+    expect(result.ratedCount).toBe(0);
+    expect(result.totalCount).toBe(1);
+  });
+
+  it("computes verdict based on rating", () => {
+    const subs = [
+      buildSubscription({
+        id: "a",
+        billingCycle: "monthly",
+        amountMinor: 2000,
+        isActive: true,
+      }),
+      buildSubscription({
+        id: "b",
+        billingCycle: "monthly",
+        amountMinor: 500,
+        isActive: true,
+      }),
+    ];
+    const ratings = { a: 1 as const, b: 5 as const };
+    const result = buildRoiData(subs, ratings);
+
+    expect(result.ratedCount).toBe(2);
+    const itemA = result.items.find((i) => i.subscriptionId === "a")!;
+    const itemB = result.items.find((i) => i.subscriptionId === "b")!;
+
+    expect(itemA.verdict).toBe("poor"); // rating 1
+    expect(itemB.verdict).toBe("good"); // rating 5
+  });
+
+  it("sums underused monthly spend from poor and fair verdicts", () => {
+    const subs = [
+      buildSubscription({ id: "a", billingCycle: "monthly", amountMinor: 3000, isActive: true }),
+      buildSubscription({ id: "b", billingCycle: "monthly", amountMinor: 1000, isActive: true }),
+      buildSubscription({ id: "c", billingCycle: "monthly", amountMinor: 500, isActive: true }),
+    ];
+    // a: poor (rating 1), b: poor (rating 2), c: good (rating 5)
+    const ratings = { a: 1 as const, b: 2 as const, c: 5 as const };
+    const result = buildRoiData(subs, ratings);
+
+    expect(result.underusedMonthlyMinor).toBe(4000);
+  });
+
+  it("sorts poor verdicts first, then by monthly cost descending", () => {
+    const subs = [
+      buildSubscription({ id: "cheap-good", billingCycle: "monthly", amountMinor: 100, isActive: true }),
+      buildSubscription({ id: "expensive-poor", billingCycle: "monthly", amountMinor: 5000, isActive: true }),
+      buildSubscription({ id: "mid-fair", billingCycle: "monthly", amountMinor: 2000, isActive: true }),
+    ];
+    const ratings = {
+      "cheap-good": 5 as const,
+      "expensive-poor": 1 as const,
+      "mid-fair": 3 as const,
+    };
+    const result = buildRoiData(subs, ratings);
+
+    expect(result.items[0].subscriptionId).toBe("expensive-poor");
+  });
+
+  it("handles yearly billing cycle conversion", () => {
+    const subs = [
+      buildSubscription({
+        id: "a",
+        billingCycle: "yearly",
+        amountMinor: 12000,
+        isActive: true,
+      }),
+    ];
+    const result = buildRoiData(subs, {});
+    expect(result.items[0].monthlyMinor).toBe(1000);
   });
 });
