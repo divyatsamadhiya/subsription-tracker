@@ -126,21 +126,22 @@ const nextChargeDate = (
 
 const pushContributor = (
   contributors: SpendComparisonPoint["contributors"],
-  subscription: Subscription
+  subscription: Subscription,
+  chargeAmountMinor: number
 ) => {
   const existing = contributors.find(
     (entry) => entry.subscriptionId === subscription.id
   );
 
   if (existing) {
-    existing.amountMinor += subscription.amountMinor;
+    existing.amountMinor += chargeAmountMinor;
     return;
   }
 
   contributors.push({
     subscriptionId: subscription.id,
     name: subscription.name,
-    amountMinor: subscription.amountMinor,
+    amountMinor: chargeAmountMinor,
   });
 };
 
@@ -163,19 +164,68 @@ const previousChargeDate = (
   }
 };
 
-const monthlyEquivalent = (sub: Subscription): number => {
-  switch (sub.billingCycle) {
+interface PriceSnapshot {
+  amountMinor: number;
+  billingCycle: BillingCycle;
+  customIntervalDays?: number;
+}
+
+/**
+ * Resolve the price that was active on `isoDate` using the subscription's
+ * price history. Falls back to the subscription's current fields.
+ */
+export const priceOnDate = (sub: Subscription, isoDate: string): PriceSnapshot => {
+  if (!sub.priceHistory || sub.priceHistory.length === 0) {
+    return {
+      amountMinor: sub.amountMinor,
+      billingCycle: sub.billingCycle,
+      customIntervalDays: sub.customIntervalDays,
+    };
+  }
+
+  let snapshot: PriceSnapshot = {
+    amountMinor: sub.priceHistory[0].amountMinor,
+    billingCycle: sub.priceHistory[0].billingCycle,
+    customIntervalDays: sub.priceHistory[0].customIntervalDays,
+  };
+
+  for (const entry of sub.priceHistory) {
+    if (entry.effectiveDate <= isoDate) {
+      snapshot = {
+        amountMinor: entry.amountMinor,
+        billingCycle: entry.billingCycle,
+        customIntervalDays: entry.customIntervalDays,
+      };
+    } else {
+      break;
+    }
+  }
+
+  return snapshot;
+};
+
+const monthlyEquivalentFromSnapshot = (snapshot: PriceSnapshot): number => {
+  switch (snapshot.billingCycle) {
     case "weekly":
-      return sub.amountMinor * (52 / 12);
+      return snapshot.amountMinor * (52 / 12);
     case "monthly":
-      return sub.amountMinor;
+      return snapshot.amountMinor;
     case "yearly":
-      return sub.amountMinor / 12;
+      return snapshot.amountMinor / 12;
     case "custom_days":
-      return sub.amountMinor * (30 / (sub.customIntervalDays ?? 30));
+      return snapshot.amountMinor * (30 / (snapshot.customIntervalDays ?? 30));
     default:
       return 0;
   }
+};
+
+const monthlyEquivalent = (sub: Subscription, onDate?: string): number => {
+  const snapshot = onDate ? priceOnDate(sub, onDate) : {
+    amountMinor: sub.amountMinor,
+    billingCycle: sub.billingCycle,
+    customIntervalDays: sub.customIntervalDays,
+  };
+  return monthlyEquivalentFromSnapshot(snapshot);
 };
 
 const isActiveDuringMonth = (
@@ -229,7 +279,9 @@ export const buildSpendTrend = (
     }
     while (date < endExclusive && guard < 1200) {
       const idx = indexByKey.get(toMonthKey(date));
-      if (idx !== undefined) result[idx].amountMinor += sub.amountMinor;
+      if (idx !== undefined) {
+        result[idx].amountMinor += priceOnDate(sub, date).amountMinor;
+      }
       date = nextChargeDate(date, sub.billingCycle, sub.customIntervalDays);
       guard++;
     }
@@ -286,7 +338,7 @@ export const buildSpendComparisonTrend = (
     while (date < endExclusiveIso && guard < 1200) {
       const point = pointByMonth.get(toMonthKey(date));
       if (point) {
-        pushContributor(point.contributors, sub);
+        pushContributor(point.contributors, sub, priceOnDate(sub, date).amountMinor);
       }
       date = nextChargeDate(date, sub.billingCycle, sub.customIntervalDays);
       guard++;
@@ -338,11 +390,12 @@ export const buildCategorySpend = (
   const previousTotals = new Map<SubscriptionCategory, number>();
 
   for (const sub of subscriptions) {
-    const monthly = monthlyEquivalent(sub);
     if (isActiveDuringMonth(sub, currentMonthStartIso)) {
+      const monthly = monthlyEquivalent(sub, currentMonthStartIso);
       currentTotals.set(sub.category, (currentTotals.get(sub.category) ?? 0) + monthly);
     }
     if (isActiveDuringMonth(sub, previousMonthStartIso)) {
+      const monthly = monthlyEquivalent(sub, previousMonthStartIso);
       previousTotals.set(sub.category, (previousTotals.get(sub.category) ?? 0) + monthly);
     }
   }
@@ -449,7 +502,7 @@ export const buildCategoryTrend = (
 
     for (const sub of subscriptions) {
       if (isActiveDuringMonth(sub, monthStartIso)) {
-        totals[sub.category] += monthlyEquivalent(sub);
+        totals[sub.category] += monthlyEquivalent(sub, monthStartIso);
       }
     }
 

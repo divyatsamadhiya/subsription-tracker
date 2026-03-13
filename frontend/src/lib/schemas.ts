@@ -95,6 +95,14 @@ export const subscriptionInputSchema = z
     }
   }) satisfies z.ZodType<SubscriptionInput>;
 
+const priceHistoryEntrySchema = z.object({
+  amountMinor: z.number().int().positive(),
+  currency: z.string().length(3),
+  billingCycle: z.enum(BILLING_CYCLE_OPTIONS),
+  customIntervalDays: z.number().int().positive().optional(),
+  effectiveDate: isoDateSchema,
+}).strict();
+
 export const subscriptionSchema: z.ZodType<Subscription> = z.object({
   id: z.string().min(1),
   name: z.string().trim().min(1),
@@ -107,6 +115,7 @@ export const subscriptionSchema: z.ZodType<Subscription> = z.object({
   reminderDaysBefore: z.array(z.number().int().nonnegative()),
   isActive: z.boolean(),
   notes: z.string().max(2000).optional(),
+  priceHistory: z.array(priceHistoryEntrySchema),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime()
 }).strict();

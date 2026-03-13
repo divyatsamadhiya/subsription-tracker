@@ -19,6 +19,7 @@ export const mockPrisma = {
   user: makeMockModel(),
   settings: makeMockModel(),
   subscription: makeMockModel(),
+  priceChange: makeMockModel(),
   adminAuditLog: makeMockModel(),
   $connect: vi.fn(),
   $disconnect: vi.fn(),

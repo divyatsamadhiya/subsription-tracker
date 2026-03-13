@@ -9,6 +9,14 @@ export type SubscriptionCategory =
 
 export type UserRole = "user" | "admin";
 
+export interface PriceHistoryEntry {
+  amountMinor: number;
+  currency: string;
+  billingCycle: BillingCycle;
+  customIntervalDays?: number;
+  effectiveDate: string;
+}
+
 export interface Subscription {
   id: string;
   name: string;
@@ -21,6 +29,7 @@ export interface Subscription {
   reminderDaysBefore: number[];
   isActive: boolean;
   notes?: string;
+  priceHistory: PriceHistoryEntry[];
   createdAt: string;
   updatedAt: string;
 }

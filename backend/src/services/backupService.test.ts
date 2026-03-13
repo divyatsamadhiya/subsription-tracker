@@ -26,11 +26,24 @@ const makeSubscription = (id: string) => {
     amountMinor: 999,
     currency: "USD",
     billingCycle: "monthly",
+    customIntervalDays: null,
     nextBillingDate: "2026-01-08",
     category: "entertainment",
     reminderDaysBefore: [1, 3, 7],
     isActive: true,
     notes: null,
+    priceChanges: [
+      {
+        id: "pc_1",
+        subscriptionPk: "pk_1",
+        amountMinor: 999,
+        currency: "USD",
+        billingCycle: "monthly",
+        customIntervalDays: null,
+        effectiveDate: "2026-01-01",
+        createdAt: now,
+      },
+    ],
     createdAt: now,
     updatedAt: now
   };
@@ -73,7 +86,7 @@ describe("backupService", () => {
     vi.mocked(prisma.subscription.deleteMany).mockResolvedValue({ count: 0 } as never);
     vi.mocked(prisma.settings.deleteMany).mockResolvedValue({ count: 0 } as never);
     vi.mocked(prisma.settings.create).mockResolvedValue({} as never);
-    vi.mocked(prisma.subscription.createMany).mockResolvedValue({ count: 1 } as never);
+    vi.mocked(prisma.subscription.create).mockResolvedValue({} as never);
 
     await importBackupForUser("user_1", {
       version: "1.0",
@@ -95,6 +108,14 @@ describe("backupService", () => {
           category: "entertainment",
           reminderDaysBefore: [1, 3, 7],
           isActive: true,
+          priceHistory: [
+            {
+              amountMinor: 999,
+              currency: "USD",
+              billingCycle: "monthly",
+              effectiveDate: "2026-01-01"
+            }
+          ],
           createdAt: "2026-01-01T00:00:00.000Z",
           updatedAt: "2026-01-01T00:00:00.000Z"
         }
@@ -103,7 +124,7 @@ describe("backupService", () => {
 
     expect(prisma.subscription.deleteMany).toHaveBeenCalledWith({ where: { userId: "user_1" } });
     expect(prisma.settings.create).toHaveBeenCalled();
-    expect(prisma.subscription.createMany).toHaveBeenCalledTimes(1);
+    expect(prisma.subscription.create).toHaveBeenCalledTimes(1);
   });
 
   it("imports backup without createMany when subscriptions are empty", async () => {
@@ -123,7 +144,7 @@ describe("backupService", () => {
       subscriptions: []
     });
 
-    expect(prisma.subscription.createMany).not.toHaveBeenCalled();
+    expect(prisma.subscription.create).not.toHaveBeenCalled();
   });
 
   it("rejects invalid backup payload", async () => {

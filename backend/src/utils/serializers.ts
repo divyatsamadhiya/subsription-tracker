@@ -8,7 +8,8 @@ import {
 import type {
   User as PrismaUser,
   Settings as PrismaSettings,
-  Subscription as PrismaSubscription
+  Subscription as PrismaSubscription,
+  PriceChange as PrismaPriceChange
 } from "../generated/prisma/client.js";
 
 export const toUserProfile = (user: PrismaUser): UserProfile => {
@@ -51,7 +52,9 @@ export const toSettings = (settings: PrismaSettings | null): AppSettings => {
   };
 };
 
-export const toSubscription = (subscription: PrismaSubscription): Subscription => {
+export const toSubscription = (
+  subscription: PrismaSubscription & { priceChanges?: PrismaPriceChange[] }
+): Subscription => {
   return {
     id: subscription.id,
     name: subscription.name,
@@ -64,6 +67,13 @@ export const toSubscription = (subscription: PrismaSubscription): Subscription =
     reminderDaysBefore: subscription.reminderDaysBefore,
     isActive: subscription.isActive,
     notes: subscription.notes ?? undefined,
+    priceHistory: (subscription.priceChanges ?? []).map((pc) => ({
+      amountMinor: pc.amountMinor,
+      currency: pc.currency,
+      billingCycle: pc.billingCycle,
+      customIntervalDays: pc.customIntervalDays ?? undefined,
+      effectiveDate: pc.effectiveDate,
+    })),
     createdAt: subscription.createdAt.toISOString(),
     updatedAt: subscription.updatedAt.toISOString()
   };

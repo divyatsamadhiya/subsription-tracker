@@ -32,11 +32,24 @@ const makeSubscription = (overrides?: Partial<Record<string, unknown>>) => {
     amountMinor: 999,
     currency: "USD",
     billingCycle: "monthly",
+    customIntervalDays: null,
     nextBillingDate: "2026-01-08",
     category: "entertainment",
     reminderDaysBefore: [1, 3, 7],
     isActive: true,
     notes: null,
+    priceChanges: [
+      {
+        id: "pc_1",
+        subscriptionPk: "pk_1",
+        amountMinor: 999,
+        currency: "USD",
+        billingCycle: "monthly",
+        customIntervalDays: null,
+        effectiveDate: "2026-01-01",
+        createdAt: now,
+      },
+    ],
     createdAt: now,
     updatedAt: now,
     ...overrides
@@ -61,7 +74,8 @@ describe("subscriptionService", () => {
 
     expect(prisma.subscription.findMany).toHaveBeenCalledWith({
       where: { userId: "user_1" },
-      orderBy: [{ nextBillingDate: "asc" }, { name: "asc" }]
+      orderBy: [{ nextBillingDate: "asc" }, { name: "asc" }],
+      include: { priceChanges: { orderBy: { effectiveDate: "asc" } } }
     });
     expect(subscriptions).toHaveLength(1);
     expect(subscriptions[0].id).toBe("sub_1");
@@ -104,7 +118,10 @@ describe("subscriptionService", () => {
 
   it("updates an existing subscription", async () => {
     vi.mocked(prisma.settings.findUnique).mockResolvedValue({ defaultCurrency: "USD" } as never);
-    vi.mocked(prisma.subscription.update).mockResolvedValue(makeSubscription({ name: "Figma" }) as never);
+    vi.mocked(prisma.subscription.findUnique).mockResolvedValue(makeSubscription() as never);
+    vi.mocked(prisma.subscription.update).mockResolvedValue(
+      makeSubscription({ name: "Figma", amountMinor: 1299 }) as never
+    );
 
     const result = await updateSubscriptionForUser("user_1", "sub_1", {
       name: "Figma",
@@ -119,9 +136,55 @@ describe("subscriptionService", () => {
     expect(result.name).toBe("Figma");
   });
 
+  it("creates price history record when price changes", async () => {
+    vi.mocked(prisma.settings.findUnique).mockResolvedValue({ defaultCurrency: "USD" } as never);
+    vi.mocked(prisma.subscription.findUnique).mockResolvedValue(
+      makeSubscription({ amountMinor: 999 }) as never
+    );
+    vi.mocked(prisma.subscription.update).mockResolvedValue(
+      makeSubscription({ amountMinor: 1499 }) as never
+    );
+
+    await updateSubscriptionForUser("user_1", "sub_1", {
+      name: "Netflix",
+      amountMinor: 1499,
+      billingCycle: "monthly",
+      nextBillingDate: "2026-01-08",
+      category: "entertainment",
+      reminderDaysBefore: [1, 3, 7],
+      isActive: true
+    });
+
+    const updateCall = vi.mocked(prisma.subscription.update).mock.calls[0][0] as Record<string, unknown>;
+    const data = updateCall.data as Record<string, unknown>;
+    expect(data.priceChanges).toBeDefined();
+  });
+
+  it("skips price history when price is unchanged", async () => {
+    vi.mocked(prisma.settings.findUnique).mockResolvedValue({ defaultCurrency: "USD" } as never);
+    vi.mocked(prisma.subscription.findUnique).mockResolvedValue(
+      makeSubscription({ amountMinor: 999 }) as never
+    );
+    vi.mocked(prisma.subscription.update).mockResolvedValue(makeSubscription() as never);
+
+    await updateSubscriptionForUser("user_1", "sub_1", {
+      name: "Netflix Updated",
+      amountMinor: 999,
+      billingCycle: "monthly",
+      nextBillingDate: "2026-01-08",
+      category: "entertainment",
+      reminderDaysBefore: [1, 3, 7],
+      isActive: true
+    });
+
+    const updateCall = vi.mocked(prisma.subscription.update).mock.calls[0][0] as Record<string, unknown>;
+    const data = updateCall.data as Record<string, unknown>;
+    expect(data.priceChanges).toBeUndefined();
+  });
+
   it("fails update for missing subscription", async () => {
     vi.mocked(prisma.settings.findUnique).mockResolvedValue({ defaultCurrency: "USD" } as never);
-    vi.mocked(prisma.subscription.update).mockRejectedValue(makeP2025Error());
+    vi.mocked(prisma.subscription.findUnique).mockResolvedValue(null as never);
 
     await expect(
       updateSubscriptionForUser("user_1", "missing_sub", {

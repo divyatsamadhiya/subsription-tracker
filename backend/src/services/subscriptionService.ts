@@ -7,10 +7,18 @@ import { HttpError } from "../utils/http.js";
 import { toSubscription } from "../utils/serializers.js";
 import { logger } from "../logger/logger.js";
 
+const priceChangeInclude = { priceChanges: { orderBy: { effectiveDate: "asc" as const } } };
+
+const nowIsoDate = (): string => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
 export const listSubscriptionsForUser = async (userId: string): Promise<Subscription[]> => {
   const docs = await prisma.subscription.findMany({
     where: { userId },
-    orderBy: [{ nextBillingDate: "asc" }, { name: "asc" }]
+    orderBy: [{ nextBillingDate: "asc" }, { name: "asc" }],
+    include: priceChangeInclude
   });
   const subscriptions = docs.map((document) => subscriptionSchema.parse(toSubscription(document)));
 
@@ -24,14 +32,25 @@ export const createSubscriptionForUser = async (
 ): Promise<Subscription> => {
   const payload = subscriptionInputSchema.parse(input);
   const settings = await prisma.settings.findUnique({ where: { userId } });
+  const currency = settings?.defaultCurrency ?? "USD";
 
   const created = await prisma.subscription.create({
     data: {
       userId,
       id: randomUUID(),
       ...payload,
-      currency: settings?.defaultCurrency ?? "USD"
-    }
+      currency,
+      priceChanges: {
+        create: {
+          amountMinor: payload.amountMinor,
+          currency,
+          billingCycle: payload.billingCycle,
+          customIntervalDays: payload.customIntervalDays,
+          effectiveDate: nowIsoDate(),
+        }
+      }
+    },
+    include: priceChangeInclude
   });
 
   const subscription = subscriptionSchema.parse(toSubscription(created));
@@ -46,20 +65,49 @@ export const updateSubscriptionForUser = async (
 ): Promise<Subscription> => {
   const payload: SubscriptionInput = subscriptionInputSchema.parse(input);
   const settings = await prisma.settings.findUnique({ where: { userId } });
+  const currency = settings?.defaultCurrency ?? "USD";
 
   try {
+    const existing = await prisma.subscription.findUnique({
+      where: { userId_id: { userId, id: subscriptionId } }
+    });
+
+    if (!existing) {
+      throw new HttpError(404, "Subscription not found");
+    }
+
+    const priceChanged =
+      payload.amountMinor !== existing.amountMinor ||
+      payload.billingCycle !== existing.billingCycle ||
+      payload.customIntervalDays !== (existing.customIntervalDays ?? undefined);
+
     const updated = await prisma.subscription.update({
       where: { userId_id: { userId, id: subscriptionId } },
       data: {
         ...payload,
-        currency: settings?.defaultCurrency ?? "USD"
-      }
+        currency,
+        ...(priceChanged
+          ? {
+              priceChanges: {
+                create: {
+                  amountMinor: payload.amountMinor,
+                  currency,
+                  billingCycle: payload.billingCycle,
+                  customIntervalDays: payload.customIntervalDays,
+                  effectiveDate: nowIsoDate(),
+                }
+              }
+            }
+          : {})
+      },
+      include: priceChangeInclude
     });
 
     const subscription = subscriptionSchema.parse(toSubscription(updated));
     logger.info("Subscription updated", { userId, subscriptionId });
     return subscription;
   } catch (error) {
+    if (error instanceof HttpError) throw error;
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
       logger.warn("Subscription update failed: not found", { userId, subscriptionId });
       throw new HttpError(404, "Subscription not found");

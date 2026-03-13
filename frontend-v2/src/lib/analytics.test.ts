@@ -11,6 +11,7 @@ import {
   getAnalyticsRangeMonths,
   getSubscriptionsForCategoryPoint,
   getMostCancelledCategory,
+  priceOnDate,
 } from "./analytics";
 import { getRoiVerdict } from "./roi-ratings";
 import { buildSubscription } from "@/test/factories";
@@ -895,5 +896,142 @@ describe("buildRoiData", () => {
     ];
     const result = buildRoiData(subs, {});
     expect(result.items[0].monthlyMinor).toBe(1000);
+  });
+});
+
+describe("priceOnDate", () => {
+  it("falls back to current fields when priceHistory is empty", () => {
+    const sub = buildSubscription({ amountMinor: 1000, billingCycle: "monthly" });
+    const snapshot = priceOnDate(sub, "2026-06-01");
+    expect(snapshot.amountMinor).toBe(1000);
+    expect(snapshot.billingCycle).toBe("monthly");
+  });
+
+  it("returns the initial price for dates before first change", () => {
+    const sub = buildSubscription({
+      amountMinor: 1500,
+      billingCycle: "monthly",
+      priceHistory: [
+        { amountMinor: 1000, currency: "USD", billingCycle: "monthly", effectiveDate: "2026-03-01" },
+        { amountMinor: 1500, currency: "USD", billingCycle: "monthly", effectiveDate: "2026-06-01" },
+      ],
+    });
+    const snapshot = priceOnDate(sub, "2026-01-15");
+    expect(snapshot.amountMinor).toBe(1000);
+  });
+
+  it("returns the correct price for a date between changes", () => {
+    const sub = buildSubscription({
+      amountMinor: 1500,
+      billingCycle: "monthly",
+      priceHistory: [
+        { amountMinor: 1000, currency: "USD", billingCycle: "monthly", effectiveDate: "2026-03-01" },
+        { amountMinor: 1500, currency: "USD", billingCycle: "monthly", effectiveDate: "2026-06-01" },
+      ],
+    });
+    const snapshot = priceOnDate(sub, "2026-04-15");
+    expect(snapshot.amountMinor).toBe(1000);
+  });
+
+  it("returns the latest price for a date after last change", () => {
+    const sub = buildSubscription({
+      amountMinor: 1500,
+      billingCycle: "monthly",
+      priceHistory: [
+        { amountMinor: 1000, currency: "USD", billingCycle: "monthly", effectiveDate: "2026-03-01" },
+        { amountMinor: 1500, currency: "USD", billingCycle: "monthly", effectiveDate: "2026-06-01" },
+      ],
+    });
+    const snapshot = priceOnDate(sub, "2026-07-15");
+    expect(snapshot.amountMinor).toBe(1500);
+  });
+
+  it("tracks billing cycle changes alongside price", () => {
+    const sub = buildSubscription({
+      amountMinor: 12000,
+      billingCycle: "yearly",
+      priceHistory: [
+        { amountMinor: 1000, currency: "USD", billingCycle: "monthly", effectiveDate: "2026-01-01" },
+        { amountMinor: 12000, currency: "USD", billingCycle: "yearly", effectiveDate: "2026-06-01" },
+      ],
+    });
+    const before = priceOnDate(sub, "2026-03-01");
+    expect(before.billingCycle).toBe("monthly");
+    expect(before.amountMinor).toBe(1000);
+
+    const after = priceOnDate(sub, "2026-07-01");
+    expect(after.billingCycle).toBe("yearly");
+    expect(after.amountMinor).toBe(12000);
+  });
+});
+
+describe("buildSpendTrend with price history", () => {
+  it("uses historical prices for past charge dates", () => {
+    const subs = [
+      buildSubscription({
+        billingCycle: "monthly",
+        amountMinor: 1500,
+        nextBillingDate: "2026-03-15",
+        isActive: true,
+        priceHistory: [
+          { amountMinor: 1000, currency: "USD", billingCycle: "monthly", effectiveDate: "2026-01-01" },
+          { amountMinor: 1500, currency: "USD", billingCycle: "monthly", effectiveDate: "2026-05-01" },
+        ],
+      }),
+    ];
+    const result = buildSpendTrend(subs, "2026-03-01", 4);
+    // Mar and Apr should use old price (1000), May and Jun should use new price (1500)
+    expect(result[0].amountMinor).toBe(1000); // Mar
+    expect(result[1].amountMinor).toBe(1000); // Apr
+    expect(result[2].amountMinor).toBe(1500); // May
+    expect(result[3].amountMinor).toBe(1500); // Jun
+  });
+});
+
+describe("buildCategorySpend with price history", () => {
+  it("uses date-aware prices for current and previous month", () => {
+    const subs = [
+      buildSubscription({
+        category: "entertainment",
+        billingCycle: "monthly",
+        amountMinor: 1500,
+        isActive: true,
+        createdAt: "2026-01-01T00:00:00Z",
+        priceHistory: [
+          { amountMinor: 1000, currency: "USD", billingCycle: "monthly", effectiveDate: "2026-01-01" },
+          { amountMinor: 1500, currency: "USD", billingCycle: "monthly", effectiveDate: "2026-03-01" },
+        ],
+      }),
+    ];
+    // Today is March 15 → current month = March (new price), previous = February (old price)
+    const result = buildCategorySpend(subs, "2026-03-15");
+    expect(result).toHaveLength(1);
+    expect(result[0].amountMinor).toBe(1500); // March uses new price
+    // MoM: (1500 - 1000) / 1000 = 50%
+    expect(result[0].momChangePercent).toBeCloseTo(50, 0);
+  });
+});
+
+describe("buildSpendComparisonTrend with price history", () => {
+  it("uses historical prices for contributor amounts", () => {
+    const subs = [
+      buildSubscription({
+        id: "netflix",
+        name: "Netflix",
+        billingCycle: "monthly",
+        amountMinor: 1500,
+        nextBillingDate: "2026-03-15",
+        isActive: true,
+        priceHistory: [
+          { amountMinor: 1000, currency: "USD", billingCycle: "monthly", effectiveDate: "2026-01-01" },
+          { amountMinor: 1500, currency: "USD", billingCycle: "monthly", effectiveDate: "2026-05-01" },
+        ],
+      }),
+    ];
+    const result = buildSpendComparisonTrend(subs, "2026-03-01", 4);
+    // March contributor should use old price (1000)
+    expect(result[0].contributors[0].amountMinor).toBe(1000);
+    // May contributor should use new price (1500)
+    expect(result[2].contributors[0].amountMinor).toBe(1500);
   });
 });
