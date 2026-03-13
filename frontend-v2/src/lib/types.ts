@@ -59,6 +59,7 @@ export interface UserProfile {
   timeZone?: string;
   phone?: string;
   bio?: string;
+  avatarUrl?: string;
 }
 
 export interface SubscriptionInput {

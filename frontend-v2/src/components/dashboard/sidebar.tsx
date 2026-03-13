@@ -207,12 +207,16 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           }
         >
           <div className={cn(
-            "flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary",
+            "flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary overflow-hidden",
             isAccountPage && "ring-2 ring-primary/30"
           )}>
-            {user?.profile?.fullName?.[0]?.toUpperCase() ??
+            {user?.profile?.avatarUrl ? (
+              <img src={user.profile.avatarUrl} alt="" className="h-full w-full object-cover" />
+            ) : (
+              user?.profile?.fullName?.[0]?.toUpperCase() ??
               user?.email[0]?.toUpperCase() ??
-              "?"}
+              "?"
+            )}
           </div>
           <AnimatePresence>
             {!collapsed && (

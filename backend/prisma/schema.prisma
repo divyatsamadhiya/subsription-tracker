@@ -53,6 +53,7 @@ model User {
   timeZone               String?
   phone                  String?
   bio                    String?
+  avatarUrl              String?
   deletedAt              DateTime?
   deletedByAdminId       String?
   deleteReason           String?

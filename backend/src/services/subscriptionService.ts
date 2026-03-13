@@ -94,7 +94,7 @@ export const updateSubscriptionForUser = async (
                   currency,
                   billingCycle: payload.billingCycle,
                   customIntervalDays: payload.customIntervalDays,
-                  effectiveDate: nowIsoDate(),
+                  effectiveDate: payload.nextBillingDate,
                 }
               }
             }

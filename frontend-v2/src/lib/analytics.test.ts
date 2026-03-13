@@ -1012,6 +1012,31 @@ describe("buildCategorySpend with price history", () => {
   });
 });
 
+describe("buildCategoryTrend reflects mid-month price change in correct month", () => {
+  it("shows new price in the month the change occurs, not the next month", () => {
+    const subs = [
+      buildSubscription({
+        category: "entertainment",
+        billingCycle: "monthly",
+        amountMinor: 1500,
+        isActive: true,
+        createdAt: "2026-01-01T00:00:00Z",
+        priceHistory: [
+          { amountMinor: 1000, currency: "USD", billingCycle: "monthly", effectiveDate: "2026-01-01" },
+          { amountMinor: 1500, currency: "USD", billingCycle: "monthly", effectiveDate: "2026-04-10" },
+        ],
+      }),
+    ];
+    const result = buildCategoryTrend(subs, "2026-03-01", 3);
+    // March: old price
+    expect(result[0].entertainment).toBeCloseTo(10, 0); // 1000 / 100
+    // April: new price (change on Apr 10 should show in April, not May)
+    expect(result[1].entertainment).toBeCloseTo(15, 0); // 1500 / 100
+    // May: new price
+    expect(result[2].entertainment).toBeCloseTo(15, 0);
+  });
+});
+
 describe("buildSpendComparisonTrend with price history", () => {
   it("uses historical prices for contributor amounts", () => {
     const subs = [
