@@ -48,7 +48,13 @@ export default function RegisterPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ fullName, country, email, password }),
+        body: JSON.stringify({
+          fullName,
+          country,
+          email,
+          password,
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        }),
       });
 
       if (!res.ok) {

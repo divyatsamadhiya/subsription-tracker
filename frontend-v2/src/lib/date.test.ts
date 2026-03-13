@@ -14,10 +14,10 @@ describe("nowIsoDate", () => {
     expect(result).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
-  it("uses UTC (no timezone shift)", () => {
+  it("matches the user's local date", () => {
     const result = nowIsoDate();
     const d = new Date();
-    const expected = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+    const expected = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     expect(result).toBe(expected);
   });
 });
