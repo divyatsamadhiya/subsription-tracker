@@ -13,7 +13,8 @@ export const exportBackupForUser = async (userId: string): Promise<BackupFileV1>
     prisma.settings.findUnique({ where: { userId } }),
     prisma.subscription.findMany({
       where: { userId },
-      orderBy: [{ nextBillingDate: "asc" }, { name: "asc" }]
+      orderBy: [{ nextBillingDate: "asc" }, { name: "asc" }],
+      include: { priceChanges: { orderBy: { effectiveDate: "asc" } } }
     })
   ]);
 
@@ -70,12 +71,24 @@ export const importBackupForUser = async (userId: string, input: unknown): Promi
   });
 
   if (backup.subscriptions.length > 0) {
-    await prisma.subscription.createMany({
-      data: backup.subscriptions.map((subscription) => ({
-        userId,
-        ...subscription
-      }))
-    });
+    for (const subscription of backup.subscriptions) {
+      const { priceHistory, ...subscriptionData } = subscription;
+      await prisma.subscription.create({
+        data: {
+          userId,
+          ...subscriptionData,
+          priceChanges: {
+            create: priceHistory.map((ph) => ({
+              amountMinor: ph.amountMinor,
+              currency: ph.currency,
+              billingCycle: ph.billingCycle,
+              customIntervalDays: ph.customIntervalDays,
+              effectiveDate: ph.effectiveDate,
+            }))
+          }
+        }
+      });
+    }
   }
 
   logger.info("Backup imported", { userId, count: backup.subscriptions.length });

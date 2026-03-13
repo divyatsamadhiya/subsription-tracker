@@ -13,6 +13,7 @@ import {
   type ForgotPasswordInput,
   type ForgotPasswordResponse,
   type LoginInput,
+  type PriceHistoryEntry,
   type ProfileResponse,
   type RegisterInput,
   type ResetPasswordInput,
@@ -139,6 +140,14 @@ export const subscriptionInputSchema = z
     }
   }) satisfies z.ZodType<SubscriptionInput>;
 
+export const priceHistoryEntrySchema = z.object({
+  amountMinor: z.number().int().positive(),
+  currency: z.string().length(3),
+  billingCycle: z.enum(BILLING_CYCLE_OPTIONS),
+  customIntervalDays: z.number().int().positive().optional(),
+  effectiveDate: isoDateSchema,
+}).strict() satisfies z.ZodType<PriceHistoryEntry>;
+
 export const subscriptionSchema = z.object({
   id: z.string().min(1),
   name: z.string().trim().min(1),
@@ -151,6 +160,7 @@ export const subscriptionSchema = z.object({
   reminderDaysBefore: z.array(z.number().int().nonnegative()),
   isActive: z.boolean(),
   notes: z.string().max(2000).optional(),
+  priceHistory: z.array(priceHistoryEntrySchema),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime()
 }).strict() satisfies z.ZodType<Subscription>;

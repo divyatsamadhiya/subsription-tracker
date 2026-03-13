@@ -65,6 +65,7 @@ const makeSubscription = (overrides?: Partial<Subscription>): Subscription => ({
   reminderDaysBefore: [1, 3, 7],
   isActive: true,
   notes: "",
+  priceHistory: [],
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
   ...overrides

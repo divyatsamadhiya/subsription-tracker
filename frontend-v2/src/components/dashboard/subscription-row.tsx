@@ -2,8 +2,11 @@
 
 import { useState } from "react";
 import {
+  ArrowDown,
+  ArrowUp,
   CalendarPlus,
   CalendarClock,
+  History,
   MoreHorizontal,
   NotepadText,
   Pencil,
@@ -285,6 +288,37 @@ export function SubscriptionRow({
                   Last updated
                 </span>
                 <p className="mt-0.5 text-foreground">{updatedDate}</p>
+              </div>
+            )}
+            {subscription.priceHistory.length > 1 && (
+              <div className="w-full">
+                <span className="flex items-center gap-1.5 font-medium text-muted-foreground">
+                  <History className="size-3" />
+                  Price history
+                </span>
+                <div className="mt-1.5 flex flex-col gap-1">
+                  {subscription.priceHistory.map((entry, index) => {
+                    const prev = index > 0 ? subscription.priceHistory[index - 1] : null;
+                    const increased = prev ? entry.amountMinor > prev.amountMinor : false;
+                    const decreased = prev ? entry.amountMinor < prev.amountMinor : false;
+                    return (
+                      <div
+                        key={entry.effectiveDate + "-" + index}
+                        className="flex items-center gap-2 text-foreground"
+                      >
+                        <span className="text-muted-foreground">{formatShortDate(entry.effectiveDate)}</span>
+                        <span className="font-medium">
+                          {formatCurrencyMinor(entry.amountMinor, entry.currency)}
+                        </span>
+                        <span className="text-muted-foreground">
+                          {billingCycleLabel(entry.billingCycle)}
+                        </span>
+                        {increased && <ArrowUp className="size-3 text-destructive" />}
+                        {decreased && <ArrowDown className="size-3 text-emerald-500" />}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>

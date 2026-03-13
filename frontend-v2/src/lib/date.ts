@@ -12,14 +12,15 @@ const toUtcMidnight = (isoDate: string): number => {
 };
 
 /**
- * Return today's date as ISO string using UTC to stay consistent
- * with toUtcMidnight — prevents off-by-one errors in non-UTC timezones.
+ * Return today's date as ISO string using the user's local timezone.
+ * This ensures "today" matches what the user sees on their clock/calendar,
+ * so renewal labels ("Due today") are correct regardless of timezone.
  */
 export const nowIsoDate = (): string => {
   const d = new Date();
-  const year = d.getUTCFullYear();
-  const month = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(d.getUTCDate()).padStart(2, "0");
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 };
 
