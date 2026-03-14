@@ -52,13 +52,18 @@ const passwordSchema = z
 
 const phoneSchema = z.string().trim().regex(/^\+[1-9]\d{6,14}$/, "Invalid phone format");
 const bioSchema = z.string().trim().max(280);
+const avatarUrlSchema = z.string().trim().max(200_000).refine(
+  (v) => v.startsWith("data:image/") || v.startsWith("https://"),
+  { message: "Avatar must be a data URI or HTTPS URL" }
+);
 
 export const userProfileSchema = z.object({
   fullName: fullNameSchema.optional(),
   country: countrySchema.optional(),
   timeZone: timeZoneSchema.optional(),
   phone: phoneSchema.optional(),
-  bio: bioSchema.optional()
+  bio: bioSchema.optional(),
+  avatarUrl: avatarUrlSchema.optional()
 }).strict() satisfies z.ZodType<UserProfile>;
 
 export const userProfilePatchSchema = z
@@ -67,7 +72,8 @@ export const userProfilePatchSchema = z
     country: countrySchema.optional(),
     timeZone: z.union([timeZoneSchema, z.null()]).optional(),
     phone: z.union([phoneSchema, z.null()]).optional(),
-    bio: z.union([bioSchema, z.null()]).optional()
+    bio: z.union([bioSchema, z.null()]).optional(),
+    avatarUrl: z.union([avatarUrlSchema, z.null()]).optional()
   })
   .strict()
   .refine((value) => Object.keys(value).length > 0, {

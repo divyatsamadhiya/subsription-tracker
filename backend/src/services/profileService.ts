@@ -43,6 +43,7 @@ export const updateProfileForUser = async (
   if (patch.timeZone !== undefined) data.timeZone = patch.timeZone;
   if ("phone" in patch) data.phone = patch.phone;
   if ("bio" in patch) data.bio = patch.bio;
+  if ("avatarUrl" in patch) data.avatarUrl = patch.avatarUrl;
 
   const updatedUser = await prisma.user.update({
     where: { id: userId },

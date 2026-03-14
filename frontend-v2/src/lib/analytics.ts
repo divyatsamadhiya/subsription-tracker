@@ -96,6 +96,13 @@ const addDays = (isoDate: string, days: number): string => {
 const daysInMonth = (year: number, monthIndex: number): number =>
   new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
 
+/** Return the last day of the month for an ISO date, e.g. "2026-04-01" → "2026-04-30" */
+const monthEndIso = (monthStartIso: string): string => {
+  const [year, month] = monthStartIso.split("-").map(Number);
+  const lastDay = daysInMonth(year, month - 1);
+  return `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+};
+
 const addMonths = (isoDate: string, months: number): string => {
   const [year, month, day] = isoDate.split("-").map(Number);
   const monthIndex = month - 1 + months;
@@ -389,13 +396,16 @@ export const buildCategorySpend = (
   const currentTotals = new Map<SubscriptionCategory, number>();
   const previousTotals = new Map<SubscriptionCategory, number>();
 
+  const currentMonthEnd = monthEndIso(currentMonthStartIso);
+  const previousMonthEnd = monthEndIso(previousMonthStartIso);
+
   for (const sub of subscriptions) {
     if (isActiveDuringMonth(sub, currentMonthStartIso)) {
-      const monthly = monthlyEquivalent(sub, currentMonthStartIso);
+      const monthly = monthlyEquivalent(sub, currentMonthEnd);
       currentTotals.set(sub.category, (currentTotals.get(sub.category) ?? 0) + monthly);
     }
     if (isActiveDuringMonth(sub, previousMonthStartIso)) {
-      const monthly = monthlyEquivalent(sub, previousMonthStartIso);
+      const monthly = monthlyEquivalent(sub, previousMonthEnd);
       previousTotals.set(sub.category, (previousTotals.get(sub.category) ?? 0) + monthly);
     }
   }
@@ -500,9 +510,10 @@ export const buildCategoryTrend = (
       other: 0,
     };
 
+    const monthEnd = monthEndIso(monthStartIso);
     for (const sub of subscriptions) {
       if (isActiveDuringMonth(sub, monthStartIso)) {
-        totals[sub.category] += monthlyEquivalent(sub, monthStartIso);
+        totals[sub.category] += monthlyEquivalent(sub, monthEnd);
       }
     }
 

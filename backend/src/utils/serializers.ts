@@ -18,7 +18,8 @@ export const toUserProfile = (user: PrismaUser): UserProfile => {
     country: user.country ?? undefined,
     timeZone: user.timeZone ?? undefined,
     phone: user.phone ?? undefined,
-    bio: user.bio ?? undefined
+    bio: user.bio ?? undefined,
+    avatarUrl: user.avatarUrl ?? undefined
   };
 };
 

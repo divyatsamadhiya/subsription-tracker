@@ -78,6 +78,7 @@ export interface UserProfile {
   timeZone?: string;
   phone?: string;
   bio?: string;
+  avatarUrl?: string;
 }
 
 export interface UserProfilePatch {
@@ -86,6 +87,7 @@ export interface UserProfilePatch {
   timeZone?: string | null;
   phone?: string | null;
   bio?: string | null;
+  avatarUrl?: string | null;
 }
 
 export interface ProfileResponse {

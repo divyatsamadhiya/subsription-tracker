@@ -158,6 +158,8 @@ describe("subscriptionService", () => {
     const updateCall = vi.mocked(prisma.subscription.update).mock.calls[0][0] as Record<string, unknown>;
     const data = updateCall.data as Record<string, unknown>;
     expect(data.priceChanges).toBeDefined();
+    const priceChanges = data.priceChanges as { create: { effectiveDate: string } };
+    expect(priceChanges.create.effectiveDate).toBe("2026-01-08");
   });
 
   it("skips price history when price is unchanged", async () => {

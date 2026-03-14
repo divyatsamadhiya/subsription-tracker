@@ -7,9 +7,22 @@ import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { PasswordInput } from "@/components/auth/password-input";
 import { Separator } from "@/components/ui/separator";
 import { GoogleButton } from "@/components/auth/google-button";
+import {
+  getCountryList,
+  getTimezonesForCountry,
+} from "@/lib/country-timezones";
+
+const countries = getCountryList();
 
 const container = {
   hidden: { opacity: 0 },
@@ -53,7 +66,8 @@ export default function RegisterPage() {
           country,
           email,
           password,
-          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          timeZone: getTimezonesForCountry(country)[0] ??
+            Intl.DateTimeFormat().resolvedOptions().timeZone,
         }),
       });
 
@@ -136,16 +150,22 @@ export default function RegisterPage() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="country">Country</Label>
-            <Input
-              id="country"
-              type="text"
-              placeholder="India"
+            <Select
               value={country}
-              onChange={(e) => setCountry(e.target.value)}
+              onValueChange={(v) => setCountry(v ?? "")}
               required
-              autoComplete="country-name"
-              className="h-11"
-            />
+            >
+              <SelectTrigger id="country" className="!w-full h-11">
+                <SelectValue placeholder="Select country" />
+              </SelectTrigger>
+              <SelectContent alignItemWithTrigger={false} className="max-h-60">
+                {countries.map((c) => (
+                  <SelectItem key={c.value} value={c.label}>
+                    {c.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </motion.div>
 
