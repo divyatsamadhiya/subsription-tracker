@@ -33,6 +33,8 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { SubscriptionAvatar } from "@/components/dashboard/subscription-avatar";
 import { useDashboard } from "@/lib/dashboard-context";
 import {
   formatCurrencyMinor,
@@ -484,7 +486,7 @@ export default function AnalyticsPage() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Category Breakdown - Donut Chart */}
-        <motion.div variants={item}>
+        <motion.div variants={item} className="h-full">
           <Card className="h-full">
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Spending by category</CardTitle>
@@ -557,71 +559,83 @@ export default function AnalyticsPage() {
                   </ResponsiveContainer>
                 </div>
                 <div className="flex-1 space-y-3">
-                  {categorySpend.map((entry) => (
-                    <CategoryLegendRow
-                      key={entry.category}
-                      category={entry.category}
-                      amountMinor={entry.amountMinor}
-                      share={entry.share}
-                      currency={currency}
-                      momChangePercent={entry.momChangePercent}
-                      color={CATEGORY_HEX[entry.category]}
-                      isSelected={selectedCategory === entry.category}
-                      onClick={() =>
-                        setSelectedCategory((current) =>
-                          current === entry.category ? null : entry.category
-                        )
-                      }
-                    />
-                  ))}
+                  {categorySpend.map((entry) => {
+                    const isSelected = selectedCategory === entry.category;
+                    const subs = isSelected ? categorySubscriptions : [];
+                    return (
+                      <Popover
+                        key={entry.category}
+                        open={isSelected}
+                        onOpenChange={(open) => {
+                          if (!open) setSelectedCategory(null);
+                        }}
+                      >
+                        <PopoverTrigger
+                          render={<div />}
+                          nativeButton={false}
+                          onClick={() =>
+                            setSelectedCategory((current) =>
+                              current === entry.category ? null : entry.category
+                            )
+                          }
+                        >
+                          <CategoryLegendRow
+                            category={entry.category}
+                            amountMinor={entry.amountMinor}
+                            share={entry.share}
+                            currency={currency}
+                            momChangePercent={entry.momChangePercent}
+                            color={CATEGORY_HEX[entry.category]}
+                            isSelected={isSelected}
+                          />
+                        </PopoverTrigger>
+                        <PopoverContent
+                          side="bottom"
+                          align="start"
+                          sideOffset={6}
+                          className="w-80 p-0"
+                        >
+                          <div className="p-3">
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <p className="text-sm font-medium text-foreground">
+                                  {categoryLabel(entry.category)} subscriptions
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {subs.length} active subscription
+                                  {subs.length === 1 ? "" : "s"}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="mt-2 space-y-1.5">
+                              {subs.map((subscription) => (
+                                <div
+                                  key={subscription.id}
+                                  className="flex items-center gap-2.5 rounded-lg bg-accent/50 px-2.5 py-1.5 text-sm"
+                                >
+                                  <SubscriptionAvatar name={subscription.name} category={subscription.category} size="xs" />
+                                  <span className="min-w-0 truncate font-medium text-foreground">
+                                    {subscription.name}
+                                  </span>
+                                  <span className="ml-auto shrink-0 text-xs font-medium text-foreground">
+                                    {formatCurrencyMinor(Math.round(monthlyEquivalent(subscription, today)), currency)}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    );
+                  })}
                 </div>
               </div>
-              {selectedCategoryPoint && (
-                <div className="mt-6 border-t border-border pt-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-medium text-foreground">
-                        {categoryLabel(selectedCategoryPoint.category)} subscriptions
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Highlighting {categorySubscriptions.length} active subscription
-                        {categorySubscriptions.length === 1 ? "" : "s"} below
-                      </p>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setSelectedCategory(null)}
-                    >
-                      Clear
-                    </Button>
-                  </div>
-                  <div className="mt-3 space-y-2">
-                    {categorySubscriptions.map((subscription) => (
-                      <div
-                        key={subscription.id}
-                        className="flex items-center justify-between rounded-xl border border-border/70 bg-background/40 px-3 py-2 text-sm"
-                      >
-                        <div>
-                          <p className="font-medium text-foreground">{subscription.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {categoryLabel(subscription.category)}
-                          </p>
-                        </div>
-                        <span className="font-medium text-foreground">
-                          {formatCurrencyMinor(Math.round(monthlyEquivalent(subscription, today)), currency)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </CardContent>
           </Card>
         </motion.div>
 
         {/* Renewal Distribution - Bar Chart */}
-        <motion.div variants={item}>
+        <motion.div variants={item} className="h-full">
           <Card className="h-full">
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Renewal distribution</CardTitle>
@@ -629,113 +643,123 @@ export default function AnalyticsPage() {
             <CardContent>
               {visibleRenewalBuckets.length > 0 ? (
                 <>
-                  <div className="h-[200px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={renewalChartData} barCategoryGap={24}>
-                        <CartesianGrid
-                          strokeDasharray="3 3"
-                          stroke="var(--color-border)"
-                          vertical={false}
-                        />
-                        <XAxis
-                          dataKey="bucketLabel"
-                          tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
-                          axisLine={false}
-                          tickLine={false}
-                        />
-                        <YAxis
-                          tick={{ fontSize: 12, fill: "var(--color-muted-foreground)" }}
-                          axisLine={false}
-                          tickLine={false}
-                          allowDecimals={false}
-                          width={30}
-                        />
-                        <Tooltip
-                          content={<RenewalBucketTooltip currency={currency} />}
-                          cursor={false}
-                        />
-                        <Bar
-                          dataKey="count"
-                          fill="var(--color-primary)"
-                          radius={[6, 6, 0, 0]}
-                          maxBarSize={56}
-                        >
-                          {renewalChartData.map((bucket) => {
-                            const isSelected = selectedRenewalBucketKey === bucket.bucketKey;
-                            return (
-                              <Cell
-                                key={bucket.bucketKey}
-                                fill="var(--color-primary)"
-                                fillOpacity={
-                                  selectedRenewalBucketKey === null || isSelected
-                                    ? 1
-                                    : 0.35
-                                }
-                                stroke={isSelected ? "var(--color-foreground)" : "none"}
-                                strokeWidth={isSelected ? 1.5 : 0}
-                                onClick={() =>
-                                  setSelectedRenewalBucketKey((current) =>
-                                    current === bucket.bucketKey ? null : bucket.bucketKey
-                                  )
-                                }
+                  <Popover
+                    open={selectedRenewalBucket !== null}
+                    onOpenChange={(open) => {
+                      if (!open) setSelectedRenewalBucketKey(null);
+                    }}
+                  >
+                    <PopoverTrigger render={<div />} nativeButton={false}>
+                      <div className="h-[200px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={renewalChartData} barCategoryGap={24}>
+                            <CartesianGrid
+                              strokeDasharray="3 3"
+                              stroke="var(--color-border)"
+                              vertical={false}
+                            />
+                            <XAxis
+                              dataKey="bucketLabel"
+                              tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
+                              axisLine={false}
+                              tickLine={false}
+                            />
+                            <YAxis
+                              tick={{ fontSize: 12, fill: "var(--color-muted-foreground)" }}
+                              axisLine={false}
+                              tickLine={false}
+                              allowDecimals={false}
+                              width={30}
+                            />
+                            <Tooltip
+                              content={<RenewalBucketTooltip currency={currency} />}
+                              cursor={false}
+                            />
+                            <Bar
+                              dataKey="count"
+                              fill="var(--color-primary)"
+                              radius={[6, 6, 0, 0]}
+                              maxBarSize={56}
+                            >
+                              {renewalChartData.map((bucket) => {
+                                const isSelected = selectedRenewalBucketKey === bucket.bucketKey;
+                                return (
+                                  <Cell
+                                    key={bucket.bucketKey}
+                                    fill="var(--color-primary)"
+                                    fillOpacity={
+                                      selectedRenewalBucketKey === null || isSelected
+                                        ? 1
+                                        : 0.35
+                                    }
+                                    stroke={isSelected ? "var(--color-foreground)" : "none"}
+                                    strokeWidth={isSelected ? 1.5 : 0}
+                                    onClick={() =>
+                                      setSelectedRenewalBucketKey((current) =>
+                                        current === bucket.bucketKey ? null : bucket.bucketKey
+                                      )
+                                    }
+                                  />
+                                );
+                              })}
+                              <LabelList
+                                dataKey="amountLabel"
+                                position="top"
+                                offset={10}
+                                className="fill-muted-foreground text-[11px]"
                               />
-                            );
-                          })}
-                          <LabelList
-                            dataKey="amountLabel"
-                            position="top"
-                            offset={10}
-                            className="fill-muted-foreground text-[11px]"
-                          />
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </PopoverTrigger>
+                    {selectedRenewalBucket && (
+                      <PopoverContent
+                        side="bottom"
+                        align="center"
+                        sideOffset={6}
+                        className="w-80 p-0"
+                      >
+                        <div className="p-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-medium text-foreground">
+                                {selectedRenewalBucket.bucketLabel} renewals
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {selectedRenewalBucket.count} subscription
+                                {selectedRenewalBucket.count === 1 ? "" : "s"} totaling{" "}
+                                {formatCurrencyMinor(selectedRenewalBucket.amountMinor, currency)}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="mt-2 space-y-1.5">
+                            {selectedRenewalBucket.subscriptions.map((subscription) => (
+                              <div
+                                key={subscription.subscriptionId}
+                                className="flex items-center gap-2.5 rounded-lg bg-accent/50 px-2.5 py-1.5 text-sm"
+                              >
+                                <SubscriptionAvatar name={subscription.name} category={subscription.category} size="xs" />
+                                <div className="min-w-0">
+                                  <p className="truncate font-medium text-foreground">{subscription.name}</p>
+                                  <p className="text-[11px] text-muted-foreground">
+                                    Renews {formatShortDate(subscription.nextBillingDate)}
+                                  </p>
+                                </div>
+                                <span className="ml-auto shrink-0 text-xs font-medium text-foreground">
+                                  {formatCurrencyMinor(subscription.amountMinor, currency)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </PopoverContent>
+                    )}
+                  </Popover>
                   {hiddenRenewalBuckets.length > 0 && (
                     <p className="mt-3 text-xs text-muted-foreground">
                       No renewals in {hiddenRenewalBuckets.map((bucket) => bucket.bucketLabel).join(", ")}.
                     </p>
-                  )}
-                  {selectedRenewalBucket && (
-                    <div className="mt-4 border-t border-border pt-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-medium text-foreground">
-                            {selectedRenewalBucket.bucketLabel} renewals
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {selectedRenewalBucket.count} subscription
-                            {selectedRenewalBucket.count === 1 ? "" : "s"} totaling{" "}
-                            {formatCurrencyMinor(selectedRenewalBucket.amountMinor, currency)}
-                          </p>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setSelectedRenewalBucketKey(null)}
-                        >
-                          Clear
-                        </Button>
-                      </div>
-                      <div className="mt-3 space-y-2">
-                        {selectedRenewalBucket.subscriptions.map((subscription) => (
-                          <div
-                            key={subscription.subscriptionId}
-                            className="flex items-center justify-between rounded-xl border border-border/70 bg-background/40 px-3 py-2 text-sm"
-                          >
-                            <div>
-                              <p className="font-medium text-foreground">{subscription.name}</p>
-                              <p className="text-xs text-muted-foreground">
-                                Renews {formatShortDate(subscription.nextBillingDate)}
-                              </p>
-                            </div>
-                            <span className="font-medium text-foreground">
-                              {formatCurrencyMinor(subscription.amountMinor, currency)}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
                   )}
                 </>
               ) : (
@@ -843,7 +867,6 @@ function CategoryLegendRow({
   momChangePercent,
   color,
   isSelected,
-  onClick,
 }: {
   category: SubscriptionCategory;
   amountMinor: number;
@@ -852,15 +875,12 @@ function CategoryLegendRow({
   momChangePercent: number | null;
   color: string;
   isSelected: boolean;
-  onClick: () => void;
 }) {
   const change = getCategoryChangeMeta(momChangePercent);
 
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`w-full rounded-xl px-3 py-2 text-left text-sm transition-colors ${
+    <div
+      className={`w-full cursor-pointer rounded-xl px-3 py-2 text-left text-sm transition-colors ${
         isSelected ? "bg-accent" : "hover:bg-accent/60"
       }`}
     >
@@ -892,7 +912,7 @@ function CategoryLegendRow({
           {Math.round(share * 100)}%
         </span>
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -912,6 +932,7 @@ function MonthlySpendTooltip({
       contributors: Array<{
         subscriptionId: string;
         name: string;
+        category: SubscriptionCategory;
         amountMinor: number;
       }>;
     };
@@ -940,10 +961,11 @@ function MonthlySpendTooltip({
             {point.contributors.map((contributor) => (
               <div
                 key={contributor.subscriptionId}
-                className="flex items-center justify-between gap-3 text-xs"
+                className="flex items-center gap-2 text-xs"
               >
-                <span className="truncate text-foreground">{contributor.name}</span>
-                <span className="shrink-0 text-muted-foreground">
+                <SubscriptionAvatar name={contributor.name} category={contributor.category} size="xs" />
+                <span className="min-w-0 truncate text-foreground">{contributor.name}</span>
+                <span className="ml-auto shrink-0 text-muted-foreground">
                   {currencySymbol}{(contributor.amountMinor / 100).toFixed(2)}
                 </span>
               </div>
@@ -1080,6 +1102,7 @@ function RoiRow({
       ) : (
         <span className="size-2 shrink-0 rounded-full bg-border" />
       )}
+      <SubscriptionAvatar name={item.name} category={item.category} size="xs" />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <p className="truncate text-sm font-medium text-foreground">

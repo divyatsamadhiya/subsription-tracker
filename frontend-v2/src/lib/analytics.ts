@@ -16,6 +16,7 @@ export interface SpendComparisonPoint extends SpendTrendPoint {
   contributors: Array<{
     subscriptionId: string;
     name: string;
+    category: SubscriptionCategory;
     amountMinor: number;
   }>;
 }
@@ -50,6 +51,7 @@ export interface RenewalBucketPoint {
   subscriptions: Array<{
     subscriptionId: string;
     name: string;
+    category: SubscriptionCategory;
     amountMinor: number;
     nextBillingDate: string;
   }>;
@@ -148,6 +150,7 @@ const pushContributor = (
   contributors.push({
     subscriptionId: subscription.id,
     name: subscription.name,
+    category: subscription.category,
     amountMinor: chargeAmountMinor,
   });
 };
@@ -591,6 +594,7 @@ export const buildRenewalBuckets = (
     bucket.subscriptions.push({
       subscriptionId: sub.id,
       name: sub.name,
+      category: sub.category,
       amountMinor: chargeAmount,
       nextBillingDate: effectiveDate,
     });

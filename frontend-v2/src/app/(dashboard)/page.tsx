@@ -486,8 +486,8 @@ export default function OverviewPage() {
 
       <div className="grid gap-6 lg:grid-cols-5">
         {/* Upcoming Renewals */}
-        <motion.div variants={item} className="lg:col-span-3">
-          <Card>
+        <motion.div variants={item} className="lg:col-span-3 h-full">
+          <Card className="h-full">
             <CardHeader className="flex-row items-center justify-between pb-3">
               <CardTitle className="text-base">Upcoming renewals</CardTitle>
               <div className="flex items-center gap-2">
@@ -647,7 +647,7 @@ export default function OverviewPage() {
         </motion.div>
 
         {/* Category Breakdown — Donut Chart */}
-        <motion.div variants={item} className="lg:col-span-2">
+        <motion.div variants={item} className="lg:col-span-2 h-full">
           <Card className="h-full">
             <CardHeader className="flex-row items-center justify-between pb-3">
               <CardTitle className="text-base">Spending by category</CardTitle>
@@ -791,16 +791,17 @@ export default function OverviewPage() {
                               transition={{ duration: 0.2 }}
                               className="overflow-hidden"
                             >
-                              <div className="ml-5 mt-1 space-y-1 border-l border-border pl-3">
+                              <div className="ml-5 mt-1 space-y-1.5 border-l border-border pl-3">
                                 {drilldownSubs.map((sub) => (
                                   <div
                                     key={sub.id}
-                                    className="flex items-center justify-between py-0.5 text-xs"
+                                    className="flex items-center gap-2 py-0.5 text-xs"
                                   >
-                                    <span className="truncate text-muted-foreground">
+                                    <SubscriptionAvatar name={sub.name} category={sub.category} size="xs" />
+                                    <span className="min-w-0 truncate text-muted-foreground">
                                       {sub.name}
                                     </span>
-                                    <span className="shrink-0 font-medium">
+                                    <span className="ml-auto shrink-0 font-medium">
                                       {formatCurrencyMinor(Math.round(monthlyEquivalent(sub, today)), sub.currency)}
                                     </span>
                                   </div>

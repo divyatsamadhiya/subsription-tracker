@@ -201,8 +201,8 @@ describe("buildSpendComparisonTrend", () => {
     const result = buildSpendComparisonTrend(subs, "2026-03-11", 1);
 
     expect(result[0].contributors).toEqual([
-      { subscriptionId: "claude", name: "Claude Pro", amountMinor: 1000 },
-      { subscriptionId: "youtube", name: "YouTube Premium", amountMinor: 500 },
+      { subscriptionId: "claude", name: "Claude Pro", category: "entertainment", amountMinor: 1000 },
+      { subscriptionId: "youtube", name: "YouTube Premium", category: "entertainment", amountMinor: 500 },
     ]);
   });
 });
@@ -579,6 +579,7 @@ describe("buildRenewalBuckets", () => {
       {
         subscriptionId: "youtube",
         name: "YouTube Premium",
+        category: "entertainment",
         amountMinor: 29900,
         nextBillingDate: "2026-03-14",
       },
