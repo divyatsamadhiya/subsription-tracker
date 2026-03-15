@@ -26,9 +26,11 @@ import {
   CreditCard,
   CalendarClock,
   BarChart3,
+  ChevronDown,
   Layers3,
   Plus,
   Star,
+  Wallet,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -49,6 +51,7 @@ import {
   buildCategoryTrend,
   buildRenewalBuckets,
   buildAnalyticsSummary,
+  buildLifetimeCategorySpend,
   buildRoiData,
   getCategoryChangeMeta,
   getAnalyticsRangeMonths,
@@ -97,6 +100,7 @@ export default function AnalyticsPage() {
     "0-7" | "8-14" | "15-21" | "22-30" | null
   >(null);
   const [roiRatings, setRoiRatings] = useState(getRoiRatings);
+  const [expandedLifetimeCategory, setExpandedLifetimeCategory] = useState<SubscriptionCategory | null>(null);
 
   const handleRoiRate = useCallback(
     (subscriptionId: string, rating: UsageRating) => {
@@ -137,6 +141,10 @@ export default function AnalyticsPage() {
   const roiData = useMemo(
     () => buildRoiData(subscriptions, roiRatings, today),
     [subscriptions, roiRatings, today]
+  );
+  const lifetimeCategorySpend = useMemo(
+    () => buildLifetimeCategorySpend(subscriptions, today),
+    [subscriptions, today]
   );
 
   const hasData = subscriptions.some((s) => s.isActive);
@@ -240,7 +248,7 @@ export default function AnalyticsPage() {
       {/* KPI Cards */}
       <motion.div
         variants={item}
-        className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4"
+        className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-5"
       >
         <KpiCard
           icon={DollarSign}
@@ -283,6 +291,12 @@ export default function AnalyticsPage() {
               : `${summary.yoyGrowthPercent >= 0 ? "+" : ""}${summary.yoyGrowthPercent.toFixed(0)}%`
           }
           subtitle="Vs previous 12 months"
+        />
+        <KpiCard
+          icon={Wallet}
+          label="Lifetime spending"
+          value={formatCurrencyMinor(summary.lifetimeTotalMinor, currency)}
+          subtitle="Total spent across all subscriptions"
         />
       </motion.div>
 
@@ -773,6 +787,98 @@ export default function AnalyticsPage() {
           </Card>
         </motion.div>
       </div>
+
+      {/* Lifetime Spending by Category */}
+      {lifetimeCategorySpend.length > 0 && (
+        <motion.div variants={item} className="mt-6">
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex items-baseline justify-between">
+                <div>
+                  <CardTitle className="text-base">Lifetime spending</CardTitle>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    All-time spend by category and subscription
+                  </p>
+                </div>
+                <p className="font-heading text-xl font-semibold tracking-tight text-foreground">
+                  {formatCurrencyMinor(summary.lifetimeTotalMinor, currency)}
+                </p>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {lifetimeCategorySpend.map((entry) => {
+                  const isExpanded = expandedLifetimeCategory === entry.category;
+                  return (
+                    <div key={entry.category}>
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition-colors hover:bg-accent/60"
+                        onClick={() =>
+                          setExpandedLifetimeCategory((current) =>
+                            current === entry.category ? null : entry.category
+                          )
+                        }
+                      >
+                        <div
+                          className="h-2.5 w-2.5 shrink-0 rounded-sm"
+                          style={{ backgroundColor: CATEGORY_HEX[entry.category] }}
+                        />
+                        <span className="font-medium text-foreground">
+                          {categoryLabel(entry.category)}
+                        </span>
+                        <span className="text-xs tabular-nums text-muted-foreground">
+                          {Math.round(entry.share * 100)}%
+                        </span>
+                        <div className="mx-2 h-2 flex-1 overflow-hidden rounded-full bg-accent">
+                          <div
+                            className="h-full rounded-full transition-all"
+                            style={{
+                              width: `${Math.round(entry.share * 100)}%`,
+                              backgroundColor: CATEGORY_HEX[entry.category],
+                            }}
+                          />
+                        </div>
+                        <span className="shrink-0 text-xs font-medium tabular-nums text-foreground">
+                          {formatCurrencyMinor(entry.amountMinor, currency)}
+                        </span>
+                        <ChevronDown
+                          className={`size-3.5 shrink-0 text-muted-foreground transition-transform ${
+                            isExpanded ? "rotate-180" : ""
+                          }`}
+                        />
+                      </button>
+                      {isExpanded && (
+                        <div className="ml-8 mt-1 space-y-1 pb-1">
+                          {entry.subscriptions.map((sub) => (
+                            <div
+                              key={sub.id}
+                              className="flex items-center gap-2.5 rounded-lg bg-accent/50 px-2.5 py-1.5 text-sm"
+                            >
+                              <SubscriptionAvatar name={sub.name} category={entry.category} size="xs" />
+                              <span className="min-w-0 truncate font-medium text-foreground">
+                                {sub.name}
+                              </span>
+                              {!sub.isActive && (
+                                <Badge variant="outline" className="px-1.5 py-0 text-[10px] text-muted-foreground">
+                                  Inactive
+                                </Badge>
+                              )}
+                              <span className="ml-auto shrink-0 text-xs font-medium tabular-nums text-foreground">
+                                {formatCurrencyMinor(sub.amountMinor, currency)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
 
       {/* Subscription ROI Tracker */}
       <motion.div variants={item} className="mt-6">

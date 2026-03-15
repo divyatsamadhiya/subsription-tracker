@@ -53,6 +53,7 @@ export function SubscriptionFormSheet({
   const [reminders, setReminders] = useState<number[]>([1, 3, 7]);
   const [isActive, setIsActive] = useState(true);
   const [notes, setNotes] = useState("");
+  const [priorSpendingDisplay, setPriorSpendingDisplay] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [nameFocused, setNameFocused] = useState(false);
@@ -73,6 +74,7 @@ export function SubscriptionFormSheet({
       setReminders(initial.reminderDaysBefore);
       setIsActive(initial.isActive);
       setNotes(initial.notes ?? "");
+      setPriorSpendingDisplay(initial.priorSpendingMinor ? String(initial.priorSpendingMinor / 100) : "");
     } else {
       setName("");
       setAmountDisplay("");
@@ -83,6 +85,7 @@ export function SubscriptionFormSheet({
       setReminders([1, 3, 7]);
       setIsActive(true);
       setNotes("");
+      setPriorSpendingDisplay("");
     }
     setError(null);
   }, [open, mode, initial]);
@@ -115,6 +118,7 @@ export function SubscriptionFormSheet({
 
     setLoading(true);
     try {
+      const priorMinor = priorSpendingDisplay ? Math.round(parseFloat(priorSpendingDisplay) * 100) : undefined;
       await onSubmit({
         name: name.trim(),
         amountMinor,
@@ -124,7 +128,8 @@ export function SubscriptionFormSheet({
         category,
         reminderDaysBefore: reminders,
         isActive,
-        notes: notes.trim() || undefined,
+        notes: notes.trim() || null,
+        priorSpendingMinor: priorMinor && priorMinor > 0 ? priorMinor : undefined,
       });
       onOpenChange(false);
     } catch (err) {
@@ -400,6 +405,29 @@ export function SubscriptionFormSheet({
               </p>
             </div>
             <Switch checked={isActive} onCheckedChange={setIsActive} />
+          </div>
+
+          {/* Prior spending */}
+          <div className="space-y-2">
+            <Label htmlFor="sub-prior-spending">Prior spending (optional)</Label>
+            <p className="text-xs text-muted-foreground">
+              Total amount spent on this subscription before adding it here
+            </p>
+            <div className="relative">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                {sym}
+              </span>
+              <Input
+                id="sub-prior-spending"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="0.00"
+                value={priorSpendingDisplay}
+                onChange={(e) => setPriorSpendingDisplay(e.target.value)}
+                className="pl-7"
+              />
+            </div>
           </div>
 
           {/* Notes */}

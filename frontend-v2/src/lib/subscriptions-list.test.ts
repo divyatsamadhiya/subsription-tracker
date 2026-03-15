@@ -8,10 +8,12 @@ import {
   matchesSubscriptionSearch,
   monthlyEquivalentMinor,
   normalizePinnedSubscriptionOrder,
+  projectedCostMinor,
   reorderPinnedSubscriptions,
   sortSubscriptions,
   summarizeSubscriptionTotals,
   togglePinnedSubscription,
+  totalSpentSinceAddedMinor,
 } from "./subscriptions-list";
 import { buildSubscription } from "@/test/factories";
 
@@ -266,5 +268,92 @@ describe("buildSubscriptionsCsv", () => {
     expect(csv).toContain('"Name","Status","Category","Billing cycle","Amount","Monthly equivalent","Next renewal"');
     expect(csv).toContain('"Claude ""Max""","Active","entertainment","monthly","2150.00","2150.00","2026-03-28"');
     expect(csv).toContain('"1Password","Active","entertainment","yearly","5828.00","485.67","2027-03-01"');
+  });
+});
+
+describe("totalSpentSinceAddedMinor", () => {
+  it("counts monthly charges from createdAt to today", () => {
+    // Created Jan 1, today is Mar 15 → charges on Jan 1, Feb 1, Mar 1 = 3 × 999
+    const sub = buildSubscription({
+      amountMinor: 999,
+      billingCycle: "monthly",
+      createdAt: "2026-01-01T00:00:00Z",
+    });
+    expect(totalSpentSinceAddedMinor(sub, "2026-03-15")).toBe(999 * 3);
+  });
+
+  it("counts weekly charges", () => {
+    // Created Jan 1, today is Jan 22 → charges on Jan 1, 8, 15, 22 = 4 × 500
+    const sub = buildSubscription({
+      amountMinor: 500,
+      billingCycle: "weekly",
+      createdAt: "2026-01-01T00:00:00Z",
+    });
+    expect(totalSpentSinceAddedMinor(sub, "2026-01-22")).toBe(500 * 4);
+  });
+
+  it("counts yearly charges", () => {
+    // Created Jan 1 2024, today is Mar 15 2026 → charges on Jan 1 2024, Jan 1 2025, Jan 1 2026 = 3
+    const sub = buildSubscription({
+      amountMinor: 12000,
+      billingCycle: "yearly",
+      createdAt: "2024-01-01T00:00:00Z",
+    });
+    expect(totalSpentSinceAddedMinor(sub, "2026-03-15")).toBe(12000 * 3);
+  });
+
+  it("uses priceHistory when available", () => {
+    // Created Jan 1, price was 500 initially, changed to 800 on Feb 15
+    // Charges: Jan 1 → 500, Feb 1 → 500, Mar 1 → 800 = 1800
+    const sub = buildSubscription({
+      amountMinor: 800,
+      billingCycle: "monthly",
+      createdAt: "2026-01-01T00:00:00Z",
+      priceHistory: [
+        { amountMinor: 500, currency: "USD", billingCycle: "monthly", effectiveDate: "2026-01-01" },
+        { amountMinor: 800, currency: "USD", billingCycle: "monthly", effectiveDate: "2026-02-15" },
+      ],
+    });
+    expect(totalSpentSinceAddedMinor(sub, "2026-03-15")).toBe(500 + 500 + 800);
+  });
+
+  it("returns single charge if created today", () => {
+    const sub = buildSubscription({ amountMinor: 999 });
+    expect(totalSpentSinceAddedMinor(sub, "2026-01-01")).toBe(999);
+  });
+
+  it("includes prior spending in total", () => {
+    // Prior spending 5000 + 3 monthly charges of 999
+    const sub = buildSubscription({
+      amountMinor: 999,
+      billingCycle: "monthly",
+      createdAt: "2026-01-01T00:00:00Z",
+      priorSpendingMinor: 5000,
+    });
+    expect(totalSpentSinceAddedMinor(sub, "2026-03-15")).toBe(5000 + 999 * 3);
+  });
+});
+
+describe("projectedCostMinor", () => {
+  it("projects monthly subscription for 6 months", () => {
+    const sub = buildSubscription({ amountMinor: 999, billingCycle: "monthly" });
+    expect(projectedCostMinor(sub, 6)).toBe(999 * 6);
+  });
+
+  it("projects monthly subscription for 12 months", () => {
+    const sub = buildSubscription({ amountMinor: 999, billingCycle: "monthly" });
+    expect(projectedCostMinor(sub, 12)).toBe(999 * 12);
+  });
+
+  it("projects yearly subscription for 12 months", () => {
+    const sub = buildSubscription({ amountMinor: 12000, billingCycle: "yearly" });
+    // monthlyEquivalent = 12000/12 = 1000, projected 12 months = 12000
+    expect(projectedCostMinor(sub, 12)).toBe(12000);
+  });
+
+  it("projects weekly subscription for 1 month", () => {
+    const sub = buildSubscription({ amountMinor: 100, billingCycle: "weekly" });
+    // monthlyEquivalent = round(100 * 52/12) = 433
+    expect(projectedCostMinor(sub, 1)).toBe(433);
   });
 });

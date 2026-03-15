@@ -29,6 +29,7 @@ export interface Subscription {
   reminderDaysBefore: number[];
   isActive: boolean;
   notes?: string;
+  priorSpendingMinor: number;
   priceHistory: PriceHistoryEntry[];
   createdAt: string;
   updatedAt: string;
@@ -71,7 +72,8 @@ export interface SubscriptionInput {
   category: SubscriptionCategory;
   reminderDaysBefore: number[];
   isActive: boolean;
-  notes?: string;
+  notes?: string | null;
+  priorSpendingMinor?: number;
 }
 
 export const CATEGORY_OPTIONS = [

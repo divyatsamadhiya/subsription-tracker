@@ -68,6 +68,7 @@ export const toSubscription = (
     reminderDaysBefore: subscription.reminderDaysBefore,
     isActive: subscription.isActive,
     notes: subscription.notes ?? undefined,
+    priorSpendingMinor: subscription.priorSpendingMinor,
     priceHistory: (subscription.priceChanges ?? []).map((pc) => ({
       amountMinor: pc.amountMinor,
       currency: pc.currency,

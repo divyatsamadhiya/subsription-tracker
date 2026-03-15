@@ -14,6 +14,7 @@ export function toSubscriptionInput(
     reminderDaysBefore: subscription.reminderDaysBefore,
     isActive: subscription.isActive,
     notes: subscription.notes,
+    priorSpendingMinor: subscription.priorSpendingMinor,
     ...overrides,
   };
 }
