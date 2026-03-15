@@ -118,7 +118,7 @@ export function SubscriptionFormSheet({
 
     setLoading(true);
     try {
-      const priorMinor = priorSpendingDisplay ? Math.round(parseFloat(priorSpendingDisplay) * 100) : undefined;
+      const priorMinor = priorSpendingDisplay ? Math.round(parseFloat(priorSpendingDisplay) * 100) : 0;
       await onSubmit({
         name: name.trim(),
         amountMinor,
@@ -129,7 +129,7 @@ export function SubscriptionFormSheet({
         reminderDaysBefore: reminders,
         isActive,
         notes: notes.trim() || null,
-        priorSpendingMinor: priorMinor && priorMinor > 0 ? priorMinor : undefined,
+        priorSpendingMinor: priorMinor > 0 ? priorMinor : 0,
       });
       onOpenChange(false);
     } catch (err) {
