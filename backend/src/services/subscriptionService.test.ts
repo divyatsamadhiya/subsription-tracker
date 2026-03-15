@@ -38,6 +38,7 @@ const makeSubscription = (overrides?: Partial<Record<string, unknown>>) => {
     reminderDaysBefore: [1, 3, 7],
     isActive: true,
     notes: null,
+    priorSpendingMinor: 0,
     priceChanges: [
       {
         id: "pc_1",

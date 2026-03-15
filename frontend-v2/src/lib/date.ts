@@ -1,4 +1,4 @@
-import type { Subscription } from "./types";
+import type { BillingCycle, Subscription } from "./types";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -33,7 +33,7 @@ export const daysUntil = (
   );
 };
 
-const averageMonthlyCost = (sub: Subscription): number => {
+export const averageMonthlyCost = (sub: Subscription): number => {
   switch (sub.billingCycle) {
     case "weekly":
       return sub.amountMinor * (52 / 12);
@@ -70,6 +70,61 @@ export const calculateYearlyTotalMinor = (
   );
 };
 
+const addDays = (isoDate: string, days: number): string => {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  const next = new Date(Date.UTC(year, month - 1, day) + days * DAY_MS);
+  return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}-${String(next.getUTCDate()).padStart(2, "0")}`;
+};
+
+const daysInMonth = (year: number, monthIndex: number): number =>
+  new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
+
+const addMonths = (isoDate: string, months: number): string => {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  const monthIndex = month - 1 + months;
+  const nextYear = year + Math.floor(monthIndex / 12);
+  const normalizedMonthIndex = ((monthIndex % 12) + 12) % 12;
+  const nextDay = Math.min(day, daysInMonth(nextYear, normalizedMonthIndex));
+  return `${nextYear}-${String(normalizedMonthIndex + 1).padStart(2, "0")}-${String(nextDay).padStart(2, "0")}`;
+};
+
+const advanceBillingDate = (
+  isoDate: string,
+  billingCycle: BillingCycle,
+  customIntervalDays?: number
+): string => {
+  switch (billingCycle) {
+    case "weekly":
+      return addDays(isoDate, 7);
+    case "monthly":
+      return addMonths(isoDate, 1);
+    case "yearly":
+      return addMonths(isoDate, 12);
+    case "custom_days":
+      return addDays(isoDate, customIntervalDays ?? 30);
+    default:
+      return isoDate;
+  }
+};
+
+/**
+ * Advance a past nextBillingDate forward by the subscription's billing cycle
+ * until it reaches a date >= fromIsoDate. Returns the original date if already
+ * in the future.
+ */
+export const nextRenewalDate = (
+  sub: Subscription,
+  fromIsoDate: string
+): string => {
+  let date = sub.nextBillingDate;
+  let guard = 0;
+  while (date < fromIsoDate && guard < 400) {
+    date = advanceBillingDate(date, sub.billingCycle, sub.customIntervalDays);
+    guard++;
+  }
+  return date;
+};
+
 export const getUpcomingRenewals = (
   subscriptions: Subscription[],
   startIsoDate: string,
@@ -77,9 +132,18 @@ export const getUpcomingRenewals = (
 ): Subscription[] => {
   return subscriptions
     .filter((s) => s.isActive)
-    .filter((s) => {
-      const delta = daysUntil(s.nextBillingDate, startIsoDate);
+    .map((s) => {
+      const effectiveDate = nextRenewalDate(s, startIsoDate);
+      return { sub: s, effectiveDate };
+    })
+    .filter(({ effectiveDate }) => {
+      const delta = daysUntil(effectiveDate, startIsoDate);
       return delta >= 0 && delta <= windowDays;
     })
-    .sort((a, b) => a.nextBillingDate.localeCompare(b.nextBillingDate));
+    .sort((a, b) => a.effectiveDate.localeCompare(b.effectiveDate))
+    .map(({ sub, effectiveDate }) =>
+      effectiveDate !== sub.nextBillingDate
+        ? { ...sub, nextBillingDate: effectiveDate }
+        : sub
+    );
 };

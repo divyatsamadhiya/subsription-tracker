@@ -88,7 +88,7 @@ export const subscriptionInputSchema = z
     category: z.enum(CATEGORY_OPTIONS),
     reminderDaysBefore: z.array(z.number().int().nonnegative()),
     isActive: z.boolean(),
-    notes: z.string().max(2000).optional()
+    notes: z.union([z.string().max(2000), z.null()]).optional()
   })
   .strict()
   .superRefine((value, context) => {
@@ -121,6 +121,7 @@ export const subscriptionSchema: z.ZodType<Subscription> = z.object({
   reminderDaysBefore: z.array(z.number().int().nonnegative()),
   isActive: z.boolean(),
   notes: z.string().max(2000).optional(),
+  priorSpendingMinor: z.number().int().nonnegative(),
   priceHistory: z.array(priceHistoryEntrySchema),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime()

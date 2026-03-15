@@ -6,6 +6,8 @@ import {
   buildCategoryTrend,
   buildRenewalBuckets,
   buildAnalyticsSummary,
+  buildHistoricalSpendTrend,
+  buildLifetimeCategorySpend,
   buildRoiData,
   getCategoryChangeMeta,
   getAnalyticsRangeMonths,
@@ -201,8 +203,8 @@ describe("buildSpendComparisonTrend", () => {
     const result = buildSpendComparisonTrend(subs, "2026-03-11", 1);
 
     expect(result[0].contributors).toEqual([
-      { subscriptionId: "claude", name: "Claude Pro", amountMinor: 1000 },
-      { subscriptionId: "youtube", name: "YouTube Premium", amountMinor: 500 },
+      { subscriptionId: "claude", name: "Claude Pro", category: "entertainment", amountMinor: 1000 },
+      { subscriptionId: "youtube", name: "YouTube Premium", category: "entertainment", amountMinor: 500 },
     ]);
   });
 });
@@ -579,6 +581,7 @@ describe("buildRenewalBuckets", () => {
       {
         subscriptionId: "youtube",
         name: "YouTube Premium",
+        category: "entertainment",
         amountMinor: 29900,
         nextBillingDate: "2026-03-14",
       },
@@ -610,10 +613,20 @@ describe("buildRenewalBuckets", () => {
     expect(result[3].count).toBe(1);
   });
 
-  it("excludes subscriptions past due (negative delta)", () => {
+  it("advances past-due monthly subscription into correct bucket", () => {
     const subs = [
-      buildSubscription({ nextBillingDate: "2026-03-01", isActive: true }),
+      buildSubscription({ nextBillingDate: "2026-03-01", billingCycle: "monthly", isActive: true }),
     ];
+    // 2026-03-01 + 1 month = 2026-04-01 → 21 days from 2026-03-11 → 15-21 bucket
+    const result = buildRenewalBuckets(subs, "2026-03-11");
+    expect(result[2].count).toBe(1);
+  });
+
+  it("excludes past-due yearly subscription whose advanced date exceeds 30 days", () => {
+    const subs = [
+      buildSubscription({ nextBillingDate: "2025-06-01", billingCycle: "yearly", isActive: true }),
+    ];
+    // 2025-06-01 + 1 year = 2026-06-01 → far beyond 30 days → excluded
     const result = buildRenewalBuckets(subs, "2026-03-11");
     expect(result.every((b) => b.count === 0)).toBe(true);
   });
@@ -699,6 +712,7 @@ describe("buildAnalyticsSummary", () => {
     expect(result.currentTwelveMonthMinor).toBe(0);
     expect(result.previousTwelveMonthMinor).toBe(0);
     expect(result.yoyGrowthPercent).toBeNull();
+    expect(result.lifetimeTotalMinor).toBe(0);
   });
 
   it("counts active subscriptions", () => {
@@ -1058,5 +1072,246 @@ describe("buildSpendComparisonTrend with price history", () => {
     expect(result[0].contributors[0].amountMinor).toBe(1000);
     // May contributor should use new price (1500)
     expect(result[2].contributors[0].amountMinor).toBe(1500);
+  });
+});
+
+describe("buildAnalyticsSummary lifetimeTotalMinor", () => {
+  it("sums total spent across all subscriptions", () => {
+    const subs = [
+      buildSubscription({
+        billingCycle: "monthly",
+        amountMinor: 1000,
+        isActive: true,
+        createdAt: "2026-01-01T00:00:00Z",
+      }),
+    ];
+    // From Jan 1 to Mar 15 → Jan, Feb, Mar = 3 charges
+    const result = buildAnalyticsSummary(subs, "2026-03-15");
+    expect(result.lifetimeTotalMinor).toBe(3000);
+  });
+
+  it("includes inactive subscriptions in lifetime total", () => {
+    const subs = [
+      buildSubscription({
+        billingCycle: "monthly",
+        amountMinor: 1000,
+        isActive: false,
+        createdAt: "2026-01-01T00:00:00Z",
+      }),
+    ];
+    const result = buildAnalyticsSummary(subs, "2026-03-15");
+    expect(result.lifetimeTotalMinor).toBe(3000);
+  });
+
+  it("includes priorSpendingMinor in lifetime total", () => {
+    const subs = [
+      buildSubscription({
+        billingCycle: "monthly",
+        amountMinor: 1000,
+        isActive: true,
+        createdAt: "2026-03-01T00:00:00Z",
+        priorSpendingMinor: 5000,
+      }),
+    ];
+    // 1 charge (Mar 1) + 5000 prior = 6000
+    const result = buildAnalyticsSummary(subs, "2026-03-15");
+    expect(result.lifetimeTotalMinor).toBe(6000);
+  });
+});
+
+describe("buildHistoricalSpendTrend", () => {
+  it("returns a single empty month point for no subscriptions", () => {
+    const result = buildHistoricalSpendTrend([], "2026-03-15");
+    expect(result).toHaveLength(1);
+    expect(result[0].monthKey).toBe("2026-03");
+    expect(result[0].amountMinor).toBe(0);
+    expect(result[0].cumulativeMinor).toBe(0);
+  });
+
+  it("returns monthly points from earliest subscription to today", () => {
+    const subs = [
+      buildSubscription({
+        billingCycle: "monthly",
+        amountMinor: 1000,
+        createdAt: "2026-01-15T00:00:00Z",
+      }),
+    ];
+    const result = buildHistoricalSpendTrend(subs, "2026-03-15");
+    expect(result).toHaveLength(3); // Jan, Feb, Mar
+    expect(result[0].monthKey).toBe("2026-01");
+    expect(result[2].monthKey).toBe("2026-03");
+  });
+
+  it("fills in actual charge amounts per month", () => {
+    const subs = [
+      buildSubscription({
+        billingCycle: "monthly",
+        amountMinor: 1000,
+        createdAt: "2026-01-01T00:00:00Z",
+      }),
+    ];
+    const result = buildHistoricalSpendTrend(subs, "2026-03-15");
+    expect(result[0].amountMinor).toBe(1000); // Jan charge
+    expect(result[1].amountMinor).toBe(1000); // Feb charge
+    expect(result[2].amountMinor).toBe(1000); // Mar charge
+  });
+
+  it("computes cumulative totals", () => {
+    const subs = [
+      buildSubscription({
+        billingCycle: "monthly",
+        amountMinor: 1000,
+        createdAt: "2026-01-01T00:00:00Z",
+      }),
+    ];
+    const result = buildHistoricalSpendTrend(subs, "2026-03-15");
+    expect(result[0].cumulativeMinor).toBe(1000);
+    expect(result[1].cumulativeMinor).toBe(2000);
+    expect(result[2].cumulativeMinor).toBe(3000);
+  });
+
+  it("respects monthsBack parameter", () => {
+    const subs = [
+      buildSubscription({
+        billingCycle: "monthly",
+        amountMinor: 1000,
+        createdAt: "2026-01-01T00:00:00Z",
+      }),
+    ];
+    const result = buildHistoricalSpendTrend(subs, "2026-03-15", 2);
+    expect(result).toHaveLength(2); // Feb, Mar
+    expect(result[0].monthKey).toBe("2026-02");
+    expect(result[1].monthKey).toBe("2026-03");
+  });
+
+  it("includes contributors for each month", () => {
+    const subs = [
+      buildSubscription({
+        id: "netflix",
+        name: "Netflix",
+        billingCycle: "monthly",
+        amountMinor: 1000,
+        createdAt: "2026-03-01T00:00:00Z",
+      }),
+    ];
+    const result = buildHistoricalSpendTrend(subs, "2026-03-15");
+    expect(result[0].contributors).toHaveLength(1);
+    expect(result[0].contributors[0].name).toBe("Netflix");
+    expect(result[0].contributors[0].amountMinor).toBe(1000);
+  });
+
+  it("sums multiple subscriptions in the same month", () => {
+    const subs = [
+      buildSubscription({
+        billingCycle: "monthly",
+        amountMinor: 1000,
+        createdAt: "2026-03-01T00:00:00Z",
+      }),
+      buildSubscription({
+        billingCycle: "monthly",
+        amountMinor: 500,
+        createdAt: "2026-03-10T00:00:00Z",
+      }),
+    ];
+    const result = buildHistoricalSpendTrend(subs, "2026-03-15");
+    expect(result[0].amountMinor).toBe(1500);
+  });
+
+  it("handles weekly subscriptions with multiple charges per month", () => {
+    const subs = [
+      buildSubscription({
+        billingCycle: "weekly",
+        amountMinor: 100,
+        createdAt: "2026-03-01T00:00:00Z",
+      }),
+    ];
+    const result = buildHistoricalSpendTrend(subs, "2026-03-15");
+    // Mar 1, Mar 8, Mar 15 = 3 charges
+    expect(result[0].amountMinor).toBe(300);
+  });
+});
+
+describe("buildLifetimeCategorySpend", () => {
+  it("returns empty array for no subscriptions", () => {
+    expect(buildLifetimeCategorySpend([], "2026-03-15")).toEqual([]);
+  });
+
+  it("groups lifetime spend by category with subscription breakdowns", () => {
+    const subs = [
+      buildSubscription({
+        id: "netflix",
+        name: "Netflix",
+        category: "entertainment",
+        billingCycle: "monthly",
+        amountMinor: 1000,
+        createdAt: "2026-01-01T00:00:00Z",
+      }),
+      buildSubscription({
+        id: "claude",
+        name: "Claude Pro",
+        category: "productivity",
+        billingCycle: "monthly",
+        amountMinor: 2000,
+        createdAt: "2026-01-01T00:00:00Z",
+      }),
+    ];
+    const result = buildLifetimeCategorySpend(subs, "2026-03-15");
+    expect(result).toHaveLength(2);
+    // Sorted by amount descending
+    expect(result[0].category).toBe("productivity");
+    expect(result[0].amountMinor).toBe(6000); // 3 months * 2000
+    expect(result[0].subscriptions).toHaveLength(1);
+    expect(result[0].subscriptions[0].name).toBe("Claude Pro");
+    expect(result[1].category).toBe("entertainment");
+    expect(result[1].amountMinor).toBe(3000); // 3 months * 1000
+  });
+
+  it("calculates share as fraction of total", () => {
+    const subs = [
+      buildSubscription({
+        category: "entertainment",
+        billingCycle: "monthly",
+        amountMinor: 3000,
+        createdAt: "2026-03-01T00:00:00Z",
+      }),
+      buildSubscription({
+        category: "productivity",
+        billingCycle: "monthly",
+        amountMinor: 1000,
+        createdAt: "2026-03-01T00:00:00Z",
+      }),
+    ];
+    const result = buildLifetimeCategorySpend(subs, "2026-03-15");
+    expect(result[0].share).toBeCloseTo(0.75, 2);
+    expect(result[1].share).toBeCloseTo(0.25, 2);
+  });
+
+  it("includes inactive subscriptions", () => {
+    const subs = [
+      buildSubscription({
+        category: "entertainment",
+        billingCycle: "monthly",
+        amountMinor: 1000,
+        isActive: false,
+        createdAt: "2026-01-01T00:00:00Z",
+      }),
+    ];
+    const result = buildLifetimeCategorySpend(subs, "2026-03-15");
+    expect(result).toHaveLength(1);
+    expect(result[0].amountMinor).toBe(3000);
+  });
+
+  it("includes priorSpendingMinor in totals", () => {
+    const subs = [
+      buildSubscription({
+        category: "entertainment",
+        billingCycle: "monthly",
+        amountMinor: 1000,
+        createdAt: "2026-03-01T00:00:00Z",
+        priorSpendingMinor: 5000,
+      }),
+    ];
+    const result = buildLifetimeCategorySpend(subs, "2026-03-15");
+    expect(result[0].amountMinor).toBe(6000); // 1 charge + 5000 prior
   });
 });

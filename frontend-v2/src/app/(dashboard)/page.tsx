@@ -34,6 +34,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Link from "next/link";
 import { useDashboard } from "@/lib/dashboard-context";
@@ -46,8 +47,6 @@ import {
   billingCycleLabel,
 } from "@/lib/format";
 import {
-  calculateMonthlyTotalMinor,
-  calculateYearlyTotalMinor,
   getUpcomingRenewals,
   nowIsoDate,
   daysUntil,
@@ -62,7 +61,7 @@ import { RenewalCalendar } from "@/components/dashboard/renewal-calendar";
 import { SubscriptionAvatar } from "@/components/dashboard/subscription-avatar";
 import { buildSpendSparkline } from "@/lib/overview-helpers";
 
-import { buildSpendTrend } from "@/lib/analytics";
+import { buildSpendTrend, monthlyEquivalent } from "@/lib/analytics";
 import {
   getGreetingRenewalTip,
   getMostExpensiveSubscription,
@@ -166,12 +165,20 @@ export default function OverviewPage() {
   }, []);
 
   const monthlyTotal = useMemo(
-    () => calculateMonthlyTotalMinor(subscriptions),
-    [subscriptions]
+    () => Math.round(
+      subscriptions
+        .filter((s) => s.isActive)
+        .reduce((sum, s) => sum + monthlyEquivalent(s, today), 0)
+    ),
+    [subscriptions, today]
   );
   const yearlyTotal = useMemo(
-    () => calculateYearlyTotalMinor(subscriptions),
-    [subscriptions]
+    () => Math.round(
+      subscriptions
+        .filter((s) => s.isActive)
+        .reduce((sum, s) => sum + monthlyEquivalent(s, today) * 12, 0)
+    ),
+    [subscriptions, today]
   );
   const activeCount = useMemo(
     () => subscriptions.filter((s) => s.isActive).length,
@@ -244,7 +251,7 @@ export default function OverviewPage() {
     const totals = new Map<SubscriptionCategory, number>();
     for (const sub of subscriptions.filter((s) => s.isActive)) {
       const prev = totals.get(sub.category) ?? 0;
-      totals.set(sub.category, prev + sub.amountMinor);
+      totals.set(sub.category, prev + Math.round(monthlyEquivalent(sub, today)));
     }
     const total = Array.from(totals.values()).reduce((a, b) => a + b, 0) || 1;
     return CATEGORY_OPTIONS
@@ -255,7 +262,7 @@ export default function OverviewPage() {
       }))
       .filter((c) => c.amount > 0)
       .sort((a, b) => b.amount - a.amount);
-  }, [subscriptions]);
+  }, [subscriptions, today]);
 
   // Pie chart data
   const pieData = useMemo(
@@ -274,8 +281,8 @@ export default function OverviewPage() {
     if (!expandedCategory) return [];
     return subscriptions
       .filter((s) => s.isActive && s.category === expandedCategory)
-      .sort((a, b) => b.amountMinor - a.amountMinor);
-  }, [subscriptions, expandedCategory]);
+      .sort((a, b) => monthlyEquivalent(b, today) - monthlyEquivalent(a, today));
+  }, [subscriptions, expandedCategory, today]);
 
   const firstName = user?.profile?.fullName?.split(" ")[0] ?? "there";
   const dueNames = renewals.slice(0, 3).map((s) => s.name);
@@ -479,8 +486,8 @@ export default function OverviewPage() {
 
       <div className="grid gap-6 lg:grid-cols-5">
         {/* Upcoming Renewals */}
-        <motion.div variants={item} className="lg:col-span-3">
-          <Card>
+        <motion.div variants={item} className="lg:col-span-3 h-full">
+          <Card className="h-full">
             <CardHeader className="flex-row items-center justify-between pb-3">
               <CardTitle className="text-base">Upcoming renewals</CardTitle>
               <div className="flex items-center gap-2">
@@ -640,7 +647,7 @@ export default function OverviewPage() {
         </motion.div>
 
         {/* Category Breakdown — Donut Chart */}
-        <motion.div variants={item} className="lg:col-span-2">
+        <motion.div variants={item} className="lg:col-span-2 h-full">
           <Card className="h-full">
             <CardHeader className="flex-row items-center justify-between pb-3">
               <CardTitle className="text-base">Spending by category</CardTitle>
@@ -784,17 +791,18 @@ export default function OverviewPage() {
                               transition={{ duration: 0.2 }}
                               className="overflow-hidden"
                             >
-                              <div className="ml-5 mt-1 space-y-1 border-l border-border pl-3">
+                              <div className="ml-5 mt-1 space-y-1.5 border-l border-border pl-3">
                                 {drilldownSubs.map((sub) => (
                                   <div
                                     key={sub.id}
-                                    className="flex items-center justify-between py-0.5 text-xs"
+                                    className="flex items-center gap-2 py-0.5 text-xs"
                                   >
-                                    <span className="truncate text-muted-foreground">
+                                    <SubscriptionAvatar name={sub.name} category={sub.category} size="xs" />
+                                    <span className="min-w-0 truncate text-muted-foreground">
                                       {sub.name}
                                     </span>
-                                    <span className="shrink-0 font-medium">
-                                      {formatCurrencyMinor(sub.amountMinor, sub.currency)}
+                                    <span className="ml-auto shrink-0 font-medium">
+                                      {formatCurrencyMinor(Math.round(monthlyEquivalent(sub, today)), sub.currency)}
                                     </span>
                                   </div>
                                 ))}
@@ -847,7 +855,7 @@ function KpiCard({
   sparklineColor?: string;
 }) {
   return (
-    <Card className="group relative min-h-[152px] overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:shadow-primary/5">
+    <Card className="group relative overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:shadow-primary/5">
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-muted-foreground">
@@ -887,7 +895,7 @@ function DueCard({
   dueExtra: number;
 }) {
   return (
-    <Card className="group relative min-h-[152px] overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:shadow-primary/5">
+    <Card className="group relative overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:shadow-primary/5">
       <CardContent className="p-4">
         <div className="flex items-center gap-2 text-muted-foreground">
           <CalendarClock className="size-3.5" />
@@ -923,7 +931,6 @@ function SavingsCard({
   savingsNames: string[];
   onFixOverlap: () => void;
 }) {
-  const [flipped, setFlipped] = useState(false);
   const summary = savingsInsight
     ? `Overlap in ${categoryLabel(savingsInsight.category).toLowerCase()}.`
     : "Estimated review target.";
@@ -932,86 +939,57 @@ function SavingsCard({
     : "No obvious duplicate category shows up yet. Review one low-value plan to free this amount.";
 
   return (
-    <Card className="group relative min-h-[152px] overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:shadow-primary/5">
-      <div className="relative h-full [perspective:1200px]">
-        <div
-          className="relative h-full transition-transform duration-500"
-          style={{
-            transformStyle: "preserve-3d",
-            transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)",
-          }}
-        >
-          <CardContent
-            className="absolute inset-0 flex h-full flex-col p-4"
-            style={{ backfaceVisibility: "hidden" }}
-          >
+    <Card className="group relative overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:shadow-primary/5">
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Lightbulb className="size-3.5" />
+            <span className="text-xs font-medium">You could save</span>
+          </div>
+          <Badge variant="outline" className="text-[10px] uppercase tracking-[0.18em]">
+            {savingsInsight ? "Overlap" : "Estimate"}
+          </Badge>
+        </div>
+        <p className="mt-1.5 font-heading text-xl font-semibold tracking-tight">
+          <AnimatedNumber
+            value={savingsMinor / 100}
+            formatFn={(value) =>
+              formatCurrencyMinor(Math.round(value * 100), currency)
+            }
+          />
+        </p>
+        <div className="mt-1 flex items-center justify-between gap-2">
+          <p className="truncate text-[11px] text-muted-foreground">{summary}</p>
+          <Popover>
+            <PopoverTrigger
+              className="shrink-0 inline-flex items-center gap-0.5 text-[11px] font-medium text-primary transition-colors hover:text-primary/80"
+              aria-label="Show savings details"
+            >
+              Details
+              <ChevronRight className="size-3" />
+            </PopoverTrigger>
+          <PopoverContent align="end" className="w-72 space-y-3 p-4">
             <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Lightbulb className="size-3.5" />
-                <span className="text-xs font-medium">You could save</span>
-              </div>
+              <p className="text-xs font-medium text-muted-foreground">
+                Savings tip
+              </p>
               <Badge variant="outline" className="text-[10px] uppercase tracking-[0.18em]">
                 {savingsInsight ? "Overlap" : "Estimate"}
               </Badge>
             </div>
-            <p className="mt-1.5 font-heading text-xl font-semibold tracking-tight">
-              <AnimatedNumber
-                value={savingsMinor / 100}
-                formatFn={(value) =>
-                  formatCurrencyMinor(Math.round(value * 100), currency)
-                }
-              />
+            <p className="text-sm leading-5 text-foreground">
+              {detail}
             </p>
-            <p className="mt-1 text-[11px] text-muted-foreground">{summary}</p>
-            <button
-              type="button"
-              onClick={() => setFlipped(true)}
-              aria-label="Show savings details"
-              className="mt-auto inline-flex items-center gap-1 text-[11px] font-medium text-primary transition-colors hover:text-primary/80"
-            >
-              How it works
-              <ChevronRight className="size-3" />
-            </button>
-          </CardContent>
-
-          <CardContent
-            className="absolute inset-0 flex h-full flex-col justify-between bg-card p-4"
-            style={{
-              backfaceVisibility: "hidden",
-              transform: "rotateY(180deg)",
-            }}
-          >
-            <div>
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-xs font-medium text-muted-foreground">
-                  Savings tip
-                </p>
-                <Badge variant="outline" className="text-[10px] uppercase tracking-[0.18em]">
-                  {savingsInsight ? "Overlap" : "Estimate"}
-                </Badge>
-              </div>
-              <p className="mt-2 text-sm leading-5 text-foreground">
-                {detail}
-              </p>
-            </div>
-            <div className="flex items-center justify-between gap-2">
-              <button
-                type="button"
-                onClick={() => setFlipped(false)}
-                aria-label="Hide savings details"
-                className="inline-flex items-center gap-1 text-[11px] font-medium text-primary transition-colors hover:text-primary/80"
-              >
-                <ChevronRight className="size-3 rotate-180" />
-                Back
-              </button>
+            <div className="flex justify-end">
               <Button size="sm" className="gap-1.5" onClick={onFixOverlap}>
                 {savingsInsight ? "Fix overlap" : "Review spend"}
                 <ChevronRight className="size-3.5" />
               </Button>
             </div>
-          </CardContent>
+          </PopoverContent>
+          </Popover>
         </div>
-      </div>
+      </CardContent>
     </Card>
   );
 }

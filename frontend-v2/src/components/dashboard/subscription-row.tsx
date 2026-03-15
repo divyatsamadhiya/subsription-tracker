@@ -15,6 +15,8 @@ import {
   PinOff,
   Play,
   Trash2,
+  TrendingUp,
+  Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +34,8 @@ import {
   formatRenewalDistance,
   getEffectiveRenewalDate,
   monthlyEquivalentMinor,
+  projectedCostMinor,
+  totalSpentSinceAddedMinor,
 } from "@/lib/subscriptions-list";
 import type { Subscription } from "@/lib/types";
 
@@ -321,6 +325,44 @@ export function SubscriptionRow({
                 </div>
               </div>
             )}
+            <div className="w-full">
+              <span className="flex items-center gap-1.5 font-medium text-muted-foreground">
+                <Wallet className="size-3" />
+                Cost insights
+              </span>
+              <div className="mt-1.5 grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-4">
+                <div>
+                  <p className="text-muted-foreground">Total spent</p>
+                  <p className="mt-0.5 font-medium text-foreground">
+                    {formatCurrencyMinor(totalSpentSinceAddedMinor(subscription, todayIsoDate), subscription.currency)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Monthly</p>
+                  <p className="mt-0.5 font-medium text-foreground">
+                    {formatCurrencyMinor(monthlyEquivalentMinor(subscription), subscription.currency)}
+                  </p>
+                </div>
+                <div>
+                  <p className="flex items-center gap-1 text-muted-foreground">
+                    <TrendingUp className="size-3" />
+                    6-month
+                  </p>
+                  <p className="mt-0.5 font-medium text-foreground">
+                    {formatCurrencyMinor(projectedCostMinor(subscription, 6), subscription.currency)}
+                  </p>
+                </div>
+                <div>
+                  <p className="flex items-center gap-1 text-muted-foreground">
+                    <TrendingUp className="size-3" />
+                    Yearly
+                  </p>
+                  <p className="mt-0.5 font-medium text-foreground">
+                    {formatCurrencyMinor(projectedCostMinor(subscription, 12), subscription.currency)}
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

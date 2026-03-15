@@ -32,6 +32,7 @@ const makeSubscription = (id: string) => {
     reminderDaysBefore: [1, 3, 7],
     isActive: true,
     notes: null,
+    priorSpendingMinor: 0,
     priceChanges: [
       {
         id: "pc_1",
@@ -108,6 +109,7 @@ describe("backupService", () => {
           category: "entertainment",
           reminderDaysBefore: [1, 3, 7],
           isActive: true,
+          priorSpendingMinor: 0,
           priceHistory: [
             {
               amountMinor: 999,

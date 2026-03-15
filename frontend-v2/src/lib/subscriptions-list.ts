@@ -1,4 +1,5 @@
 import { daysUntil } from "./date";
+import { priceOnDate } from "./analytics";
 import type { BillingCycle, Subscription } from "./types";
 
 export type SubscriptionSortOption =
@@ -291,4 +292,38 @@ export function buildSubscriptionsCsv(
   });
 
   return [CSV_HEADERS.map(escapeCsv).join(","), ...rows].join("\n");
+}
+
+/**
+ * Walk billing cycles from createdAt to today, summing the charge at each
+ * renewal using the price that was active on that date.
+ */
+export function totalSpentSinceAddedMinor(
+  subscription: Subscription,
+  todayIsoDate: string
+): number {
+  let total = subscription.priorSpendingMinor ?? 0;
+  let date = subscription.createdAt.slice(0, 10); // ISO date portion
+  let guard = 0;
+
+  // First charge happens on createdAt
+  while (date <= todayIsoDate && guard < 2000) {
+    const price = priceOnDate(subscription, date);
+    total += price.amountMinor;
+    date = nextChargeDate(date, price.billingCycle, price.customIntervalDays);
+    guard++;
+  }
+
+  return total;
+}
+
+/**
+ * Project cost for a given number of months based on the current monthly
+ * equivalent rate.
+ */
+export function projectedCostMinor(
+  subscription: Subscription,
+  months: number
+): number {
+  return Math.round(monthlyEquivalentMinor(subscription) * months);
 }

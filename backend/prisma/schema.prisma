@@ -101,6 +101,7 @@ model Subscription {
   reminderDaysBefore Int[]
   isActive           Boolean              @default(true)
   notes              String?
+  priorSpendingMinor Int                  @default(0)
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
 

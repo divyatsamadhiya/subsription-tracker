@@ -1,4 +1,4 @@
-import { calculateMonthlyTotalMinor, daysUntil, getUpcomingRenewals } from "./date";
+import { calculateMonthlyTotalMinor, daysUntil, getUpcomingRenewals, nextRenewalDate } from "./date";
 import type { BillingCycle, Subscription, SubscriptionCategory } from "./types";
 import type { UsageRating } from "./roi-ratings";
 import { getRoiVerdict, type RoiVerdict } from "./roi-ratings";
@@ -16,6 +16,7 @@ export interface SpendComparisonPoint extends SpendTrendPoint {
   contributors: Array<{
     subscriptionId: string;
     name: string;
+    category: SubscriptionCategory;
     amountMinor: number;
   }>;
 }
@@ -50,6 +51,7 @@ export interface RenewalBucketPoint {
   subscriptions: Array<{
     subscriptionId: string;
     name: string;
+    category: SubscriptionCategory;
     amountMinor: number;
     nextBillingDate: string;
   }>;
@@ -69,6 +71,32 @@ export interface AnalyticsSummary {
   currentTwelveMonthMinor: number;
   previousTwelveMonthMinor: number;
   yoyGrowthPercent: number | null;
+  lifetimeTotalMinor: number;
+}
+
+export interface HistoricalSpendPoint {
+  monthLabel: string;
+  monthKey: string;
+  amountMinor: number;
+  cumulativeMinor: number;
+  contributors: Array<{
+    subscriptionId: string;
+    name: string;
+    category: SubscriptionCategory;
+    amountMinor: number;
+  }>;
+}
+
+export interface LifetimeCategoryPoint {
+  category: SubscriptionCategory;
+  amountMinor: number;
+  share: number;
+  subscriptions: Array<{
+    id: string;
+    name: string;
+    amountMinor: number;
+    isActive: boolean;
+  }>;
 }
 
 export type CategoryChangeTone = "positive" | "negative" | "neutral";
@@ -148,6 +176,7 @@ const pushContributor = (
   contributors.push({
     subscriptionId: subscription.id,
     name: subscription.name,
+    category: subscription.category,
     amountMinor: chargeAmountMinor,
   });
 };
@@ -226,7 +255,7 @@ const monthlyEquivalentFromSnapshot = (snapshot: PriceSnapshot): number => {
   }
 };
 
-const monthlyEquivalent = (sub: Subscription, onDate?: string): number => {
+export const monthlyEquivalent = (sub: Subscription, onDate?: string): number => {
   const snapshot = onDate ? priceOnDate(sub, onDate) : {
     amountMinor: sub.amountMinor,
     billingCycle: sub.billingCycle,
@@ -579,17 +608,21 @@ export const buildRenewalBuckets = (
   ];
 
   for (const sub of subscriptions.filter((s) => s.isActive)) {
-    const delta = daysUntil(sub.nextBillingDate, fromIsoDate);
+    const effectiveDate = nextRenewalDate(sub, fromIsoDate);
+    const delta = daysUntil(effectiveDate, fromIsoDate);
     if (delta < 0 || delta > 30) continue;
     const bucket =
       delta <= 7 ? buckets[0] : delta <= 14 ? buckets[1] : delta <= 21 ? buckets[2] : buckets[3];
+    const snapshot = priceOnDate(sub, fromIsoDate);
+    const chargeAmount = snapshot.amountMinor;
     bucket.count++;
-    bucket.amountMinor += sub.amountMinor;
+    bucket.amountMinor += chargeAmount;
     bucket.subscriptions.push({
       subscriptionId: sub.id,
       name: sub.name,
-      amountMinor: sub.amountMinor,
-      nextBillingDate: sub.nextBillingDate,
+      category: sub.category,
+      amountMinor: chargeAmount,
+      nextBillingDate: effectiveDate,
     });
   }
 
@@ -619,7 +652,7 @@ export const getSubscriptionsForCategoryPoint = (
     )
     .sort(
       (left, right) =>
-        right.amountMinor - left.amountMinor || left.name.localeCompare(right.name)
+        monthlyEquivalent(right) - monthlyEquivalent(left) || left.name.localeCompare(right.name)
     );
 };
 
@@ -687,8 +720,17 @@ export const buildAnalyticsSummary = (
         ? 100
         : null;
 
+  const lifetimeTotalMinor = subscriptions.reduce(
+    (sum, sub) => sum + totalSpentForSub(sub, todayIsoDate),
+    0
+  );
+
   return {
-    monthlyBaselineMinor: calculateMonthlyTotalMinor(subscriptions),
+    monthlyBaselineMinor: Math.round(
+      subscriptions
+        .filter((s) => s.isActive)
+        .reduce((sum, s) => sum + monthlyEquivalent(s, todayIsoDate), 0)
+    ),
     projectedSixMonthMinor: sixMonthTrend.reduce((sum, point) => sum + point.amountMinor, 0),
     activeCount: subscriptions.filter((s) => s.isActive).length,
     renewalCount30Days: getUpcomingRenewals(subscriptions, todayIsoDate, 30).length,
@@ -698,6 +740,7 @@ export const buildAnalyticsSummary = (
     currentTwelveMonthMinor,
     previousTwelveMonthMinor,
     yoyGrowthPercent,
+    lifetimeTotalMinor,
   };
 };
 
@@ -719,7 +762,8 @@ export interface RoiSummary {
 
 export const buildRoiData = (
   subscriptions: Subscription[],
-  ratings: Record<string, UsageRating>
+  ratings: Record<string, UsageRating>,
+  todayIsoDate?: string
 ): RoiSummary => {
   const active = subscriptions.filter((s) => s.isActive);
 
@@ -727,7 +771,7 @@ export const buildRoiData = (
   let ratedCount = 0;
 
   const items: RoiItem[] = active.map((sub) => {
-    const monthly = Math.round(monthlyEquivalent(sub));
+    const monthly = Math.round(monthlyEquivalent(sub, todayIsoDate));
     const rating = ratings[sub.id] ?? null;
     const verdict = rating !== null ? getRoiVerdict(rating) : null;
 
@@ -755,4 +799,136 @@ export const buildRoiData = (
   });
 
   return { items, ratedCount, totalCount: active.length, underusedMonthlyMinor };
+};
+
+/**
+ * Walk billing cycles from createdAt to today, summing the charge at each
+ * renewal using the price that was active on that date.
+ * Local copy to avoid circular import (subscriptions-list.ts imports from analytics.ts).
+ */
+const totalSpentForSub = (
+  subscription: Subscription,
+  todayIsoDate: string
+): number => {
+  let total = subscription.priorSpendingMinor ?? 0;
+  let date = subscription.createdAt.slice(0, 10);
+  let guard = 0;
+
+  while (date <= todayIsoDate && guard < 2000) {
+    const price = priceOnDate(subscription, date);
+    total += price.amountMinor;
+    date = nextChargeDate(date, price.billingCycle, price.customIntervalDays);
+    guard++;
+  }
+
+  return total;
+};
+
+export const buildHistoricalSpendTrend = (
+  subscriptions: Subscription[],
+  todayIsoDate: string,
+  monthsBack?: number
+): HistoricalSpendPoint[] => {
+  const todayMonthKey = toMonthKey(todayIsoDate);
+  const todayMonthStartIso = `${todayMonthKey}-01`;
+
+  let startMonthStartIso: string;
+  if (monthsBack !== undefined) {
+    startMonthStartIso = addMonths(todayMonthStartIso, -(monthsBack - 1));
+  } else {
+    const earliest = subscriptions.reduce<string | null>((current, sub) => {
+      const created = sub.createdAt.slice(0, 10);
+      if (!current || created < current) return created;
+      return current;
+    }, null);
+    startMonthStartIso = earliest ? `${toMonthKey(earliest)}-01` : todayMonthStartIso;
+  }
+
+  if (startMonthStartIso > todayMonthStartIso) {
+    startMonthStartIso = todayMonthStartIso;
+  }
+
+  // Build month slots
+  const months: HistoricalSpendPoint[] = [];
+  let cursor = startMonthStartIso;
+  while (cursor <= todayMonthStartIso) {
+    const mk = toMonthKey(cursor);
+    months.push({
+      monthLabel: toMonthLabel(mk),
+      monthKey: mk,
+      amountMinor: 0,
+      cumulativeMinor: 0,
+      contributors: [],
+    });
+    cursor = addMonths(cursor, 1);
+  }
+
+  if (months.length === 0) return [];
+
+  const indexByKey = new Map(months.map((p, i) => [p.monthKey, i]));
+
+  // Walk each subscription's charge history
+  for (const sub of subscriptions) {
+    let date = sub.createdAt.slice(0, 10);
+    let guard = 0;
+
+    while (date <= todayIsoDate && guard < 2000) {
+      const price = priceOnDate(sub, date);
+      const mk = toMonthKey(date);
+      const idx = indexByKey.get(mk);
+      if (idx !== undefined) {
+        months[idx].amountMinor += price.amountMinor;
+        pushContributor(months[idx].contributors, sub, price.amountMinor);
+      }
+      date = nextChargeDate(date, price.billingCycle, price.customIntervalDays);
+      guard++;
+    }
+  }
+
+  // Compute cumulative totals
+  let cumulative = 0;
+  for (const point of months) {
+    cumulative += point.amountMinor;
+    point.cumulativeMinor = cumulative;
+  }
+
+  return months;
+};
+
+export const buildLifetimeCategorySpend = (
+  subscriptions: Subscription[],
+  todayIsoDate: string
+): LifetimeCategoryPoint[] => {
+  const catSubs = new Map<SubscriptionCategory, Array<{
+    id: string;
+    name: string;
+    amountMinor: number;
+    isActive: boolean;
+  }>>();
+
+  for (const sub of subscriptions) {
+    const spent = totalSpentForSub(sub, todayIsoDate);
+    if (spent <= 0) continue;
+    const list = catSubs.get(sub.category) ?? [];
+    list.push({ id: sub.id, name: sub.name, amountMinor: spent, isActive: sub.isActive });
+    catSubs.set(sub.category, list);
+  }
+
+  let grandTotal = 0;
+  for (const subs of catSubs.values()) {
+    for (const s of subs) grandTotal += s.amountMinor;
+  }
+  if (grandTotal === 0) return [];
+
+  return [...catSubs.entries()]
+    .map(([category, subs]) => {
+      const amountMinor = subs.reduce((sum, s) => sum + s.amountMinor, 0);
+      return {
+        category,
+        amountMinor,
+        share: amountMinor / grandTotal,
+        subscriptions: subs.sort((a, b) => b.amountMinor - a.amountMinor),
+      };
+    })
+    .sort((a, b) => b.amountMinor - a.amountMinor);
 };
