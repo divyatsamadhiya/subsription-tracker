@@ -29,7 +29,6 @@ import {
   Layers3,
   Plus,
   Star,
-  Gauge,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -52,6 +51,7 @@ import {
   getCategoryChangeMeta,
   getAnalyticsRangeMonths,
   getSubscriptionsForCategoryPoint,
+  monthlyEquivalent,
   type AnalyticsRange,
   type RoiItem,
 } from "@/lib/analytics";
@@ -133,8 +133,8 @@ export default function AnalyticsPage() {
     [subscriptions, today]
   );
   const roiData = useMemo(
-    () => buildRoiData(subscriptions, roiRatings),
-    [subscriptions, roiRatings]
+    () => buildRoiData(subscriptions, roiRatings, today),
+    [subscriptions, roiRatings, today]
   );
 
   const hasData = subscriptions.some((s) => s.isActive);
@@ -609,7 +609,7 @@ export default function AnalyticsPage() {
                           </p>
                         </div>
                         <span className="font-medium text-foreground">
-                          {formatCurrencyMinor(subscription.amountMinor, currency)}
+                          {formatCurrencyMinor(Math.round(monthlyEquivalent(subscription, today)), currency)}
                         </span>
                       </div>
                     ))}
@@ -754,10 +754,7 @@ export default function AnalyticsPage() {
       <motion.div variants={item} className="mt-6">
         <Card>
           <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <Gauge className="size-4 text-muted-foreground" />
-              <CardTitle className="text-base">Subscription ROI</CardTitle>
-            </div>
+            <CardTitle className="text-base">Subscription ROI</CardTitle>
             <p className="mt-1 text-sm text-muted-foreground">
               Are you using what you pay for? Rate each subscription to find savings.
             </p>

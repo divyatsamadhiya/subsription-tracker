@@ -610,10 +610,20 @@ describe("buildRenewalBuckets", () => {
     expect(result[3].count).toBe(1);
   });
 
-  it("excludes subscriptions past due (negative delta)", () => {
+  it("advances past-due monthly subscription into correct bucket", () => {
     const subs = [
-      buildSubscription({ nextBillingDate: "2026-03-01", isActive: true }),
+      buildSubscription({ nextBillingDate: "2026-03-01", billingCycle: "monthly", isActive: true }),
     ];
+    // 2026-03-01 + 1 month = 2026-04-01 → 21 days from 2026-03-11 → 15-21 bucket
+    const result = buildRenewalBuckets(subs, "2026-03-11");
+    expect(result[2].count).toBe(1);
+  });
+
+  it("excludes past-due yearly subscription whose advanced date exceeds 30 days", () => {
+    const subs = [
+      buildSubscription({ nextBillingDate: "2025-06-01", billingCycle: "yearly", isActive: true }),
+    ];
+    // 2025-06-01 + 1 year = 2026-06-01 → far beyond 30 days → excluded
     const result = buildRenewalBuckets(subs, "2026-03-11");
     expect(result.every((b) => b.count === 0)).toBe(true);
   });

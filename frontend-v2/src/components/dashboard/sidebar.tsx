@@ -27,7 +27,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useDashboard } from "@/lib/dashboard-context";
 import { formatCurrencyMinor } from "@/lib/format";
-import { calculateMonthlyTotalMinor } from "@/lib/date";
+import { nowIsoDate } from "@/lib/date";
+import { monthlyEquivalent } from "@/lib/analytics";
 import { RenewalAlertsBell } from "@/components/dashboard/top-bar";
 
 const NAV_ITEMS = [
@@ -45,7 +46,12 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const pathname = usePathname();
   const { user, subscriptions, settings, logout } = useDashboard();
 
-  const monthlyTotal = calculateMonthlyTotalMinor(subscriptions);
+  const today = nowIsoDate();
+  const monthlyTotal = Math.round(
+    subscriptions
+      .filter((s) => s.isActive)
+      .reduce((sum, s) => sum + monthlyEquivalent(s, today), 0)
+  );
   const activeCount = subscriptions.filter((s) => s.isActive).length;
 
   const isActive = (href: string) => {

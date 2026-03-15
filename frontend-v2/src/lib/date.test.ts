@@ -5,6 +5,7 @@ import {
   calculateMonthlyTotalMinor,
   calculateYearlyTotalMinor,
   getUpcomingRenewals,
+  nextRenewalDate,
 } from "./date";
 import { buildSubscription } from "@/test/factories";
 
@@ -153,6 +154,40 @@ describe("calculateYearlyTotalMinor", () => {
   });
 });
 
+describe("nextRenewalDate", () => {
+  it("returns nextBillingDate if already in the future", () => {
+    const sub = buildSubscription({ nextBillingDate: "2026-04-01", billingCycle: "monthly" });
+    expect(nextRenewalDate(sub, "2026-03-11")).toBe("2026-04-01");
+  });
+
+  it("advances monthly past-due date forward", () => {
+    const sub = buildSubscription({ nextBillingDate: "2026-02-15", billingCycle: "monthly" });
+    expect(nextRenewalDate(sub, "2026-03-11")).toBe("2026-03-15");
+  });
+
+  it("advances weekly past-due date forward", () => {
+    const sub = buildSubscription({ nextBillingDate: "2026-03-01", billingCycle: "weekly" });
+    // 2026-03-01 + 7 = 03-08, + 7 = 03-15 (>= 03-11)
+    expect(nextRenewalDate(sub, "2026-03-11")).toBe("2026-03-15");
+  });
+
+  it("advances yearly past-due date forward", () => {
+    const sub = buildSubscription({ nextBillingDate: "2025-06-15", billingCycle: "yearly" });
+    expect(nextRenewalDate(sub, "2026-03-11")).toBe("2026-06-15");
+  });
+
+  it("advances custom_days past-due date forward", () => {
+    const sub = buildSubscription({ nextBillingDate: "2026-03-01", billingCycle: "custom_days", customIntervalDays: 14 });
+    // 2026-03-01 + 14 = 2026-03-15 (>= 03-11)
+    expect(nextRenewalDate(sub, "2026-03-11")).toBe("2026-03-15");
+  });
+
+  it("returns same date if nextBillingDate equals fromIsoDate", () => {
+    const sub = buildSubscription({ nextBillingDate: "2026-03-11", billingCycle: "monthly" });
+    expect(nextRenewalDate(sub, "2026-03-11")).toBe("2026-03-11");
+  });
+});
+
 describe("getUpcomingRenewals", () => {
   it("returns empty for no subscriptions", () => {
     expect(getUpcomingRenewals([], "2026-03-11", 30)).toEqual([]);
@@ -198,10 +233,21 @@ describe("getUpcomingRenewals", () => {
     expect(result).toHaveLength(1);
   });
 
-  it("excludes past subscriptions", () => {
+  it("advances past-due monthly subscriptions into window", () => {
     const subs = [
-      buildSubscription({ nextBillingDate: "2026-03-01", isActive: true }),
+      buildSubscription({ nextBillingDate: "2026-03-01", billingCycle: "monthly", isActive: true }),
     ];
+    // nextBillingDate 2026-03-01 is before 2026-03-11, so it advances to 2026-04-01 (within 30 days)
+    const result = getUpcomingRenewals(subs, "2026-03-11", 30);
+    expect(result).toHaveLength(1);
+    expect(result[0].nextBillingDate).toBe("2026-04-01");
+  });
+
+  it("excludes past-due subscriptions whose advanced date exceeds window", () => {
+    const subs = [
+      buildSubscription({ nextBillingDate: "2025-06-01", billingCycle: "yearly", isActive: true }),
+    ];
+    // nextBillingDate 2025-06-01 yearly → advances to 2026-06-01 which is 82 days from 2026-03-11
     const result = getUpcomingRenewals(subs, "2026-03-11", 30);
     expect(result).toHaveLength(0);
   });

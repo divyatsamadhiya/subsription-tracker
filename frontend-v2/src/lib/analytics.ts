@@ -1,4 +1,4 @@
-import { calculateMonthlyTotalMinor, daysUntil, getUpcomingRenewals } from "./date";
+import { calculateMonthlyTotalMinor, daysUntil, getUpcomingRenewals, nextRenewalDate } from "./date";
 import type { BillingCycle, Subscription, SubscriptionCategory } from "./types";
 import type { UsageRating } from "./roi-ratings";
 import { getRoiVerdict, type RoiVerdict } from "./roi-ratings";
@@ -226,7 +226,7 @@ const monthlyEquivalentFromSnapshot = (snapshot: PriceSnapshot): number => {
   }
 };
 
-const monthlyEquivalent = (sub: Subscription, onDate?: string): number => {
+export const monthlyEquivalent = (sub: Subscription, onDate?: string): number => {
   const snapshot = onDate ? priceOnDate(sub, onDate) : {
     amountMinor: sub.amountMinor,
     billingCycle: sub.billingCycle,
@@ -579,17 +579,20 @@ export const buildRenewalBuckets = (
   ];
 
   for (const sub of subscriptions.filter((s) => s.isActive)) {
-    const delta = daysUntil(sub.nextBillingDate, fromIsoDate);
+    const effectiveDate = nextRenewalDate(sub, fromIsoDate);
+    const delta = daysUntil(effectiveDate, fromIsoDate);
     if (delta < 0 || delta > 30) continue;
     const bucket =
       delta <= 7 ? buckets[0] : delta <= 14 ? buckets[1] : delta <= 21 ? buckets[2] : buckets[3];
+    const snapshot = priceOnDate(sub, fromIsoDate);
+    const chargeAmount = snapshot.amountMinor;
     bucket.count++;
-    bucket.amountMinor += sub.amountMinor;
+    bucket.amountMinor += chargeAmount;
     bucket.subscriptions.push({
       subscriptionId: sub.id,
       name: sub.name,
-      amountMinor: sub.amountMinor,
-      nextBillingDate: sub.nextBillingDate,
+      amountMinor: chargeAmount,
+      nextBillingDate: effectiveDate,
     });
   }
 
@@ -619,7 +622,7 @@ export const getSubscriptionsForCategoryPoint = (
     )
     .sort(
       (left, right) =>
-        right.amountMinor - left.amountMinor || left.name.localeCompare(right.name)
+        monthlyEquivalent(right) - monthlyEquivalent(left) || left.name.localeCompare(right.name)
     );
 };
 
@@ -688,7 +691,11 @@ export const buildAnalyticsSummary = (
         : null;
 
   return {
-    monthlyBaselineMinor: calculateMonthlyTotalMinor(subscriptions),
+    monthlyBaselineMinor: Math.round(
+      subscriptions
+        .filter((s) => s.isActive)
+        .reduce((sum, s) => sum + monthlyEquivalent(s, todayIsoDate), 0)
+    ),
     projectedSixMonthMinor: sixMonthTrend.reduce((sum, point) => sum + point.amountMinor, 0),
     activeCount: subscriptions.filter((s) => s.isActive).length,
     renewalCount30Days: getUpcomingRenewals(subscriptions, todayIsoDate, 30).length,
@@ -719,7 +726,8 @@ export interface RoiSummary {
 
 export const buildRoiData = (
   subscriptions: Subscription[],
-  ratings: Record<string, UsageRating>
+  ratings: Record<string, UsageRating>,
+  todayIsoDate?: string
 ): RoiSummary => {
   const active = subscriptions.filter((s) => s.isActive);
 
@@ -727,7 +735,7 @@ export const buildRoiData = (
   let ratedCount = 0;
 
   const items: RoiItem[] = active.map((sub) => {
-    const monthly = Math.round(monthlyEquivalent(sub));
+    const monthly = Math.round(monthlyEquivalent(sub, todayIsoDate));
     const rating = ratings[sub.id] ?? null;
     const verdict = rating !== null ? getRoiVerdict(rating) : null;
 
